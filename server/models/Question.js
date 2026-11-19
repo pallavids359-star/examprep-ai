@@ -83,6 +83,14 @@ const questionSchema = new mongoose.Schema(
             default: "draft",
         },
 
+        // Set only for questions copied from a Supabase database (see utils/supabaseSync.js).
+        // source = the database's name, id = the row's id in that database.
+        external: {
+            source: { type: String },
+            id: { type: String },
+            syncedAt: { type: Date },
+        },
+
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         version: { type: Number, default: 1 },
@@ -94,6 +102,11 @@ const questionSchema = new mongoose.Schema(
 questionSchema.index({ examId: 1, chapterId: 1, topicId: 1, difficulty: 1, status: 1 });
 // Previous-year paper lookups
 questionSchema.index({ "source.kind": 1, "source.year": 1, examId: 1 });
+// One GenPrep question per Supabase row
+questionSchema.index(
+    { "external.source": 1, "external.id": 1 },
+    { unique: true, partialFilterExpression: { "external.id": { $exists: true } } }
+);
 // Admin search box
 questionSchema.index({ text: "text", tags: "text" });
 

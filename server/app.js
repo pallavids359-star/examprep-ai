@@ -13,6 +13,7 @@ const attemptRoutes = require("./routes/attemptRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
 const testRoutes = require("./routes/testRoutes");
+const syncRoutes = require("./routes/syncRoutes");
 
 const {
     securityHeaders,
@@ -65,6 +66,10 @@ app.use("/api", async (req, res, next) => {
         res.status(503).json({ message: "Could not connect to the database. Please try again." });
     }
 });
+
+// Supabase webhooks and the Vercel cron. Mounted before the general rate limit:
+// a bulk insert in Supabase fires one webhook per row, all from the same address.
+app.use("/api/sync", syncRoutes);
 
 // Authentication rate limits
 const authLimit = rateLimit({

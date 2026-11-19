@@ -53,4 +53,9 @@ router.get("/stats/questions", questionBreakdown);
 const { syllabusFilters } = require("../controllers/questionStatsController");
 router.get("/syllabus-filters", syllabusFilters);
 
+// Supabase question databases
+const { runSync, syncStatus } = require("../controllers/syncController");
+router.get("/sync/status", syncStatus);
+router.post("/sync/supabase", runSync);
+
 module.exports = router;

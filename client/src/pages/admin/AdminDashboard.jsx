@@ -1,4 +1,5 @@
 import QuestionBreakdown from "../../components/QuestionBreakdown";
+import SupabaseSyncPanel from "../../components/SupabaseSyncPanel";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
                 ))}
             </div>
         <QuestionBreakdown />
+        <SupabaseSyncPanel />
       </AdminLayout>
     );
 }
