@@ -17,35 +17,46 @@ Supabase DB 1..8 ──(webhook, instant)──▶ /api/sync/supabase/webhook �
   attempts still point to it. **Full resync** also archives questions whose rows
   are gone from Supabase.
 
-## 1. What each Supabase table needs
+## 1. How rows become GenPrep questions
 
-The sync connects to each database with its Postgres connection string
-(or, alternatively, the Supabase REST API) and only reads from it.
+The sync reads `public.questions` from each database (the question website's table:
+`subject, klass, chapter, topic, exams, q_type, question, opt_a..opt_d, correct_option,
+num_answer, solution_text, review_status, acceptance_status ...`). It uses the same rules
+as the bulk upload's Supabase CSV import:
 
-The table uses the same fields as GenPrep's `Question` model. Column names can be
-camelCase or snake_case.
+- **Syllabus by name:** each exam in `exams` (e.g. `["JEE","NEET"]`) gets its own copy,
+  placed under the GenPrep Subject → Chapter → Topic with the same names (case, `&`/`and`
+  and punctuation ignored; Maths = Mathematics). A missing **topic** under an existing
+  chapter is created; a missing chapter or exam is reported and the row is skipped.
+- **Question types:** assertion–reason and match-the-column are built like the bulk upload;
+  numerical uses `num_answer`; `correct_option` `"1"`–`"4"` means A–D.
+- **Difficulty** comes from `[QBP_DIFFICULTY:…]` in `solution_text`; the tag is removed.
+- **Review status:** `pending` → **draft** (hidden from students, like `seed/draftPending.js`),
+  `rejected` → archived, otherwise published. Set `SUPABASE_PENDING_STATUS=published` to show
+  pending questions too.
+- **Already uploaded questions** (same exam, same text) are linked to their row instead of
+  being added again, so bookmarks and attempts stay attached.
 
-| Column | Required | Notes |
-| --- | --- | --- |
-| `id` | yes | primary key (bigint or uuid) |
-| `topic_id` / `topicId` | yes | the GenPrep **Topic `_id`** (24-character Mongo id). Exam, subject and chapter are filled in from it. |
-| `text` | yes | question text |
-| `type` | no | `mcq_single` (default), `mcq_multi`, `numerical` |
-| `options` | MCQ | jsonb `[{"id":"A","text":"..."}, ...]`, or `["a","b","c","d"]`, or columns `option_a` … `option_d` |
-| `correct_option_ids` / `correctOptionIds` | MCQ | `["B"]`, `"B"` or `"A,C"` (`correct_answer` / `answer` also work) |
-| `numerical_answer` | numerical | `{"value": 9.8, "tolerance": 0.1}` or just a number |
-| `explanation` | no | text, or `{"text","images","videoUrl"}` |
-| `difficulty` | no | `easy`, `medium` (default), `hard` |
-| `images`, `tags`, `marks`, `source` | no | same shapes as in MongoDB |
-| `status` | no | `published`, `draft`, `archived`. Without it, rows are `published` (change with `SUPABASE_DEFAULT_STATUS=draft`) |
-| `updated_at` | recommended | added by `supabase/setup.sql` |
+Options: `SUPABASE_CREATE_TOPICS=false` to skip rows with unknown topics instead of creating
+them; `SUPABASE_CREATE_CHAPTERS=true` to also create missing chapters (uses `klass`).
 
-Rows that can't be imported (unknown topic, 3 options, no correct answer…) are
-skipped and listed with the reason on the admin dashboard.
+Tables that instead have a GenPrep `topic_id` column are also supported.
 
-## 2. Prepare each Supabase project
+**First import from your computer** (fastest, no Vercel time limit):
 
-In **each** of the 8 projects: SQL Editor → paste `supabase/setup.sql` → Run.
+```
+cd server
+node seed/syncSupabase.js
+```
+
+It prints how many questions were saved per database and the most common reasons rows were
+skipped. Your `server/.env` `MONGO_URI` must point to the same database as the live site.
+
+## 2. Prepare each Supabase project (optional)
+
+Nothing is required: the sync only reads. Your tables already have `updated_at`, so only
+changed rows are read on each sync. `supabase/setup.sql` (keeps `updated_at` current on
+edits) and webhooks (instant updates) are optional and do change the Supabase database.
 
 ## 3. Add environment variables on Vercel
 

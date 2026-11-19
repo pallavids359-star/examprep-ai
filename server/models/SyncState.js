@@ -14,6 +14,8 @@ const syncStateSchema = new mongoose.Schema(
         mode: { type: String, enum: ["updated", "id"], default: "updated" },
         caughtUp: { type: Boolean, default: false },
         pendingReconcile: { type: Boolean, default: false },
+        // Set by a full resync; cleared when this database is actually restarted
+        fullRequested: { type: Boolean, default: false },
 
         lastRunAt: { type: Date },
         lastSuccessAt: { type: Date },

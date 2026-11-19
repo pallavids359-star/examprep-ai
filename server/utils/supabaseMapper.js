@@ -2,6 +2,8 @@
 // and builds the PostgREST query strings used by the sync.
 // No database or network code here, so it is easy to test.
 
+const { isQbpRow, convertQbpRow } = require("./qbpFormat");
+
 const OPTION_IDS = ["A", "B", "C", "D"];
 const DIFFICULTIES = ["easy", "medium", "hard"];
 const STATUSES = ["draft", "published", "archived"];
@@ -187,9 +189,12 @@ const toStatus = (row, defaultStatus) => {
     return defaultStatus;
 };
 
-// Returns { ok: true, id, topicId, data } or { ok: false, id, reason }
-const mapRow = (row, { defaultStatus = "published" } = {}) => {
+// Returns { ok: true, id, topicId, data }            (row has a GenPrep topic_id)
+//      or { ok: true, id, exams, names, data }       (question website rows: subject/chapter/topic names)
+//      or { ok: false, id, reason }
+const mapRow = (row, { defaultStatus = "published", pendingStatus = "draft" } = {}) => {
     if (!row || typeof row !== "object") return { ok: false, id: null, reason: "Empty row" };
+    if (isQbpRow(row)) return convertQbpRow(row, { defaultStatus, pendingStatus });
 
     const id = row.id;
     if (id === undefined || id === null || id === "") return { ok: false, id: null, reason: "Row has no id column" };

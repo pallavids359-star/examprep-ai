@@ -18,6 +18,9 @@
 //   SUPABASE_N_UPDATED_COLUMN  column changed on every edit      (default updated_at; "none" if absent)
 //
 // SUPABASE_DEFAULT_STATUS  status for rows without a status column (default published)
+// SUPABASE_PENDING_STATUS  status for rows whose review_status/acceptance_status is pending (default draft)
+// SUPABASE_CREATE_TOPICS   add missing topics under existing chapters (default true)
+// SUPABASE_CREATE_CHAPTERS add missing chapters under existing subjects (default false)
 
 const MAX_SOURCES = 20;
 const NAME_RE = /^[A-Za-z0-9_]+$/;
@@ -119,7 +122,11 @@ const getSources = () => {
     const status = env("SUPABASE_DEFAULT_STATUS").toLowerCase() || "published";
     const defaultStatus = ["draft", "published"].includes(status) ? status : "published";
 
-    return { sources, problems, defaultStatus };
+    // Rows still "pending" review on the question website (default: draft, hidden from students)
+    const pending = env("SUPABASE_PENDING_STATUS").toLowerCase() || "draft";
+    const pendingStatus = ["draft", "published"].includes(pending) ? pending : "draft";
+
+    return { sources, problems, defaultStatus, pendingStatus };
 };
 
 module.exports = { getSources, describeDbUrl };

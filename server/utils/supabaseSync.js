@@ -15,11 +15,12 @@ const SyncState = require("../models/SyncState");
 const { validateQuestion } = require("../controllers/questionController");
 const { getSources } = require("../config/supabaseSources");
 const { mapRow, buildPageQuery, buildIdQuery } = require("./supabaseMapper");
+const { normText } = require("./qbpFormat");
+const { makeResolver } = require("./syllabusResolver");
 const { makePgReader } = require("./pgReader");
 
 const PAGE_SIZE = 500;
 const ID_PAGE_SIZE = 1000;
-const PARALLEL = 20; // rows written to MongoDB at the same time
 const MAX_RECENT_SKIPPED = 20;
 
 // ---------- Supabase REST ----------
@@ -85,85 +86,207 @@ const readerFor = (source) => (source.kind === "postgres" ? makePgReader(source)
 const isMissingColumn = (err) => err.code === "42703" || /column .* does not exist/i.test(err.message);
 
 // ---------- Writing to MongoDB ----------
+//
+// Each Supabase row becomes one GenPrep question per exam it lists (exams = ["JEE","NEET"]
+// gives two questions). The copy's key is external.id = "<row id>|<exam code>" and
+// external.rowId = "<row id>", so deleting the row archives every copy.
+//
+// A question that was already bulk-uploaded into GenPrep (same exam, same text, not yet
+// linked) is linked to its row instead of being added again, so bookmarks and past
+// attempts on it keep working.
 
-// Finds the topic so exam, subject and chapter can be filled in, like createQuestion does
-const makeTopicLookup = () => {
-    const cache = new Map();
-    return async (topicId) => {
-        if (!cache.has(topicId)) {
-            cache.set(topicId, Topic.findById(topicId).select("examId subjectId chapterId").lean());
+// single = true for one webhook row: look up the exact text instead of loading every unlinked question
+const makeContext = async ({ defaultStatus, pendingStatus, single = false }) => {
+    const resolver = await makeResolver();
+
+    const topicCache = new Map();
+    const findTopic = (topicId) => {
+        if (!topicCache.has(topicId)) topicCache.set(topicId, Topic.findById(topicId).select("examId subjectId chapterId").lean());
+        return topicCache.get(topicId);
+    };
+
+    // examId -> Map(normalised text -> [{ id, topicId }]) of questions not linked to any row yet
+    const unlinked = new Map();
+    const claimed = new Set();
+    const getUnlinked = (examId) => {
+        const k = String(examId);
+        if (!unlinked.has(k)) {
+            unlinked.set(
+                k,
+                Question.find({ examId, "external.id": { $exists: false } })
+                    .select("text topicId")
+                    .lean()
+                    .then((docs) => {
+                        const map = new Map();
+                        for (const d of docs) {
+                            const t = normText(d.text);
+                            if (!map.has(t)) map.set(t, []);
+                            map.get(t).push({ id: String(d._id), topicId: String(d.topicId) });
+                        }
+                        return map;
+                    })
+            );
         }
-        return cache.get(topicId);
+        return unlinked.get(k);
     };
-};
-
-// Returns { result: "upserted" | "archived" | "skipped", id, reason? }
-const applyRow = async (source, row, { defaultStatus, findTopic }) => {
-    const mapped = mapRow(row, { defaultStatus });
-    if (!mapped.ok) return { result: "skipped", id: mapped.id, reason: mapped.reason };
-
-    const key = { "external.source": source.name, "external.id": mapped.id };
-
-    // Deleted/archived rows: just hide the existing copy (old attempts still point to it)
-    if (mapped.data.status === "archived") {
-        const r = await Question.updateOne(key, { $set: { status: "archived", "external.syncedAt": new Date() } });
-        return { result: r.matchedCount ? "archived" : "skipped", id: mapped.id, reason: r.matchedCount ? undefined : "Archived row that was never imported" };
-    }
-
-    const topic = await findTopic(mapped.topicId);
-    if (!topic) return { result: "skipped", id: mapped.id, reason: `topic_id ${mapped.topicId} does not exist in GenPrep` };
-
-    const data = {
-        ...mapped.data,
-        topicId: topic._id,
-        chapterId: topic.chapterId,
-        subjectId: topic.subjectId,
-        examId: topic.examId,
+    const adopt = async (data) => {
+        if (single) {
+            const doc = await Question.findOne({ examId: data.examId, text: data.text, "external.id": { $exists: false } }).select("_id").lean();
+            return doc ? String(doc._id) : null;
+        }
+        const list = (await getUnlinked(data.examId)).get(normText(data.text));
+        if (!list) return null;
+        const free = list.filter((c) => !claimed.has(c.id));
+        const pick = free.find((c) => c.topicId === String(data.topicId)) || free[0];
+        if (!pick) return null;
+        claimed.add(pick.id);
+        return pick.id;
     };
 
-    const error = validateQuestion(data);
-    if (error) return { result: "skipped", id: mapped.id, reason: error };
-
-    await Question.updateOne(
-        key,
-        {
-            $set: { ...data, "external.source": source.name, "external.id": mapped.id, "external.syncedAt": new Date() },
-            $inc: { version: 1 },
-        },
-        { upsert: true, runValidators: true }
-    );
-    return { result: "upserted", id: mapped.id };
+    return { defaultStatus, pendingStatus, resolver, findTopic, adopt };
 };
 
-const archiveRow = async (source, id) => {
-    const r = await Question.updateOne(
-        { "external.source": source.name, "external.id": String(id) },
+const archiveRowIds = async (source, rowIds) => {
+    if (!rowIds.length) return 0;
+    const ids = rowIds.map(String);
+    const r = await Question.updateMany(
+        { "external.source": source.name, $or: [{ "external.rowId": { $in: ids } }, { "external.id": { $in: ids } }], status: { $ne: "archived" } },
         { $set: { status: "archived", "external.syncedAt": new Date() } }
     );
-    return { result: r.matchedCount ? "archived" : "skipped", id: String(id) };
+    return r.modifiedCount;
 };
 
-const tally = () => ({ upserted: 0, skipped: 0, archived: 0, skippedRows: [] });
+// Saves a list of rows. Returns one outcome per row: { result, id, reason? }
+const applyBatch = async (source, rows, ctx) => {
+    const outcomes = new Map(); // row id -> { saved, reasons }
+    const order = [];
+    const note = (id, reason) => {
+        if (!outcomes.has(id)) {
+            outcomes.set(id, { saved: 0, reasons: [], archived: false });
+            order.push(id);
+        }
+        if (reason) outcomes.get(id).reasons.push(reason);
+        return outcomes.get(id);
+    };
+
+    const targets = [];
+    const toArchive = [];
+    const multiExamRows = new Set();
+
+    for (const row of rows) {
+        const m = mapRow(row, { defaultStatus: ctx.defaultStatus, pendingStatus: ctx.pendingStatus });
+        if (!m.ok) {
+            note(m.id || "?", m.reason);
+            continue;
+        }
+        note(m.id);
+
+        if (m.data.status === "archived") {
+            toArchive.push(m.id);
+            outcomes.get(m.id).archived = true;
+            continue;
+        }
+
+        const found = [];
+        if (m.exams) {
+            multiExamRows.add(m.id);
+            for (const code of m.exams) {
+                const r = await ctx.resolver.resolve(code, m.names);
+                if (r.error) note(m.id, r.error);
+                else found.push({ key: `${m.id}|${code}`, topic: r.topic });
+            }
+        } else {
+            const topic = await ctx.findTopic(m.topicId);
+            if (!topic) note(m.id, `topic_id ${m.topicId} does not exist in GenPrep`);
+            else found.push({ key: m.id, topic });
+        }
+
+        for (const f of found) {
+            const data = { ...m.data, topicId: f.topic._id, chapterId: f.topic.chapterId, subjectId: f.topic.subjectId, examId: f.topic.examId };
+            const error = validateQuestion(data);
+            if (error) note(m.id, error);
+            else targets.push({ rowId: m.id, key: f.key, data });
+        }
+    }
+
+    // Write everything in one go
+    if (targets.length) {
+        const keys = targets.map((t) => t.key);
+        const existing = await Question.find({ "external.source": source.name, "external.id": { $in: keys } })
+            .select("external.id")
+            .lean();
+        const have = new Set(existing.map((d) => d.external.id));
+        const now = new Date();
+
+        const ops = [];
+        for (const t of targets) {
+            const update = {
+                $set: { ...t.data, "external.source": source.name, "external.id": t.key, "external.rowId": t.rowId, "external.syncedAt": now },
+                $inc: { version: 1 },
+            };
+            if (have.has(t.key)) {
+                ops.push({ updateOne: { filter: { "external.source": source.name, "external.id": t.key }, update } });
+                continue;
+            }
+            const adoptedId = await ctx.adopt(t.data);
+            if (adoptedId) ops.push({ updateOne: { filter: { _id: adoptedId }, update } });
+            else ops.push({ updateOne: { filter: { "external.source": source.name, "external.id": t.key }, update, upsert: true } });
+        }
+
+        const failed = new Set();
+        try {
+            await Question.bulkWrite(ops, { ordered: false });
+        } catch (err) {
+            if (!err.writeErrors) throw err;
+            for (const we of err.writeErrors) {
+                const t = targets[we.index];
+                failed.add(we.index);
+                note(t.rowId, we.code === 11000 ? "Saved at the same time by another sync; will retry next sync" : `Save failed: ${we.errmsg || we.message}`);
+            }
+        }
+        targets.forEach((t, i) => {
+            if (!failed.has(i)) outcomes.get(t.rowId).saved += 1;
+        });
+
+        // A row that no longer lists an exam: hide the copy for that exam
+        if (multiExamRows.size) {
+            await Question.updateMany(
+                {
+                    "external.source": source.name,
+                    "external.rowId": { $in: [...multiExamRows] },
+                    "external.id": { $nin: keys },
+                    status: { $ne: "archived" },
+                },
+                { $set: { status: "archived", "external.syncedAt": now } }
+            );
+        }
+    }
+
+    const archivedCount = await archiveRowIds(source, toArchive);
+
+    return order.map((id) => {
+        const o = outcomes.get(id);
+        if (o.archived) return { result: archivedCount ? "archived" : "skipped", id, reason: archivedCount ? undefined : "Rejected/deleted row that was never imported" };
+        if (o.saved > 0) return { result: "upserted", id, reason: o.reasons.length ? o.reasons.join("; ") : undefined };
+        return { result: "skipped", id, reason: o.reasons.join("; ") || "Not imported" };
+    });
+};
+
+const tally = () => ({ upserted: 0, skipped: 0, archived: 0, skippedRows: [], reasons: new Map() });
 
 const record = (counts, outcome) => {
     counts[outcome.result] += 1;
-    if (outcome.result === "skipped" && outcome.reason) {
+    if (outcome.reason && (outcome.result === "skipped" || outcome.result === "upserted")) {
         counts.skippedRows.push({ id: outcome.id || "?", reason: outcome.reason });
+        for (const r of outcome.reason.split("; ")) counts.reasons.set(r, (counts.reasons.get(r) || 0) + 1);
     }
 };
 
+const PAGE_CHUNK = 250; // rows per bulk write
+
 const applyRows = async (source, rows, ctx, counts) => {
-    for (let i = 0; i < rows.length; i += PARALLEL) {
-        const chunk = rows.slice(i, i + PARALLEL);
-        const outcomes = await Promise.all(
-            chunk.map((row) =>
-                applyRow(source, row, ctx).catch((err) => ({
-                    result: "skipped",
-                    id: row && row.id !== undefined ? String(row.id) : "?",
-                    reason: err.code === 11000 ? "Duplicate row" : `Save failed: ${err.message}`,
-                }))
-            )
-        );
+    for (let i = 0; i < rows.length; i += PAGE_CHUNK) {
+        const outcomes = await applyBatch(source, rows.slice(i, i + PAGE_CHUNK), ctx);
         outcomes.forEach((o) => record(counts, o));
     }
 };
@@ -197,7 +320,7 @@ const reconcileDeletes = async (source, reader, deadline) => {
     }
 
     const r = await Question.updateMany(
-        { ...filter, "external.id": { $nin: ids } },
+        { ...filter, "external.rowId": { $nin: ids } },
         { $set: { status: "archived", "external.syncedAt": new Date() } }
     );
     return { done: true, archived: r.modifiedCount };
@@ -205,13 +328,14 @@ const reconcileDeletes = async (source, reader, deadline) => {
 
 // ---------- One database ----------
 
-const syncSource = async (source, { full = false, deadline, defaultStatus }) => {
+const syncSource = async (source, { full = false, deadline, defaultStatus, pendingStatus }) => {
     let state = await SyncState.findOne({ source: source.name });
     if (!state) state = new SyncState({ source: source.name });
 
-    if (full) {
+    if (full || state.fullRequested) {
         state.cursor = { updatedAt: null, id: null };
         state.pendingReconcile = true;
+        state.fullRequested = false;
     }
     // Table changed from/to having an updated_at column
     const wantedMode = source.updatedColumn ? "updated" : "id";
@@ -223,7 +347,7 @@ const syncSource = async (source, { full = false, deadline, defaultStatus }) => 
     state.lastRunAt = new Date();
     state.warning = "";
     const counts = tally();
-    const ctx = { defaultStatus, findTopic: makeTopicLookup() };
+    const ctx = await makeContext({ defaultStatus, pendingStatus });
     const reader = readerFor(source);
     let reachedEnd = false;
 
@@ -309,6 +433,7 @@ const syncSource = async (source, { full = false, deadline, defaultStatus }) => 
         archived: counts.archived,
         error: state.lastError || undefined,
         warning: state.warning || undefined,
+        topReasons: [...counts.reasons.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([reason, count]) => ({ reason, count })),
     };
 };
 
@@ -317,7 +442,7 @@ const syncSource = async (source, { full = false, deadline, defaultStatus }) => 
 // budgetMs keeps us inside Vercel's 60 second function limit.
 // Anything unfinished continues on the next run from the saved cursor.
 const syncAll = async ({ full = false, only = null, budgetMs = 45000 } = {}) => {
-    const { sources, problems, defaultStatus } = getSources();
+    const { sources, problems, defaultStatus, pendingStatus } = getSources();
     const deadline = Date.now() + budgetMs;
 
     let list = only ? sources.filter((s) => s.name === only) : sources;
@@ -328,13 +453,18 @@ const syncAll = async ({ full = false, only = null, budgetMs = 45000 } = {}) => 
     const lastRun = new Map(states.map((s) => [s.source, s.lastRunAt ? new Date(s.lastRunAt).getTime() : 0]));
     list = [...list].sort((a, b) => (lastRun.get(a.name) || 0) - (lastRun.get(b.name) || 0));
 
+    // A full resync may need several calls; remember it for databases not reached in this one
+    if (full) {
+        await Promise.all(list.map((s) => SyncState.updateOne({ source: s.name }, { $set: { fullRequested: true } }, { upsert: true })));
+    }
+
     const results = [];
     for (const source of list) {
         if (Date.now() > deadline) {
             results.push({ source: source.name, caughtUp: false, pending: true });
             continue;
         }
-        results.push(await syncSource(source, { full, deadline, defaultStatus }));
+        results.push(await syncSource(source, { full, deadline, defaultStatus, pendingStatus }));
     }
 
     return { configured: sources.length, problems, results, done: results.every((r) => r.caughtUp) };
@@ -344,7 +474,7 @@ const syncAll = async ({ full = false, only = null, budgetMs = 45000 } = {}) => 
 
 // payload: { type: "INSERT" | "UPDATE" | "DELETE", table, schema, record, old_record }
 const handleWebhook = async (sourceName, payload) => {
-    const { sources, defaultStatus } = getSources();
+    const { sources, defaultStatus, pendingStatus } = getSources();
     const source = sources.find((s) => s.name === sourceName);
     if (!source) {
         const err = new Error(`No Supabase database named "${sourceName}"`);
@@ -364,15 +494,17 @@ const handleWebhook = async (sourceName, payload) => {
     if (payload.type === "DELETE") {
         const id = payload.old_record && payload.old_record.id;
         if (id === undefined || id === null) return { result: "ignored", reason: "DELETE without old_record.id" };
-        outcome = await archiveRow(source, id);
+        const n = await archiveRowIds(source, [id]);
+        outcome = { result: n ? "archived" : "skipped", id: String(id) };
     } else if (payload.type === "INSERT" || payload.type === "UPDATE") {
-        outcome = await applyRow(source, payload.record, { defaultStatus, findTopic: makeTopicLookup() });
+        const ctx = await makeContext({ defaultStatus, pendingStatus, single: true });
+        [outcome] = await applyBatch(source, [payload.record], ctx);
     } else {
         return { result: "ignored", reason: `Unknown event ${payload.type}` };
     }
 
     const update = { $set: { lastWebhookAt: new Date() }, $inc: { [`totals.${outcome.result}`]: 1 } };
-    if (outcome.result === "skipped" && outcome.reason) {
+    if (outcome.reason) {
         update.$push = { recentSkipped: { $each: [{ id: outcome.id || "?", reason: outcome.reason }], $position: 0, $slice: MAX_RECENT_SKIPPED } };
     }
     await SyncState.updateOne({ source: source.name }, update, { upsert: true });
@@ -425,4 +557,4 @@ const getStatus = async () => {
     };
 };
 
-module.exports = { syncAll, handleWebhook, getStatus, applyRow, SupabaseError };
+module.exports = { syncAll, handleWebhook, getStatus, applyBatch, SupabaseError };

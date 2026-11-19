@@ -88,6 +88,7 @@ const questionSchema = new mongoose.Schema(
         external: {
             source: { type: String },
             id: { type: String },
+            rowId: { type: String }, // the Supabase row id (one row can make one question per exam)
             syncedAt: { type: Date },
         },
 
@@ -107,6 +108,7 @@ questionSchema.index(
     { "external.source": 1, "external.id": 1 },
     { unique: true, partialFilterExpression: { "external.id": { $exists: true } } }
 );
+questionSchema.index({ "external.source": 1, "external.rowId": 1 }, { partialFilterExpression: { "external.rowId": { $exists: true } } });
 // Admin search box
 questionSchema.index({ text: "text", tags: "text" });
 
