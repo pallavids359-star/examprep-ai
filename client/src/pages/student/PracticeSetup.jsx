@@ -236,10 +236,10 @@ export default function PracticeSetup() {
                                             <p className="text-sm text-slate-500">No concepts in this chapter.</p>
                                         ) : (
                                             <>
-                                                <div className="flex gap-4">
+                                                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2.5"><span className="text-xs text-slate-500">Tick the concepts you want</span><div className="flex gap-4 shrink-0">
                                                     <button type="button" className={smallBtn} onClick={() => setChapterTopics(c._id, true)}>Select all</button>
                                                     <button type="button" className={smallBtn} onClick={() => setChapterTopics(c._id, false)}>Clear</button>
-                                                </div>
+                                                </div></div>
                                                 <div className="grid sm:grid-cols-2 gap-2 mt-2">
                                                     {list.map((t) => (
                                                         <Tick key={t._id} checked={topicIds.includes(t._id)} onChange={() => toggleTopic(t._id)} title={t.name} />

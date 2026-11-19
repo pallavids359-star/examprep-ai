@@ -3,6 +3,8 @@ const Test = require("../models/Test");
 const Question = require("../models/Question");
 const Exam = require("../models/Exam");
 const Subject = require("../models/Subject");
+const Chapter = require("../models/Chapter");
+const Topic = require("../models/Topic");
 const TestAttempt = require("../models/TestAttempt");
 const { finalizeAttempt, isExpired } = require("../utils/finalizeAttempt");
 
@@ -15,8 +17,10 @@ const userError = (message, status = 400) => Object.assign(new Error(message), {
 
 const sendError = (res, error, where) => {
     if (error.status) return res.status(error.status).json({ message: error.message });
-    console.error(`${where} error:`, error.message);
-    return res.status(500).json({ message: "Something went wrong on the server" });
+    console.error(`${where} error:`, error);
+    // On your own computer show the real reason; on the live site keep it generic
+    const detail = process.env.NODE_ENV !== "production" && !process.env.VERCEL ? ` (${error.name}: ${error.message})` : "";
+    return res.status(500).json({ message: "Something went wrong on the server" + detail });
 };
 
 // Fills one section: the exact questions listed, or random ones by count
@@ -239,11 +243,90 @@ const patternFor = (code, stream) => {
     return { key: code, label: code };
 };
 
-// STUDENT: POST /api/tests/generate   Body: { examId, stream?: "PCM" | "PCB" }
-// Makes a fresh full mock test from random published questions and starts it.
+// ---------- How each subject's questions are picked ----------
+
+// JEE Main: each subject has 20 MCQs followed by 5 numerical questions.
+// NEET and KCET are MCQ only.
+const NUMERICAL_PER_SUBJECT = { JEE: 5 };
+
+// Every subject gets a share of questions with a diagram: at least 10,
+// and more for long sections (about 2 in 9, e.g. 20 of NEET Biology's 90).
+const diagramTarget = (count) => Math.min(count, Math.max(10, Math.round((count * 2) / 9)));
+
+// A question "has a diagram" when it has an uploaded image, an option image,
+// or a {{IMG::https://...}} picture in its text or options.
+const IMG_IN_TEXT = /\{\{IMG::/;
+const HAS_DIAGRAM = {
+    $or: [{ "images.0": { $exists: true } }, { "options.image.url": { $exists: true } }, { text: IMG_IN_TEXT }, { "options.text": IMG_IN_TEXT }],
+};
+
+const shuffle = (list) => {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+};
+
+const sample = (match, size) =>
+    size > 0
+        ? Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: { _id: 1, subjectId: 1, chapterId: 1, topicId: 1 } }])
+        : Promise.resolve([]);
+
+// Picks one subject's questions: MCQs (with the diagram share mixed in), then numericals at the end.
+const pickSection = async (baseMatch, count, numericalCount) => {
+    const numericals = await sample({ ...baseMatch, type: "numerical" }, numericalCount);
+    const mcqCount = count - numericals.length; // too few numericals: fill with MCQs
+    const mcqMatch = { ...baseMatch, type: { $ne: "numerical" } };
+
+    const diagrams = await sample({ ...mcqMatch, $and: [HAS_DIAGRAM] }, Math.min(diagramTarget(count), mcqCount));
+    const taken = diagrams.map((q) => q._id);
+    const others = await sample({ ...mcqMatch, _id: { $nin: taken } }, mcqCount - diagrams.length);
+
+    return [...shuffle([...diagrams, ...others]), ...numericals];
+};
+
+// For a chapter-wise mock: which chapters (and ticked concepts) to use, grouped by subject.
+// A chapter with ticked concepts gives only those concepts; one with none gives all of it.
+const chosenSyllabus = async (exam, chapterIds, topicIds) => {
+    const asList = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+    const wanted = [...new Set(asList(chapterIds).map(String))].filter(isValidId).slice(0, 300);
+    if (wanted.length === 0) return null; // full syllabus
+
+    const chapters = await Chapter.find({ _id: { $in: wanted.map(toObjectId) }, examId: exam._id }).select("subjectId").lean();
+    if (chapters.length === 0) throw userError("Choose at least one chapter from this exam");
+
+    const chapterSet = new Set(chapters.map((c) => String(c._id)));
+    const validTopics = asList(topicIds).filter(isValidId).slice(0, 1000);
+    const topics = validTopics.length ? await Topic.find({ _id: { $in: validTopics.map(toObjectId) } }).select("chapterId").lean() : [];
+    const topicsByChapter = new Map();
+    for (const t of topics) {
+        const k = String(t.chapterId);
+        if (!chapterSet.has(k)) continue;
+        if (!topicsByChapter.has(k)) topicsByChapter.set(k, []);
+        topicsByChapter.get(k).push(t._id);
+    }
+
+    const bySubject = new Map(); // subjectId -> [$or parts]
+    for (const c of chapters) {
+        const k = String(c.subjectId);
+        if (!bySubject.has(k)) bySubject.set(k, []);
+        const ts = topicsByChapter.get(String(c._id));
+        bySubject.get(k).push(ts ? { chapterId: c._id, topicId: { $in: ts } } : { chapterId: c._id });
+    }
+    return bySubject;
+};
+
+// STUDENT: POST /api/tests/generate
+// Body: { examId, stream?: "PCM" | "PCB" | "PCMB",
+//         chapterIds?: [...], topicIds?: [...],   (leave out for the full syllabus)
+//         difficulty?: "any" | "easy" | "medium" | "hard" }
+// Makes a fresh mock test from random published questions and starts it.
 const generateMock = async (req, res) => {
     try {
-        const { examId, stream } = req.body;
+        const { examId, stream, chapterIds, topicIds } = req.body;
+        const difficulty = ["easy", "medium", "hard"].includes(req.body.difficulty) ? req.body.difficulty : "any";
         if (!isValidId(examId)) throw userError("Choose an exam");
         const exam = await Exam.findById(examId);
         if (!exam) throw userError("Exam not found", 404);
@@ -258,20 +341,32 @@ const generateMock = async (req, res) => {
             await finalizeAttempt(open, null, true);
         }
 
+        const custom = await chosenSyllabus(exam, chapterIds, topicIds);
+
         const subjects = await Subject.find({ examId: exam._id }).lean();
         const sections = [];
         for (const [name, count] of pattern.sections) {
             const subject = subjects.find((s) => subjectKey(s.name) === name);
             if (!subject) continue;
-            const picked = await Question.aggregate([
-                { $match: { examId: exam._id, subjectId: subject._id, status: "published" } },
-                { $sample: { size: count } },
-                { $project: { _id: 1, subjectId: 1, chapterId: 1, topicId: 1 } },
-            ]);
+            const match = { examId: exam._id, subjectId: subject._id, status: "published" };
+            if (custom) {
+                const parts = custom.get(String(subject._id));
+                if (!parts) continue; // no chapters chosen in this subject
+                match.$or = parts;
+            }
+            if (difficulty !== "any") match.difficulty = difficulty;
+            const picked = await pickSection(match, count, NUMERICAL_PER_SUBJECT[exam.code] || 0);
             if (picked.length) sections.push({ name: subject.name, subjectId: subject._id, picked });
         }
         const all = sections.flatMap((s) => s.picked);
-        if (all.length === 0) throw userError(`No questions are available for ${label} yet`);
+        if (all.length === 0) {
+            throw userError(custom || difficulty !== "any" ? "No questions found for these choices. Try more chapters or another difficulty." : `No questions are available for ${label} yet`);
+        }
+
+        // Full paper: the real time. Chapter-wise: time in proportion to the questions
+        const patternTotal = pattern.sections.reduce((a, [, n]) => a + n, 0);
+        const minutes = custom ? Math.max(5, Math.round((pattern.minutes * all.length) / patternTotal)) : pattern.minutes;
+        const level = difficulty === "any" ? "" : ` (${difficulty[0].toUpperCase()}${difficulty.slice(1)})`;
 
         const markingScheme = {
             correct: exam.markingScheme.correct,
@@ -280,11 +375,11 @@ const generateMock = async (req, res) => {
         };
         const number = (await Test.countDocuments({ ownerId: req.user._id, examId: exam._id })) + 1;
         const test = await Test.create({
-            title: `${label} Mock Test ${number}`,
+            title: `${label} ${custom ? "Chapter-wise " : ""}Mock Test ${number}${level}`,
             examId: exam._id,
-            type: "full_syllabus",
+            type: custom ? "custom" : "full_syllabus",
             sections: sections.map((s) => ({ name: s.name, subjectId: s.subjectId, questionIds: s.picked.map((q) => q._id) })),
-            durationMinutes: pattern.minutes,
+            durationMinutes: minutes,
             markingScheme,
             totalQuestions: all.length,
             totalMarks: all.length * markingScheme.correct,
@@ -302,11 +397,11 @@ const generateMock = async (req, res) => {
             testId: test._id,
             markingScheme,
             startedAt: now,
-            expiresAt: new Date(now.getTime() + pattern.minutes * 60 * 1000),
+            expiresAt: new Date(now.getTime() + minutes * 60 * 1000),
             answers: all.map((q) => ({ questionId: q._id, subjectId: q.subjectId, chapterId: q.chapterId, topicId: q.topicId })),
         });
 
-        res.status(201).json({ attemptId: attempt._id, resumed: false, title: test.title, totalQuestions: all.length });
+        res.status(201).json({ attemptId: attempt._id, resumed: false, title: test.title, totalQuestions: all.length, minutes });
     } catch (error) {
         sendError(res, error, "generateMock");
     }

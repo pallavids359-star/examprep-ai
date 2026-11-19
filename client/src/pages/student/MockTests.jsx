@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui";
 import api, { getErrorMessage } from "../../api/axios";
+import MockSetup from "../../components/MockSetup";
 
 // The real paper pattern (the server uses the same numbers)
 const PATTERNS = {
@@ -34,6 +35,8 @@ export default function MockTests() {
     const [exams, setExams] = useState([]);
     const [mine, setMine] = useState([]);
     const [stream, setStream] = useState("PCMB");
+    const [setupFor, setSetupFor] = useState(null); // exam whose setup (chapters, difficulty) is open
+    const [filters, setFilters] = useState(null); // choices from the setup
     const [chosen, setChosen] = useState(null); // exam whose instructions are open
     const [starting, setStarting] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -56,7 +59,13 @@ export default function MockTests() {
         setError("");
         goFullScreen();
         try {
-            const res = await api.post("/tests/generate", { examId: chosen._id, stream });
+            const res = await api.post("/tests/generate", {
+                examId: chosen._id,
+                stream,
+                chapterIds: filters?.chapterIds || [],
+                topicIds: filters?.topicIds || [],
+                difficulty: filters?.difficulty || "any",
+            });
             navigate(`/attempt/${res.data.attemptId}`);
         } catch (err) {
             if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
@@ -92,7 +101,24 @@ export default function MockTests() {
 
                 {loading && <p className="mt-6 text-slate-500">Loading...</p>}
 
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {setupFor && patternOf(setupFor.code, stream) && (
+                    <div className="mt-6 max-w-3xl">
+                        <MockSetup
+                            key={`${setupFor._id}-${stream}`}
+                            exam={setupFor}
+                            stream={stream}
+                            parts={patternOf(setupFor.code, stream).parts}
+                            minutes={patternOf(setupFor.code, stream).minutes}
+                            onBack={() => setSetupFor(null)}
+                            onContinue={(f) => {
+                                setFilters(f);
+                                setChosen(setupFor);
+                            }}
+                        />
+                    </div>
+                )}
+
+                <div className={`mt-6 grid gap-4 md:grid-cols-3 ${setupFor ? "hidden" : ""}`}>
                     {exams.map((e) => {
                         const p = patternOf(e.code, stream);
                         if (!p) return null;
@@ -132,7 +158,7 @@ export default function MockTests() {
                                     </span>
                                 </div>
                                 <button
-                                    onClick={() => setChosen(e)}
+                                    onClick={() => setSetupFor(e)}
                                     disabled={Boolean(inProgress)}
                                     className="mt-5 rounded-lg bg-indigo-600 text-white text-sm font-semibold py-2.5 hover:bg-indigo-700 disabled:opacity-50"
                                 >
@@ -153,9 +179,16 @@ export default function MockTests() {
                             {chosen.code === "KCET" ? ` (${stream})` : ""} mock test
                         </h2>
                         <ul className="mt-4 space-y-2 text-sm text-slate-700 list-disc pl-5">
-                            <li>
-                                {total(chosenPattern)} questions in {hours(chosenPattern.minutes)}. Questions come one by one.
-                            </li>
+                            {filters?.scope === "chapters" ? (
+                                <li>
+                                    Up to {filters.maxQuestions} questions from your chosen chapters, about {filters.minutes} minutes. Questions come one by one.
+                                </li>
+                            ) : (
+                                <li>
+                                    {total(chosenPattern)} questions in {hours(chosenPattern.minutes)}. Questions come one by one.
+                                </li>
+                            )}
+                            {filters?.difficulty && filters.difficulty !== "any" && <li>Only {filters.difficulty} questions.</li>}
                             <li>
                                 +{chosen.markingScheme?.correct ?? 4} for a correct answer, {chosen.markingScheme?.incorrect ?? -1} for a wrong one, 0 if left blank.
                             </li>
