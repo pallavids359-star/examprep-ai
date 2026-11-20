@@ -10,6 +10,7 @@ const {
 } = require("../controllers/questionController");
 const { createTest, listTestsAdmin, deleteTest } = require("../controllers/testController");
 const admin = require("../controllers/adminController");
+const attempts = require("../controllers/adminAttemptController");
 const uploadImage = require("../middleware/upload");
 const { uploadQuestionImage } = require("../controllers/uploadController");
 const { bulkImport, bulkSyllabus } = require("../controllers/bulkQuestionController");
@@ -47,6 +48,8 @@ router.delete("/tests/:id", deleteTest);
 router.get("/students", admin.listStudents);
 router.get("/students/:id", admin.getStudent);
 router.get("/students/:id/history", admin.getStudentHistory);
+router.get("/students/:id/attempts", attempts.listStudentAttempts);
+router.get("/attempts/:id", attempts.getAttemptDetail);
 router.put("/students/:id/status", admin.setStudentStatus);
 
 const { questionBreakdown } = require("../controllers/questionStatsController");

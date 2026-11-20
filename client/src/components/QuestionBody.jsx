@@ -5,7 +5,7 @@ import MathText from "./MathText";
 // Used by the lecturer's picker, the head lecturer's review and the live test report.
 //   q: { type, text, images, options, correctOptionIds, numericalAnswer | correctNumericalValue, explanation }
 //   chosen: the student's options (report only); numericalValue: the student's number
-export default function QuestionBody({ q, chosen = null, numericalValue = null, solutionOpen = true, compact = false }) {
+export default function QuestionBody({ q, chosen = null, numericalValue = null, solutionOpen = true, compact = false, who = "Your" }) {
   const [open, setOpen] = useState(solutionOpen);
   const correct = q.correctOptionIds || [];
   const isNumerical = q.type === "numerical" || !(q.options || []).length;
@@ -34,7 +34,7 @@ export default function QuestionBody({ q, chosen = null, numericalValue = null, 
             <span
               className={`rounded-lg border px-3 py-2 ${numericalValue === null || numericalValue === undefined ? "border-slate-200 text-slate-500" : Number(numericalValue) === Number(answerValue) ? "border-green-300 bg-green-50 text-green-800" : "border-orange-300 bg-orange-50 text-orange-800"}`}
             >
-              Your answer: <b>{numericalValue ?? "not answered"}</b>
+              {who} answer: <b>{numericalValue ?? "not answered"}</b>
             </span>
           )}
         </div>
@@ -57,7 +57,7 @@ export default function QuestionBody({ q, chosen = null, numericalValue = null, 
                 </div>
                 {(isRight || isMine) && (
                   <span className="shrink-0 text-xs font-semibold">
-                    {isRight && isMine ? "Your answer ✓" : isRight ? "Correct ✓" : "Your answer ✗"}
+                    {isRight && isMine ? `${who} answer ✓` : isRight ? "Correct ✓" : `${who} answer ✗`}
                   </span>
                 )}
               </li>

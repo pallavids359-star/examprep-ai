@@ -180,7 +180,7 @@ export default function LiveTests() {
                 )}
                 {t.status !== "draft" && (
                   <Link to={`/admin/live-tests/${t._id}/results`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300">
-                    Results
+                    🏆 Leaderboard
                   </Link>
                 )}
               </div>

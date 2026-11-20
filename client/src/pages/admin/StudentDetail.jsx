@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { AnalyticsView } from "../student/Analytics";
+import StudentAttempts from "../../components/StudentAttempts";
 
 // Admin view of one student: details plus the same Analytics the student sees
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Never");
@@ -55,7 +56,10 @@ export default function StudentDetail() {
                         />
                     </div>
 
-                    <div className="mt-6">
+                    <StudentAttempts studentId={id} />
+
+                    <h2 className="mt-10 text-xl font-extrabold text-slate-900">Performance analytics</h2>
+                    <div className="mt-4">
                         <p className="text-sm font-semibold text-slate-700">Exam</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                             {info.exams.map((e) => (
