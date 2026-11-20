@@ -9,8 +9,50 @@ import { fmtUntil, preview } from "../../components/liveHelpers";
 
 // The lecturer picks questions for one section of a live test:
 // class -> chapters -> concepts -> questions grouped by concept, with answers and solutions.
-const pill = (on) =>
-  `rounded-lg border px-3 py-1.5 text-sm font-medium ${on ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-700 hover:border-slate-400"}`;
+
+const FLABEL = "mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500";
+
+// Small building blocks for the filter panel
+const Seg = ({ value, onChange, options }) => (
+  <div className="grid gap-1 rounded-xl bg-amber-50/70 p-1 ring-1 ring-amber-200/70" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+    {options.map(([v, l]) => (
+      <button
+        key={v}
+        type="button"
+        aria-pressed={value === v}
+        onClick={() => onChange(v)}
+        className={`rounded-lg px-1 py-1.5 text-xs font-semibold transition ${value === v ? "bg-slate-900 text-amber-200 shadow" : "text-slate-700 hover:bg-white"}`}
+      >
+        {l}
+      </button>
+    ))}
+  </div>
+);
+const Box = ({ on }) => (
+  <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border text-[10px] font-bold ${on ? "border-amber-600 bg-amber-500 text-white" : "border-slate-300 bg-white"}`}>
+    {on ? "✓" : ""}
+  </span>
+);
+const Toggle = ({ on, onClick, label }) => (
+  <button type="button" role="switch" aria-checked={on} onClick={onClick} className="flex items-center gap-2.5 text-left text-sm text-slate-700">
+    <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${on ? "bg-amber-500" : "bg-slate-300"}`}>
+      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+    </span>
+    {label}
+  </button>
+);
+const Fold = ({ title, badge, open, onToggle, children }) => (
+  <div className="border-b border-amber-100 last:border-b-0">
+    <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-amber-50/40">
+      <span className="text-sm font-bold text-slate-900">{title}</span>
+      <span className="flex items-center gap-2">
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold capitalize text-amber-800">{badge}</span>
+        <span className={`text-slate-400 transition ${open ? "rotate-180" : ""}`}>⌄</span>
+      </span>
+    </button>
+    {open && <div className="px-5 pb-4">{children}</div>}
+  </div>
+);
 
 const DIFFS = [
   ["any", "Any level"],
@@ -507,130 +549,150 @@ export default function PickQuestions() {
       {view === "add" && (
       <div className="mx-auto flex max-w-7xl flex-wrap items-start gap-6 px-4 py-6">
         {/* Filters */}
-        <aside className="w-full space-y-4 lg:w-72 lg:shrink-0" aria-label="Filters">
-          <section className="gp-card p-4">
-            <h2 className="text-sm font-semibold text-slate-900">1. Choose class</h2>
-            <div className="mt-2 flex gap-2">
-              {[
-                ["11", "11"],
-                ["12", "12"],
-                ["both", "Both"],
-              ].map(([v, l]) => (
-                <button key={v} type="button" className={`${pill(classLevel === v)} flex-1`} onClick={filtered(() => setClassLevel(v))}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="gp-card p-4">
-            <h2 className="text-sm font-semibold text-slate-900">2. Tick chapters</h2>
-            {classes.length === 0 && <p className="mt-2 text-sm text-slate-500">No chapters for this class.</p>}
-            {classes.map((cl) => {
-              const list = visibleChapters.filter((c) => c.classLevel === cl);
-              const allOn = list.every((c) => chapterIds.includes(c._id));
-              return (
-                <div key={cl} className="mt-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Class {cl}</p>
-                    <button type="button" className="text-xs font-semibold text-amber-800 hover:underline" onClick={() => setClassChapters(cl, !allOn)}>
-                      {allOn ? "Clear" : "Select all"}
-                    </button>
-                  </div>
-                  <div className="mt-1 max-h-64 space-y-1 overflow-y-auto pr-1">
-                    {list.map((c) => (
-                      <label key={c._id} className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 text-sm text-slate-800 hover:bg-slate-50">
-                        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={chapterIds.includes(c._id)} onChange={() => toggleChapter(c._id)} />
-                        <span>{c.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </section>
-
-          {chapterIds.length > 0 && !showConcepts && (
-            <button type="button" onClick={() => setShowConcepts(true)} className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-3 text-sm font-medium text-indigo-700 hover:border-indigo-400">
-              + Narrow down to concepts{topicIds.length ? ` (${topicIds.length} ticked)` : ""}
-            </button>
-          )}
-          {chapterIds.length > 0 && showConcepts && (
-            <section className="gp-card p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Concepts <span className="font-normal text-slate-500">(optional)</span>
-                </h2>
-                <button type="button" onClick={() => setShowConcepts(false)} className="text-xs font-semibold text-amber-800 hover:underline">
-                  Hide
-                </button>
+        <aside className="w-full lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto" aria-label="Filters">
+          <div className="gp-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50/50 px-5 py-3.5">
+              <div>
+                <p className="font-bold text-slate-900">Find questions</p>
+                <p className="text-xs text-slate-500">{chapterIds.length ? `${chapterIds.length} chapter${chapterIds.length === 1 ? "" : "s"} ticked` : "Tick chapters to start"}</p>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">Nothing ticked = every concept of the chosen chapters.</p>
-              <div className="mt-2 max-h-80 space-y-3 overflow-y-auto pr-1">
-                {chapterIds.map((cid) => {
-                  const ch = chapters.find((c) => c._id === cid);
-                  const ts = topicsByChapter[cid];
-                  return (
-                    <div key={cid}>
-                      <p className="text-xs font-semibold text-slate-600">{ch?.name}</p>
-                      {ts === "loading" || !ts ? (
-                        <p className="text-xs text-slate-400">Loading...</p>
-                      ) : (
-                        ts.map((t) => (
-                          <label key={t._id} className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-0.5 text-sm text-slate-800 hover:bg-slate-50">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 h-4 w-4 accent-indigo-600"
-                              checked={topicIds.includes(t._id)}
-                              onChange={filtered(() => setTopicIds((p) => (p.includes(t._id) ? p.filter((x) => x !== t._id) : [...p, t._id])))}
-                            />
-                            <span>{t.name}</span>
-                          </label>
-                        ))
-                      )}
+              {(chapterIds.length > 0 || type !== "all" || difficulty !== "any" || diagram) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPage(1);
+                    setChapterIds([]);
+                    setTopicIds([]);
+                    setType("all");
+                    setDifficulty("any");
+                    setDiagram(false);
+                  }}
+                  className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-white"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {/* Class */}
+            <div className="border-b border-amber-100 px-5 py-4">
+              <p className={FLABEL}>Class</p>
+              <Seg
+                value={classLevel}
+                onChange={filtered((v) => setClassLevel(v))}
+                options={[
+                  ["11", "Class 11"],
+                  ["12", "Class 12"],
+                  ["both", "Both"],
+                ]}
+              />
+            </div>
+
+            {/* Chapters */}
+            <div className="border-b border-amber-100 px-5 py-4">
+              <p className={FLABEL}>Chapters</p>
+              {classes.length === 0 && <p className="text-sm text-slate-500">No chapters for this class.</p>}
+              {classes.map((cl) => {
+                const list = visibleChapters.filter((c) => c.classLevel === cl);
+                const on = list.filter((c) => chapterIds.includes(c._id)).length;
+                const allOn = on === list.length;
+                return (
+                  <div key={cl} className="mb-3 last:mb-0">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-700">
+                        Class {cl} <span className="font-normal text-slate-400">· {on} of {list.length}</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setClassChapters(cl, !allOn)}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${allOn ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"}`}
+                      >
+                        {allOn ? "Clear" : "Select all"}
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+                    <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
+                      {list.map((c) => {
+                        const checked = chapterIds.includes(c._id);
+                        return (
+                          <button
+                            key={c._id}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={checked}
+                            onClick={() => toggleChapter(c._id)}
+                            className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${checked ? "bg-amber-50 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            <Box on={checked} />
+                            <span>{c.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-          {!moreFilters ? (
-            <button type="button" onClick={() => setMoreFilters(true)} className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-3 text-sm font-medium text-indigo-700 hover:border-indigo-400">
-              + More filters (type, level, diagrams)
-            </button>
-          ) : (
-          <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Show only</h2>
-              <button type="button" onClick={() => setMoreFilters(false)} className="text-xs font-semibold text-amber-800 hover:underline">
-                Hide
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {TYPES.map(([v, l]) => (
-                <button key={v} type="button" className={pill(type === v)} onClick={filtered(() => setType(v))}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {DIFFS.map(([v, l]) => (
-                <button key={v} type="button" className={pill(difficulty === v)} onClick={filtered(() => setDifficulty(v))}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-800">
-              <input type="checkbox" className="h-4 w-4 accent-indigo-600" checked={diagram} onChange={filtered(() => setDiagram((v) => !v))} />
-              With a diagram only
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-800">
-              <input type="checkbox" className="h-4 w-4 accent-indigo-600" checked={hideUsed} onChange={filtered(() => setHideUsed((v) => !v))} />
-              Hide questions used in other live tests
-            </label>
-          </section>
-          )}
+            {/* Concepts */}
+            {chapterIds.length > 0 && (
+              <Fold
+                title="Concepts"
+                badge={topicIds.length ? `${topicIds.length} ticked` : "All"}
+                open={showConcepts}
+                onToggle={() => setShowConcepts((v) => !v)}
+              >
+                <p className="mb-2 text-xs text-slate-500">Nothing ticked = every concept of the ticked chapters.</p>
+                <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+                  {chapterIds.map((cid) => {
+                    const ch = chapters.find((c) => c._id === cid);
+                    const ts = topicsByChapter[cid];
+                    return (
+                      <div key={cid}>
+                        <p className="mb-1 text-xs font-semibold text-slate-600">{ch?.name}</p>
+                        {ts === "loading" || !ts ? (
+                          <p className="text-xs text-slate-400">Loading...</p>
+                        ) : (
+                          ts.map((t) => {
+                            const checked = topicIds.includes(t._id);
+                            return (
+                              <button
+                                key={t._id}
+                                type="button"
+                                role="checkbox"
+                                aria-checked={checked}
+                                onClick={filtered(() => setTopicIds((p) => (p.includes(t._id) ? p.filter((x) => x !== t._id) : [...p, t._id])))}
+                                className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-1 text-left text-sm ${checked ? "bg-amber-50 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                              >
+                                <Box on={checked} />
+                                <span>{t.name}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Fold>
+            )}
+
+            {/* Type and level */}
+            <Fold
+              title="Type & level"
+              badge={[type !== "all" && (type === "mcq" ? "MCQ" : "Numerical"), difficulty !== "any" && difficulty, diagram && "Diagrams"].filter(Boolean).join(" · ") || "Any"}
+              open={moreFilters}
+              onToggle={() => setMoreFilters((v) => !v)}
+            >
+              <p className={FLABEL}>Type</p>
+              <Seg value={type} onChange={filtered((v) => setType(v))} options={TYPES} />
+              <p className={`${FLABEL} mt-3`}>Level</p>
+              <Seg value={difficulty} onChange={filtered((v) => setDifficulty(v))} options={DIFFS.map(([v, l]) => [v, v === "any" ? "Any" : l])} />
+              <div className="mt-3 space-y-2">
+                <Toggle on={diagram} onClick={filtered(() => setDiagram((v) => !v))} label="Only questions with a diagram" />
+                <Toggle on={hideUsed} onClick={filtered(() => setHideUsed((v) => !v))} label="Hide questions used in other live tests" />
+              </div>
+            </Fold>
+          </div>
         </aside>
 
         {/* Questions grouped by concept */}
@@ -664,29 +726,31 @@ export default function PickQuestions() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-slate-600">
-                  {results.total} questions{loadingResults ? " · loading..." : ""}
+                  <b className="font-display text-lg text-slate-900">{results.total}</b> questions found{loadingResults ? " · loading..." : ""}
                 </p>
-                <button type="button" onClick={() => setShowSolutions((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
-                  {showSolutions ? "Collapse all solutions" : "Open all solutions"}
-                </button>
+                <Toggle on={showSolutions} onClick={() => setShowSolutions((v) => !v)} label="Show answers & solutions" />
               </div>
               {groups.map((g) => {
                 const inTopic = picked.filter((q) => String(q.topicId) === String(g.topicId)).length;
                 return (
                   <section key={`${g.topicId}-${g.questions[0]._id}`} className="space-y-3">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2 pt-2">
-                      <h2 className="text-lg font-bold text-slate-900">
-                        {g.name} <span className="text-sm font-normal text-slate-500">· {g.chapter}</span>
-                      </h2>
-                      <span className="text-sm text-slate-500">
-                        {g.total} questions · {inTopic} picked
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-l-4 border-amber-400 pl-3 pt-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{g.chapter}</p>
+                        <h2 className="text-lg font-bold text-slate-900">{g.name}</h2>
+                      </div>
+                      <span className="flex gap-1.5 text-xs font-semibold">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-200">{g.total} questions</span>
+                        {inTopic > 0 && <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-800 ring-1 ring-green-200">{inTopic} in paper</span>}
                       </span>
                     </div>
                     {g.questions.map((q) => {
                       const isPicked = pickedIds.has(String(q._id));
                       return (
-                        <article key={q._id} className={`gp-card p-5 transition ${isPicked ? "ring-2 ring-amber-500" : ""}`}>
-                          <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
+                        <article key={q._id} className={`gp-card overflow-hidden transition ${isPicked ? "ring-2 ring-green-500" : ""}`}>
+                          <div className="p-5">
+                          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+                            {isPicked && <span className="rounded-full bg-green-600 px-2.5 py-0.5 font-semibold text-white">✓ In paper</span>}
                             <span className={`rounded-full px-2.5 py-0.5 font-medium ${q.type === "numerical" ? "bg-orange-50 text-orange-800" : "bg-blue-50 text-blue-800"}`}>
                               {q.type === "numerical" ? "Numerical" : q.type === "mcq_multi" ? "MCQ (multi)" : "MCQ"}
                             </span>
@@ -696,8 +760,9 @@ export default function PickQuestions() {
                             {q.source?.kind === "pyq" && <span className="rounded-full bg-amber-50 px-2.5 py-0.5 font-medium text-amber-800">PYQ {q.source.year || ""}</span>}
                           </div>
                           <QuestionBody key={`${q._id}-${showSolutions}`} q={q} solutionOpen={showSolutions} compact />
+                          </div>
                           {editable && (
-                            <div className="mt-4 flex justify-end">
+                            <div className={`flex items-center justify-end gap-3 border-t px-5 py-3 ${isPicked ? "border-green-100 bg-green-50/60" : "border-slate-100 bg-amber-50/30"}`}>
                               {swapFor && !isPicked ? (
                                 (q.type === "numerical") === (swapFor.type === "numerical") ? (
                                   <button type="button" onClick={() => finishManualSwap(q)} disabled={Boolean(busyId)} className="gp-gold-btn px-4 py-2 text-sm disabled:opacity-50">
@@ -707,11 +772,14 @@ export default function PickQuestions() {
                                   <span className="text-xs text-slate-500">{swapFor.type === "numerical" ? "Pick a numerical question" : "Pick an MCQ"} to swap</span>
                                 )
                               ) : isPicked ? (
-                                <button type="button" onClick={() => remove(q._id)} disabled={saving} className="rounded-xl border border-green-600 bg-green-50 px-4 py-2 text-sm font-semibold text-green-800 disabled:opacity-50">
-                                  ✓ Added · Remove
-                                </button>
+                                <>
+                                  <span className="text-sm font-semibold text-green-800">Added to the paper</span>
+                                  <button type="button" onClick={() => remove(q._id)} disabled={saving} className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+                                    Remove
+                                  </button>
+                                </>
                               ) : (
-                                <button type="button" onClick={() => add(q)} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                                <button type="button" onClick={() => add(q)} disabled={saving} className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-amber-200 shadow-sm hover:bg-black disabled:opacity-50">
                                   + Add to paper
                                 </button>
                               )}
@@ -732,7 +800,7 @@ export default function PickQuestions() {
                       setPage((p) => p - 1);
                       listTop.current?.scrollIntoView({ behavior: "smooth" });
                     }}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300 disabled:opacity-40"
                   >
                     ← Previous
                   </button>
@@ -746,7 +814,7 @@ export default function PickQuestions() {
                       setPage((p) => p + 1);
                       listTop.current?.scrollIntoView({ behavior: "smooth" });
                     }}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300 disabled:opacity-40"
                   >
                     Next →
                   </button>
