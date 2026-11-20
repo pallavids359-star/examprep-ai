@@ -4,6 +4,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import QuestionBody from "../../components/QuestionBody";
 import { toast } from "../../components/Toaster";
+import { askConfirm } from "../../components/ConfirmDialog";
 import { fmtUntil, preview } from "../../components/liveHelpers";
 import { Ring } from "../../components/premium";
 
@@ -48,13 +49,21 @@ export default function PickQuestions() {
   const [showConcepts, setShowConcepts] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
   const [testStatus, setTestStatus] = useState(null);
+  const [view, setView] = useState("add"); // "add" = browse the bank, "paper" = the questions picked so far
+  const [history, setHistory] = useState([]); // earlier versions of the paper, for Undo
+  const [swapFor, setSwapFor] = useState(null); // the picked question being replaced by hand
+  const [busyId, setBusyId] = useState(null);
   const listTop = useRef(null);
+  const remember = (list) => setHistory((h) => [...h.slice(-19), list]);
 
   const load = useCallback(() => {
     api
       .get(`/lecturer/live-tests/${id}/sections/${key}`)
       .then((res) => {
-        setInfo(res.data);
+        setInfo((prev) => {
+          if (!prev && res.data.questions.length) setView("paper");
+          return res.data;
+        });
         setPicked(res.data.questions);
         setTestStatus(res.data.test.status);
       })
@@ -136,17 +145,21 @@ export default function PickQuestions() {
   };
 
   // Save the whole list; the server puts numericals last and checks every rule
-  const save = async (next) => {
+  const save = async (next, { undo = true } = {}) => {
     const before = picked;
+    if (undo) remember(before);
     setPicked(next);
     setSaving(true);
     try {
       const res = await api.put(`/lecturer/live-tests/${id}/sections/${key}`, { questionIds: next.map((q) => q._id) });
       if (res.data.testStatus === "published" && testStatus !== "published") toast("Every subject is ready. The test opens by itself at its start time.");
       setTestStatus(res.data.testStatus);
+      return true;
     } catch (err) {
       setPicked(before);
+      if (undo) setHistory((h) => h.slice(0, -1));
       toast(getErrorMessage(err), "error");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -158,6 +171,89 @@ export default function PickQuestions() {
     save([...next.filter((x) => x.type !== "numerical"), ...next.filter((x) => x.type === "numerical")]);
   };
   const remove = (qid) => save(picked.filter((q) => String(q._id) !== String(qid)));
+  const undo = () => {
+    const prev = history[history.length - 1];
+    if (!prev) return;
+    setHistory((h) => h.slice(0, -1));
+    save(prev, { undo: false }).then((done) => done && toast("Undone"));
+  };
+  const clearAll = async () => {
+    if (!(await askConfirm(`Remove all ${picked.length} questions from the ${sec.name} paper? You can press Undo right after if you change your mind.`, { title: "Clear the paper?", confirmText: "Remove all", danger: true }))) return;
+    if (await save([])) toast("All questions removed. Press Undo to bring them back.");
+  };
+
+  // "Send to head lecturer": the lecturer is done; the test goes live once every subject is ready
+  const needsSend = sec?.picker === "lecturer";
+  const sentAt = sec?.submittedAt;
+  const sendToHead = async () => {
+    if (!(await askConfirm(`Send your ${sec.name} paper (${picked.length} questions) to the head lecturer? You can take it back to make changes until the test opens.`, { title: "Send to head lecturer?", confirmText: "Send", danger: false }))) return;
+    setSaving(true);
+    try {
+      const res = info.isAdmin && info.section.picker === "lecturer"
+        ? await api.post(`/admin/live-tests/${id}/sections/${key}/accept`)
+        : await api.post(`/lecturer/live-tests/${id}/sections/${key}/submit`);
+      setHistory([]);
+      toast(res.data.testStatus === "published" ? "Sent. Every subject is ready, so the test opens by itself at its start time." : `Sent to the head lecturer.${res.data.waitingFor?.length ? ` Still waiting for: ${res.data.waitingFor.join(", ")}.` : ""}`);
+      load();
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const takeBack = async () => {
+    setSaving(true);
+    try {
+      const res = info.isAdmin
+        ? await api.post(`/admin/live-tests/${id}/sections/${key}/reopen`, {})
+        : await api.post(`/lecturer/live-tests/${id}/sections/${key}/unsubmit`);
+      toast(res.data.testStatus === "draft" ? "Taken back. Make your changes, then send it again." : "Taken back");
+      load();
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Swap: GenPrep finds a similar one (same kind, same concept or chapter), or the lecturer chooses
+  const swap = async (q, newQuestionId) => {
+    setBusyId(String(q._id));
+    try {
+      const res = await api.post(`/lecturer/live-tests/${id}/sections/${key}/swap`, { questionId: q._id, newQuestionId });
+      remember(picked);
+      setPicked((list) => list.map((x) => (String(x._id) === String(q._id) ? res.data.question : x)));
+      setTestStatus(res.data.testStatus);
+      toast(`Question ${res.data.position + 1} swapped`);
+      return true;
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const startManualSwap = (q) => {
+    setSwapFor(q);
+    setView("add");
+    setPage(1);
+    setClassLevel("both");
+    setChapterIds(q.chapterId ? [String(q.chapterId)] : []);
+    setTopicIds([]);
+    setType(q.type === "numerical" ? "numerical" : "mcq");
+    setDifficulty("any");
+    setDiagram(false);
+    setMoreFilters(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const finishManualSwap = async (newQ) => {
+    const target = swapFor;
+    if (await swap(target, newQ._id)) {
+      setSwapFor(null);
+      setView("paper");
+      setTimeout(() => document.getElementById(`paper-${newQ._id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    }
+  };
   const move = (index, dir) => {
     const next = [...picked];
     const j = index + dir;
@@ -169,12 +265,15 @@ export default function PickQuestions() {
   // Let GenPrep pick the remaining questions (from the ticked chapters, if any)
   const autoFill = async () => {
     setSaving(true);
+    const before = picked;
     try {
       const res = await api.post(`/lecturer/live-tests/${id}/sections/${key}/autopick`, { chapterIds, classLevel });
       if (res.data.shortMcq || res.data.shortNumerical) {
         toast(`Added ${res.data.added}. These chapters ran out: still ${res.data.shortMcq} MCQ and ${res.data.shortNumerical} numerical needed. Tick more chapters and try again.`, "error");
-      } else toast(`Added ${res.data.added} questions`);
+      } else toast(`Added ${res.data.added} questions. Check them in "Your paper" — swap or remove any you don't like, or press Undo.`);
+      if (res.data.added) remember(before);
       load();
+      setView("paper");
     } catch (err) {
       toast(getErrorMessage(err), "error");
     } finally {
@@ -244,7 +343,22 @@ export default function PickQuestions() {
                 {saving && <span className="ml-2 text-xs text-amber-200/60">Saving...</span>}
               </p>
             </div>
-            {complete ? (
+            {needsSend && sentAt ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="rounded-xl bg-green-500/15 px-3 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
+                  Sent to head lecturer ✓ {testStatus === "published" ? `· opens ${fmtUntil(info.test.startsAt)}` : "· waiting for the other subjects"}
+                </span>
+                {info.canChange && (
+                  <button type="button" disabled={saving} onClick={takeBack} className="rounded-xl px-3 py-2 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10 disabled:opacity-50">
+                    {info.isAdmin ? "Send back to lecturer" : "Take back to edit"}
+                  </button>
+                )}
+              </span>
+            ) : needsSend && complete && editable ? (
+              <button type="button" disabled={saving} onClick={sendToHead} className="gp-gold-btn px-5 py-2.5 text-sm disabled:opacity-50">
+                {info.isAdmin ? "Mark as ready" : "Send to head lecturer →"}
+              </button>
+            ) : complete ? (
               <span className="rounded-xl bg-green-500/15 px-3 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
                 Done ✓ {testStatus === "published" ? `Opens ${fmtUntil(info.test.startsAt)}` : "Waiting for the other subjects"}
               </span>
@@ -263,13 +377,98 @@ export default function PickQuestions() {
             )}
           </div>
         </div>
-        {!editable && (
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 pb-3">
+          <div className="flex gap-1 rounded-xl bg-white/5 p-1 ring-1 ring-amber-200/15" role="tablist">
+            {[
+              ["add", "Add questions"],
+              ["paper", `Your paper · ${pickedCount}/${total}`],
+            ].map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => {
+                  setView(v);
+                  if (v === "paper") setSwapFor(null);
+                }}
+                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${view === v ? "bg-amber-200 text-slate-900" : "text-amber-100/80 hover:text-white"}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          {editable && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={undo}
+                disabled={!history.length || saving}
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10 disabled:opacity-40"
+                title="Bring back the paper as it was before your last change"
+              >
+                ↶ Undo
+              </button>
+              {picked.length > 0 && (
+                <button type="button" onClick={clearAll} disabled={saving} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-300 ring-1 ring-red-300/30 hover:bg-red-500/10 disabled:opacity-40">
+                  Remove all
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {!editable && !info.canChange && (
           <p className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-800">
             The test has opened, so its questions can't change now.
           </p>
         )}
+        {!editable && info.canChange && needsSend && sentAt && (
+          <p className="bg-green-50 px-4 py-2 text-center text-sm text-green-800">
+            You sent this paper to the head lecturer. To change anything, press <b>Take back to edit</b>.
+          </p>
+        )}
+        {editable && needsSend && !sentAt && sec.returnedAt && (
+          <p className="bg-orange-50 px-4 py-2 text-center text-sm text-orange-900">
+            The head lecturer sent this back for changes{sec.returnNote ? <>: <b>“{sec.returnNote}”</b></> : "."} Fix it, then press <b>Send to head lecturer</b> again.
+          </p>
+        )}
       </div>
 
+      {view === "paper" && (
+        <PaperView
+          sec={sec}
+          picked={picked}
+          editable={editable}
+          saving={saving}
+          busyId={busyId}
+          showSolutions={showSolutions}
+          setShowSolutions={setShowSolutions}
+          onMove={move}
+          onRemove={remove}
+          onSwap={(q) => swap(q)}
+          onChoose={startManualSwap}
+          onAdd={() => setView("add")}
+          sendCard={
+            needsSend ? (
+              <SendCard
+                sec={sec}
+                complete={complete}
+                sentAt={sentAt}
+                editable={editable}
+                canChange={info.canChange}
+                isAdmin={info.isAdmin}
+                saving={saving}
+                left={total - pickedCount}
+                onSend={sendToHead}
+                onTakeBack={takeBack}
+              />
+            ) : null
+          }
+        />
+      )}
+
+
+      {view === "add" && (
       <div className="mx-auto flex max-w-7xl flex-wrap items-start gap-6 px-4 py-6">
         {/* Filters */}
         <aside className="w-full space-y-4 lg:w-72 lg:shrink-0" aria-label="Filters">
@@ -400,6 +599,23 @@ export default function PickQuestions() {
 
         {/* Questions grouped by concept */}
         <main className="min-w-0 flex-[999_1_480px] space-y-4" ref={listTop}>
+          {swapFor && (
+            <div className="gp-hero flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="relative min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-200/80">Swapping question {picked.findIndex((q) => String(q._id) === String(swapFor._id)) + 1}</p>
+                <p className="mt-1 truncate text-sm text-white">{preview(swapFor.text, 110)}</p>
+                <p className="text-xs text-amber-100/70">Showing other {swapFor.type === "numerical" ? "numerical questions" : "MCQs"} from {swapFor.chapter}. Change the chapter on the left to look elsewhere, then press <b>Swap in</b>.</p>
+              </div>
+              <div className="relative flex gap-2">
+                <button type="button" disabled={busyId === String(swapFor._id)} onClick={() => swap(swapFor).then((okd) => okd && (setSwapFor(null), setView("paper")))} className="gp-gold-btn px-4 py-2 text-sm disabled:opacity-50">
+                  Let GenPrep choose
+                </button>
+                <button type="button" onClick={() => { setSwapFor(null); setView("paper"); }} className="rounded-xl px-4 py-2 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {chapterIds.length === 0 ? (
             <div className="gp-card p-10 text-center text-slate-500">
               Tick one or more chapters to see their questions. Or press <b>Auto-fill the rest</b> and GenPrep picks for you.
@@ -446,7 +662,15 @@ export default function PickQuestions() {
                           <QuestionBody key={`${q._id}-${showSolutions}`} q={q} solutionOpen={showSolutions} compact />
                           {editable && (
                             <div className="mt-4 flex justify-end">
-                              {isPicked ? (
+                              {swapFor && !isPicked ? (
+                                (q.type === "numerical") === (swapFor.type === "numerical") ? (
+                                  <button type="button" onClick={() => finishManualSwap(q)} disabled={Boolean(busyId)} className="gp-gold-btn px-4 py-2 text-sm disabled:opacity-50">
+                                    ⇄ Swap in for Q{picked.findIndex((x) => String(x._id) === String(swapFor._id)) + 1}
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-slate-500">{swapFor.type === "numerical" ? "Pick a numerical question" : "Pick an MCQ"} to swap</span>
+                                )
+                              ) : isPicked ? (
                                 <button type="button" onClick={() => remove(q._id)} disabled={saving} className="rounded-xl border border-green-600 bg-green-50 px-4 py-2 text-sm font-semibold text-green-800 disabled:opacity-50">
                                   ✓ Added · Remove
                                 </button>
@@ -496,55 +720,146 @@ export default function PickQuestions() {
           )}
         </main>
 
-        {/* The paper so far */}
-        <aside className="w-full rounded-2xl border border-slate-200 bg-white p-4 lg:sticky lg:top-28 lg:w-72 lg:shrink-0" aria-label="Paper so far">
-          <h2 className="font-semibold text-slate-900">{sec.name} paper so far</h2>
-          <p className="mt-0.5 text-xs text-slate-500">MCQs first, numericals last. Use the arrows to change the order.</p>
-          {picked.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">Nothing picked yet.</p>
-          ) : (
-            <ol className="mt-3 max-h-[60vh] space-y-1.5 overflow-y-auto pr-1 text-sm">
-              {picked.map((q, i) => (
-                <li key={q._id} className="flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
-                  <span className="w-6 shrink-0 text-right font-semibold text-slate-500">{i + 1}.</span>
-                  <span className="min-w-0 flex-1 text-slate-800">
-                    {preview(q.text, 60)}
-                    <span className="block text-xs text-slate-500">
-                      {q.topic}
-                      {q.type === "numerical" ? " · numerical" : ""}
-                    </span>
-                  </span>
-                  {editable && (
-                    <span className="flex shrink-0 gap-0.5">
-                      <button type="button" aria-label="Move up" onClick={() => move(i, -1)} className="rounded px-1 text-slate-500 hover:bg-slate-200">
-                        ↑
-                      </button>
-                      <button type="button" aria-label="Move down" onClick={() => move(i, 1)} className="rounded px-1 text-slate-500 hover:bg-slate-200">
-                        ↓
-                      </button>
-                      <button type="button" aria-label="Remove" onClick={() => remove(q._id)} className="rounded px-1 text-red-600 hover:bg-red-50">
-                        ×
-                      </button>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-          )}
-          {!complete && (
-            <p className="mt-3 rounded-lg bg-slate-50 p-2 text-sm text-slate-700">
-              Still needed: <b>{Math.max(0, sec.mcqCount - mcqPicked)} MCQ</b>
-              {sec.numericalCount ? (
-                <>
-                  {" "}
-                  and <b>{Math.max(0, sec.numericalCount - numPicked)} numerical</b>
-                </>
-              ) : null}
-            </p>
-          )}
-        </aside>
       </div>
-
+      )}
     </LecturerLayout>
+  );
+}
+
+// Every picked question in full, with answer and solution, and Move / Swap / Remove under each one
+function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setShowSolutions, onMove, onRemove, onSwap, onChoose, onAdd, sendCard }) {
+  const mcqs = picked.filter((q) => q.type !== "numerical");
+  const nums = picked.filter((q) => q.type === "numerical");
+  const groups = [
+    ["MCQs", mcqs, sec.mcqCount, 0],
+    ["Numerical questions", nums, sec.numericalCount, mcqs.length],
+  ].filter(([, , need]) => need > 0);
+
+  if (!picked.length) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10">
+        <div className="gp-card grid place-items-center px-6 py-14 text-center">
+          <h2 className="text-xl font-bold text-slate-900">Your {sec.name} paper is empty</h2>
+          <p className="mt-1 max-w-md text-sm text-slate-500">Add questions yourself or press Auto-fill. Everything you add shows up here, where you can swap or remove it.</p>
+          <button type="button" onClick={onAdd} className="gp-gold-btn mt-5 px-5 py-2.5 text-sm">
+            Add questions
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">
+          Read every question. Don't like one? <b>Swap</b> puts a similar question in the same place, <b>Choose</b> lets you pick the replacement, <b>Remove</b> takes it out.
+        </p>
+        <button type="button" onClick={() => setShowSolutions((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
+          {showSolutions ? "Hide solutions" : "Show solutions"}
+        </button>
+      </div>
+      {groups.map(([title, list, need, offset]) => (
+        <section key={title} className="space-y-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+            <span className={`text-sm font-semibold ${list.length === need ? "text-green-700" : "text-slate-500"}`}>
+              {list.length} of {need}
+              {list.length === need ? " ✓" : ""}
+            </span>
+          </div>
+          {list.length === 0 && <p className="gp-card p-5 text-sm text-slate-500">None yet.</p>}
+          {list.map((q, j) => {
+            const i = offset + j;
+            const busy = busyId === String(q._id);
+            return (
+              <article key={q._id} id={`paper-${q._id}`} className={`gp-card overflow-hidden transition ${busy ? "opacity-60" : ""}`}>
+                <div className="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-amber-50/50 px-5 py-2.5 text-xs">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-xs font-extrabold text-amber-200">{i + 1}</span>
+                  <span className="font-semibold text-slate-700">{q.chapter}</span>
+                  {q.topic && <span className="text-slate-500">· {q.topic}</span>}
+                  <span className="ml-auto flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-white px-2 py-0.5 font-medium capitalize text-slate-700 ring-1 ring-slate-200">{q.difficulty}</span>
+                    {q.classLevel && <span className="rounded-full bg-white px-2 py-0.5 text-slate-700 ring-1 ring-slate-200">Class {q.classLevel}</span>}
+                    {q.diagram && <span className="rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-800">Diagram</span>}
+                  </span>
+                </div>
+                <div className="p-5">
+                  <QuestionBody key={`${q._id}-${showSolutions}`} q={q} solutionOpen={showSolutions} compact />
+                </div>
+                {editable && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3">
+                    <button type="button" aria-label="Move up" disabled={saving || j === 0} onClick={() => onMove(i, -1)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:border-amber-300 disabled:opacity-30">
+                      ↑
+                    </button>
+                    <button type="button" aria-label="Move down" disabled={saving || j === list.length - 1} onClick={() => onMove(i, 1)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:border-amber-300 disabled:opacity-30">
+                      ↓
+                    </button>
+                    <span className="flex-1" />
+                    <button type="button" disabled={busy || saving} onClick={() => onSwap(q)} className="rounded-lg bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-amber-200 hover:bg-black disabled:opacity-50" title="Replace with a similar question from the same concept or chapter">
+                      {busy ? "Swapping..." : "⇄ Swap"}
+                    </button>
+                    <button type="button" disabled={busy || saving} onClick={() => onChoose(q)} className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:border-amber-400 disabled:opacity-50" title="Choose the replacement yourself">
+                      Choose replacement
+                    </button>
+                    <button type="button" disabled={busy || saving} onClick={() => onRemove(q._id)} className="rounded-lg border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ))}
+      {sendCard}
+    </div>
+  );
+}
+
+// Last step for a lecturer: send the finished paper to the head lecturer
+function SendCard({ sec, complete, sentAt, editable, canChange, isAdmin, saving, left, onSend, onTakeBack }) {
+  return (
+    <section className="gp-hero p-6">
+      <div className="relative flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0 max-w-xl">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">Last step</p>
+          {sentAt ? (
+            <>
+              <h2 className="mt-1 text-xl font-extrabold text-white">Sent to the head lecturer ✓</h2>
+              <p className="gp-muted mt-1 text-sm">
+                Sent {new Date(sentAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.{" "}
+                {canChange ? "Need a change? Take it back, fix it and send again before the test opens." : "The test has opened, so it is final."}
+              </p>
+            </>
+          ) : complete ? (
+            <>
+              <h2 className="mt-1 text-xl font-extrabold text-white">Happy with all {sec.mcqCount + sec.numericalCount} questions?</h2>
+              <p className="gp-muted mt-1 text-sm">Send your {sec.name} paper to the head lecturer. The test goes live once every subject is sent.</p>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-1 text-xl font-extrabold text-white">
+                {left} more question{left === 1 ? "" : "s"} to go
+              </h2>
+              <p className="gp-muted mt-1 text-sm">Once all {sec.mcqCount + sec.numericalCount} are picked, you can send the paper to the head lecturer.</p>
+            </>
+          )}
+        </div>
+        {sentAt ? (
+          canChange && (
+            <button type="button" disabled={saving} onClick={onTakeBack} className="rounded-xl px-5 py-3 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10 disabled:opacity-50">
+              {isAdmin ? "Send back to lecturer" : "Take back to edit"}
+            </button>
+          )
+        ) : (
+          editable && (
+            <button type="button" disabled={saving || !complete} onClick={onSend} className="gp-gold-btn px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-40">
+              {isAdmin ? "Mark as ready" : "Send to head lecturer →"}
+            </button>
+          )
+        )}
+      </div>
+    </section>
   );
 }

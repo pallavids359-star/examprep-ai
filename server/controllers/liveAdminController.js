@@ -47,8 +47,14 @@ const sectionSummary = (s, lecturersById) => {
         picked: (s.questionIds || []).length,
         dueAt: s.dueAt || null,
         submittedAt: s.submittedAt || null,
+        returnedAt: s.returnedAt || null,
+        returnNote: s.returnNote || "",
     };
 };
+
+// full = has every question; sent = the lecturer sent it in (or nobody needs to); ready = both
+const readiness = (t, st) =>
+    t.status !== "draft" ? { full: true, sent: true, ready: true } : { full: Boolean(st?.full), sent: st ? st.sent : true, ready: Boolean(st?.ready) };
 
 const lecturerMap = async (tests) => {
     const ids = [...new Set(tests.flatMap((t) => t.sections.map((s) => String(s.lecturerId || ""))).filter(Boolean))];
@@ -108,10 +114,23 @@ const createLecturer = handle("createLecturer", async (req, res) => {
     res.status(201).json({ lecturer: { _id: user._id, name: user.name, email: user.email, role: user.role, status: user.status, sections: 0 } });
 });
 
-// PUT /api/admin/lecturers/:id   { status?: "active"|"suspended", password?: "new password" }
+// PUT /api/admin/lecturers/:id   { name?, email?, status?: "active"|"suspended", password?: "new password" }
 const updateLecturer = handle("updateLecturer", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid lecturer id");
     const update = {};
+    if (req.body.name !== undefined) {
+        const name = String(req.body.name).trim();
+        if (name.length < 2) throw userError("Enter the lecturer's name");
+        if (name.length > 80) throw userError("The name is too long");
+        update.name = name;
+    }
+    if (req.body.email !== undefined) {
+        const email = String(req.body.email).trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw userError("Enter a valid email address");
+        const taken = await User.findOne({ email, _id: { $ne: req.params.id } }).select("_id").lean();
+        if (taken) throw userError("Another account already uses this email");
+        update.email = email;
+    }
     if (req.body.status !== undefined) {
         if (!["active", "suspended"].includes(req.body.status)) throw userError("Status must be active or suspended");
         update.status = req.body.status;
@@ -124,6 +143,32 @@ const updateLecturer = handle("updateLecturer", async (req, res) => {
     const user = await User.findOneAndUpdate({ _id: req.params.id, role: "lecturer" }, update, { returnDocument: "after" }).select("name email role status");
     if (!user) throw userError("Lecturer not found", 404);
     res.json({ lecturer: user });
+});
+
+// PUT /api/admin/live-tests/:id/sections/:key/lecturer   { lecturerId, keepQuestions = true }
+// Gives a subject to a different lecturer (before the test opens). The new lecturer has to send it again.
+const changeSectionLecturer = handle("changeSectionLecturer", async (req, res) => {
+    if (!isValidId(req.params.id)) throw userError("Invalid test id");
+    if (!isValidId(req.body.lecturerId)) throw userError("Choose a lecturer");
+    const test = await Test.findOne({ _id: req.params.id, type: "live", status: { $in: ["draft", "published"] } });
+    if (!test) throw userError("Live test not found", 404);
+    const section = test.sections.find((s) => s.key === req.params.key);
+    if (!section) throw userError("Section not found", 404);
+    if (!(await canEditQuestions(test))) throw userError("The test has already opened, so the lecturer can't change now");
+    const lecturer = await User.findOne({ _id: req.body.lecturerId, role: "lecturer", status: "active" }).select("name").lean();
+    if (!lecturer) throw userError("That lecturer doesn't exist or is suspended");
+    const same = String(section.lecturerId) === String(lecturer._id) && section.picker === "lecturer";
+    section.picker = "lecturer";
+    section.lecturerId = lecturer._id;
+    if (!same) {
+        section.submittedAt = undefined;
+        section.returnedAt = undefined;
+        section.returnNote = undefined;
+    }
+    if (req.body.keepQuestions === false) section.questionIds = [];
+    await test.save();
+    const { status } = await syncLiveStatus(test, { pullBack: true });
+    res.json({ message: `${section.name} is now with ${lecturer.name}`, testStatus: status });
 });
 
 // ---------- Live tests ----------
@@ -263,7 +308,7 @@ const listLiveTests = handle("listLiveTests", async (req, res) => {
             endsAt: t.availability.endsAt,
             durationMinutes: t.durationMinutes,
             totalQuestions: t.sections.reduce((a, s) => a + (s.mcqCount || 0) + (s.numericalCount || 0), 0),
-            sections: t.sections.map((s) => ({ ...sectionSummary(s, lecturers), full: t.status === "published" || states.get(String(t._id))?.sections.find((x) => x.key === s.key)?.full || false })),
+            sections: t.sections.map((s) => ({ ...sectionSummary(s, lecturers), ...readiness(t, states.get(String(t._id))?.sections.find((x) => x.key === s.key)) })),
             started: byTest.get(String(t._id))?.started || 0,
             finished: byTest.get(String(t._id))?.finished || 0,
         })),
@@ -304,7 +349,7 @@ const getLiveTest = handle("getLiveTest", async (req, res) => {
             editable,
             sections: test.sections.map((s) => ({
                 ...sectionSummary(s, lecturers),
-                full: state.sections.find((x) => x.key === s.key)?.full || false,
+                ...readiness(test, state.sections.find((x) => x.key === s.key)),
                 missing: state.sections.find((x) => x.key === s.key)?.missing || 0,
                 questions: s.questionIds
                     .map((id) => byId.get(String(id)))
@@ -394,10 +439,10 @@ const publishLiveTest = handle("publishLiveTest", async (req, res) => {
     const { status, state } = await syncLiveStatus(test);
     if (status !== "published") {
         const missing = state.sections
-            .filter((x) => !x.full)
+            .filter((x) => !x.ready)
             .map((x) => {
                 const sec = test.sections.find((y) => y.key === x.key);
-                return `${sec.name} has ${x.mcq} + ${x.numerical}, needs ${sec.mcqCount} + ${sec.numericalCount}`;
+                return x.full ? `${sec.name} is not sent by its lecturer yet` : `${sec.name} has ${x.mcq} + ${x.numerical}, needs ${sec.mcqCount} + ${sec.numericalCount}`;
             });
         throw userError(`Can't publish yet: ${missing.join("; ")}`);
     }
@@ -416,15 +461,38 @@ const unpublishLiveTest = handle("unpublishLiveTest", async (req, res) => {
     res.json({ message: "Moved back to draft", status: test.status });
 });
 
-// POST /api/admin/live-tests/:id/sections/:key/reopen   (let the lecturer change a handed-in section)
+// POST /api/admin/live-tests/:id/sections/:key/reopen   { note? }
+// "Send back to lecturer": they can change the questions again (only before the test opens)
 const reopenSection = handle("reopenSection", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
-    const r = await Test.updateOne(
-        { _id: req.params.id, type: "live", status: "draft", "sections.key": req.params.key },
-        { $unset: { "sections.$.submittedAt": 1 } }
-    );
-    if (!r.matchedCount) throw userError("Section not found, or the test is already published", 404);
-    res.json({ message: "Section re-opened" });
+    const test = await Test.findOne({ _id: req.params.id, type: "live", status: { $in: ["draft", "published"] } });
+    if (!test) throw userError("Live test not found", 404);
+    const section = test.sections.find((s) => s.key === req.params.key);
+    if (!section) throw userError("Section not found", 404);
+    if (!(await canEditQuestions(test))) throw userError("The test has already opened, so it can't change now");
+    section.submittedAt = undefined;
+    section.returnedAt = new Date();
+    section.returnNote = String(req.body?.note || "").trim().slice(0, 500) || undefined;
+    await test.save();
+    const { status } = await syncLiveStatus(test, { pullBack: true });
+    res.json({ message: "Sent back to the lecturer", testStatus: status });
+});
+
+// POST /api/admin/live-tests/:id/sections/:key/accept   (head lecturer marks a lecturer's full section ready)
+const acceptSection = handle("acceptSection", async (req, res) => {
+    if (!isValidId(req.params.id)) throw userError("Invalid test id");
+    const test = await Test.findOne({ _id: req.params.id, type: "live", status: "draft" });
+    if (!test) throw userError("Live test not found, or already live", 404);
+    const section = test.sections.find((s) => s.key === req.params.key);
+    if (!section) throw userError("Section not found", 404);
+    const st = (await sectionState(test)).sections.find((x) => x.key === section.key);
+    if (!st.full) throw userError(`${section.name} is not full yet`);
+    section.submittedAt = new Date();
+    section.returnedAt = undefined;
+    section.returnNote = undefined;
+    await test.save();
+    const { status } = await syncLiveStatus(test);
+    res.json({ message: "Accepted", testStatus: status });
 });
 
 // DELETE /api/admin/live-tests/:id   (a draft is removed; anything students took is archived)
@@ -497,6 +565,8 @@ module.exports = {
     publishLiveTest,
     unpublishLiveTest,
     reopenSection,
+    acceptSection,
+    changeSectionLecturer,
     deleteLiveTest,
     liveResults,
     phase,

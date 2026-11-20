@@ -8,7 +8,7 @@ const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const Question = require("../models/Question");
 const { phase } = require("./liveAdminController");
-const { syncLiveStatus, canEditQuestions, autoPick } = require("../utils/liveSchedule");
+const { syncLiveStatus, canEditQuestions, autoPick, findSwap, sectionState } = require("../utils/liveSchedule");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const toId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -39,7 +39,13 @@ const loadSection = async (req) => {
     if (!isAdmin && String(section.lecturerId) !== String(req.user._id)) throw userError("This section is assigned to another lecturer", 403);
     // Questions can change until the test opens and nobody has started it
     const editable = await canEditQuestions(test);
-    return { test, section, isAdmin, editable };
+    // A lecturer who sent the section to the head lecturer takes it back before changing it
+    const lockedBySend = !isAdmin && section.picker === "lecturer" && Boolean(section.submittedAt);
+    return { test, section, isAdmin, editable, lockedBySend };
+};
+const mustBeChangeable = ({ editable, lockedBySend }) => {
+    if (!editable) throw userError("The test has already opened, so its questions can't change");
+    if (lockedBySend) throw userError("You already sent this to the head lecturer. Press \"Take back to edit\" first.");
 };
 
 const counts = (questions) => ({
@@ -110,8 +116,11 @@ const mySections = handle("mySections", async (req, res) => {
                     numericalCount: s.numericalCount || 0,
                     mcqPicked: c.mcq,
                     numericalPicked: c.numerical,
+                    picker: s.picker || "lecturer",
                     dueAt: s.dueAt || null,
                     submittedAt: s.submittedAt || null,
+                    returnedAt: s.returnedAt || null,
+                    returnNote: s.returnNote || "",
                 },
             });
         }
@@ -121,7 +130,7 @@ const mySections = handle("mySections", async (req, res) => {
 
 // GET /api/lecturer/live-tests/:id/sections/:key   (section, its syllabus and the picked questions)
 const getSection = handle("getSection", async (req, res) => {
-    const { test, section, editable } = await loadSection(req);
+    const { test, section, editable, lockedBySend } = await loadSection(req);
     const [exam, subject, chapters] = await Promise.all([
         Exam.findById(test.examId).select("code name").lean(),
         Subject.findById(section.subjectId).select("name").lean(),
@@ -141,10 +150,15 @@ const getSection = handle("getSection", async (req, res) => {
             name: section.name,
             mcqCount: section.mcqCount || 0,
             numericalCount: section.numericalCount || 0,
+            picker: section.picker || "lecturer",
             dueAt: section.dueAt || null,
             submittedAt: section.submittedAt || null,
+            returnedAt: section.returnedAt || null,
+            returnNote: section.returnNote || "",
         },
-        editable,
+        editable: editable && !lockedBySend,
+        canChange: editable, // test not open yet (the lecturer may take a sent section back)
+        isAdmin: req.user.role === "admin",
         chapters,
         questions,
     });
@@ -235,8 +249,9 @@ const browseQuestions = handle("browseQuestions", async (req, res) => {
 
 // PUT /api/lecturer/live-tests/:id/sections/:key   { questionIds: [...] }  (saves the picks)
 const savePicks = handle("savePicks", async (req, res) => {
-    const { test, section, editable } = await loadSection(req);
-    if (!editable) throw userError("The test has already opened, so its questions can't change");
+    const ctx = await loadSection(req);
+    const { test, section } = ctx;
+    mustBeChangeable(ctx);
 
     const ids = [...new Set((Array.isArray(req.body.questionIds) ? req.body.questionIds : []).map(String))];
     if (ids.some((id) => !isValidId(id))) throw userError("Invalid question id");
@@ -269,8 +284,9 @@ const savePicks = handle("savePicks", async (req, res) => {
 //   { chapterIds?: [...], classLevel?: "11"|"12"|"both", replace?: boolean }
 // Fills the rest of the section (or all of it) with random questions from those chapters.
 const autoPickSection = handle("autoPickSection", async (req, res) => {
-    const { test, section, editable } = await loadSection(req);
-    if (!editable) throw userError("The test has already opened, so its questions can't change");
+    const ctx = await loadSection(req);
+    const { test, section } = ctx;
+    mustBeChangeable(ctx);
     const chapterIds = asList(req.body.chapterIds).filter(isValidId).map(toId);
     const result = await autoPick(test, section, { chapterIds, classLevel: req.body.classLevel, replace: req.body.replace === true });
     await test.save();
@@ -278,18 +294,68 @@ const autoPickSection = handle("autoPickSection", async (req, res) => {
     res.json({ ...result, testStatus: status });
 });
 
-// POST /api/lecturer/live-tests/:id/sections/:key/submit   (hand the section in)
-const submitSection = handle("submitSection", async (req, res) => {
-    const { test, section } = await loadSection(req);
-    if (test.status !== "draft") throw userError("The test is already published");
-    const questions = await Question.find({ _id: { $in: section.questionIds } }).select("type").lean();
-    const c = counts(questions);
-    if (c.mcq !== (section.mcqCount || 0) || c.numerical !== (section.numericalCount || 0)) {
-        throw userError(`Pick exactly ${section.mcqCount} MCQ and ${section.numericalCount} numerical questions first (now ${c.mcq} + ${c.numerical})`);
+// POST /api/lecturer/live-tests/:id/sections/:key/swap
+//   { questionId, newQuestionId? }  newQuestionId missing = GenPrep finds a similar one.
+// The new question takes the old one's place in the paper.
+const swapQuestion = handle("swapQuestion", async (req, res) => {
+    const ctx = await loadSection(req);
+    const { test, section } = ctx;
+    mustBeChangeable(ctx);
+    const oldId = String(req.body.questionId || "");
+    const pos = section.questionIds.map(String).indexOf(oldId);
+    if (pos === -1) throw userError("That question is not in this section any more. Refresh and try again.");
+    const old = await Question.findById(oldId).select("type topicId chapterId difficulty").lean();
+    if (!old) throw userError("That question was deleted from the bank. Remove it instead.");
+
+    let next;
+    if (req.body.newQuestionId) {
+        if (!isValidId(req.body.newQuestionId)) throw userError("Invalid question id");
+        next = await Question.findById(req.body.newQuestionId).select("type status examId subjectId").lean();
+        if (!next || next.status !== "published") throw userError("That question can't be used");
+        if (String(next.examId) !== String(test.examId) || String(next.subjectId) !== String(section.subjectId)) throw userError(`That is not a ${section.name} question of this exam`);
+        if ((next.type === "numerical") !== (old.type === "numerical")) throw userError(old.type === "numerical" ? "Swap a numerical question with another numerical question" : "Swap an MCQ with another MCQ");
+        if (test.sections.some((s) => s.questionIds.map(String).includes(String(next._id)))) throw userError("That question is already in this test");
+    } else {
+        next = await findSwap(test, section, old);
+        if (!next) throw userError("No other question of this kind is left in the bank for this subject");
     }
-    section.submittedAt = new Date();
+
+    section.questionIds.splice(pos, 1, toId(next._id));
     await test.save();
-    res.json({ message: "Handed in", submittedAt: section.submittedAt });
+    const { status } = await syncLiveStatus(test);
+    const full = await Question.findById(next._id).select(FULL_FIELDS).lean();
+    const [chaptersById, topicsById] = await namesFor([full]);
+    res.json({ message: "Swapped", position: pos, question: shape(full, chaptersById, topicsById), testStatus: status });
 });
 
-module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection, autoPickSection };
+// POST /api/lecturer/live-tests/:id/sections/:key/submit   ("Send to head lecturer")
+// The section must be full. Once every section is ready the test goes live by itself.
+const submitSection = handle("submitSection", async (req, res) => {
+    const { test, section, editable } = await loadSection(req);
+    if (!editable) throw userError("The test has already opened");
+    const state = await sectionState(test);
+    const mine = state.sections.find((x) => x.key === section.key);
+    if (mine.missing) throw userError(`${mine.missing} of your questions were deleted from the bank. Swap or remove them first.`);
+    if (!mine.full) {
+        throw userError(`Pick all ${section.mcqCount} MCQ${section.numericalCount ? ` and ${section.numericalCount} numerical` : ""} questions first (now ${mine.mcq}${section.numericalCount ? ` + ${mine.numerical}` : ""})`);
+    }
+    section.submittedAt = new Date();
+    section.returnedAt = undefined;
+    section.returnNote = undefined;
+    await test.save();
+    const { status, state: after } = await syncLiveStatus(test);
+    const waitingFor = test.sections.filter((s) => !after.sections.find((x) => x.key === s.key)?.ready).map((s) => s.name);
+    res.json({ message: "Sent", submittedAt: section.submittedAt, testStatus: status, waitingFor });
+});
+
+// POST /api/lecturer/live-tests/:id/sections/:key/unsubmit   ("Take back to edit", before the test opens)
+const unsubmitSection = handle("unsubmitSection", async (req, res) => {
+    const { test, section, editable } = await loadSection(req);
+    if (!editable) throw userError("The test has already opened, so it can't change now");
+    section.submittedAt = undefined;
+    await test.save();
+    const { status } = await syncLiveStatus(test, { pullBack: true });
+    res.json({ message: "Taken back", testStatus: status });
+});
+
+module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection, autoPickSection, swapQuestion, unsubmitSection };

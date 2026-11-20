@@ -154,13 +154,15 @@ export default function LiveTests() {
                     <li key={s.key} className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                       <div className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate font-semibold text-slate-800">{s.name}</span>
-                        <span className={`text-xs font-semibold ${s.full ? "text-green-700" : "text-slate-500"}`}>{s.full ? "Ready" : `${s.picked || 0}/${need}`}</span>
+                        <span className={`text-xs font-semibold ${s.ready ? "text-green-700" : s.full ? "text-orange-700" : "text-slate-500"}`}>
+                          {s.ready ? "Ready" : s.full ? "Not sent yet" : `${s.picked || 0}/${need}`}
+                        </span>
                       </div>
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-amber-100/70">
-                        <div className={`h-full rounded-full ${s.full ? "bg-green-600" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full ${s.ready ? "bg-green-600" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
                       </div>
                       <p className="mt-1 truncate text-xs text-slate-500">
-                        {s.picker === "auto" ? "Filled automatically" : s.picker === "me" ? "Picked by you" : s.lecturer?.name || "Lecturer"}
+                        {s.picker === "auto" ? "Filled automatically" : s.picker === "me" ? "Picked by you" : `${s.lecturer?.name || "Lecturer"}${s.picker === "lecturer" && !s.ready ? (s.full ? " · has to send it" : " · picking") : s.submittedAt ? " · sent ✓" : ""}`}
                       </p>
                     </li>
                   );

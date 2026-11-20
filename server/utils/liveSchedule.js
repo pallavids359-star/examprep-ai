@@ -11,7 +11,11 @@ const TestAttempt = require("../models/TestAttempt");
 const IMG = /\{\{IMG::/;
 const HAS_DIAGRAM = { $or: [{ "images.0": { $exists: true } }, { "options.image.url": { $exists: true } }, { text: IMG }, { "options.text": IMG }] };
 
-// For every section: how many MCQs and numericals it has now, and whether it is full
+// Sections picked by a lecturer must also be sent to the head lecturer before the test can go live
+const needsSending = (s) => s.picker === "lecturer";
+
+// For every section: how many MCQs and numericals it has now, whether it is full, and whether it is ready
+// (full, and sent to the head lecturer when a lecturer picks it)
 const sectionState = async (test) => {
     const ids = test.sections.flatMap((s) => s.questionIds);
     const qs = ids.length ? await Question.find({ _id: { $in: ids } }).select("type status marks").lean() : [];
@@ -29,9 +33,11 @@ const sectionState = async (test) => {
             numerical,
             missing: list.length - live.length, // deleted or unpublished since being picked
             full: mcq === (s.mcqCount || 0) && numerical === (s.numericalCount || 0) && list.length === live.length,
+            sent: !needsSending(s) || Boolean(s.submittedAt),
         };
     });
-    return { sections, full: sections.every((s) => s.full), totalQuestions: ids.length, totalMarks };
+    sections.forEach((x) => (x.ready = x.full && x.sent));
+    return { sections, full: sections.every((s) => s.full), ready: sections.every((s) => s.ready), totalQuestions: ids.length, totalMarks };
 };
 
 const hasStarted = async (test, now = new Date()) =>
@@ -40,15 +46,16 @@ const hasStarted = async (test, now = new Date()) =>
 // Questions can change until the test opens (and nobody has started)
 const canEditQuestions = async (test) => test.status === "draft" || (test.status === "published" && !(await hasStarted(test)));
 
-// Publishes or un-publishes to match the sections. Saves the test. Returns { status, state }.
-const syncLiveStatus = async (test) => {
+// Publishes once every section is ready; goes back to draft if a section is no longer full
+// (or, with { pullBack: true }, no longer ready) before the test opens. Saves. Returns { status, state }.
+const syncLiveStatus = async (test, { pullBack = false } = {}) => {
     if (test.status === "archived") return { status: test.status };
     const state = await sectionState(test);
     const now = new Date();
-    if (test.status === "draft" && state.full && new Date(test.availability.endsAt) > now) {
+    if (test.status === "draft" && state.ready && new Date(test.availability.endsAt) > now) {
         test.status = "published";
         test.live.publishedAt = now;
-    } else if (test.status === "published" && !state.full && !(await hasStarted(test, now))) {
+    } else if (test.status === "published" && !(pullBack ? state.ready : state.full) && !(await hasStarted(test, now))) {
         test.status = "draft";
     }
     test.totalQuestions = state.totalQuestions;
@@ -109,4 +116,28 @@ const autoPick = async (test, section, { chapterIds = [], classLevel = "both", r
     return { added: picked.length, shortMcq: Math.max(0, needMcq), shortNumerical: Math.max(0, needNum) };
 };
 
-module.exports = { sectionState, syncLiveStatus, canEditQuestions, autoPick, hasStarted };
+// Finds one replacement for a picked question: same kind (MCQ / numerical), as close as
+// possible (same concept, then same chapter, then anywhere in the subject), preferring the
+// same difficulty and questions not used in other live tests.
+const findSwap = async (test, section, old) => {
+    const isNum = old.type === "numerical";
+    const inThisTest = test.sections.flatMap((s) => s.questionIds.map(String));
+    const others = await Test.find({ type: "live", status: { $ne: "archived" }, _id: { $ne: test._id } }).select("sections.questionIds").lean();
+    const usedElsewhere = others.flatMap((t) => t.sections.flatMap((s) => s.questionIds.map(String)));
+    const oid = (ids) => ids.map((id) => new mongoose.Types.ObjectId(String(id)));
+    const base = { examId: test.examId, subjectId: section.subjectId, status: "published", type: isNum ? "numerical" : { $ne: "numerical" } };
+    const places = [old.topicId && { topicId: old.topicId }, old.chapterId && { chapterId: old.chapterId }, {}].filter(Boolean);
+    const levels = old.difficulty ? [{ difficulty: old.difficulty }, {}] : [{}];
+    for (const avoidUsed of [true, false]) {
+        const exclude = oid([...inThisTest, String(old._id), ...(avoidUsed ? usedElsewhere : [])]);
+        for (const place of places) {
+            for (const level of levels) {
+                const [got] = await sample({ ...base, ...place, ...level, _id: { $nin: exclude } }, 1);
+                if (got) return got;
+            }
+        }
+    }
+    return null;
+};
+
+module.exports = { needsSending, sectionState, syncLiveStatus, canEditQuestions, autoPick, hasStarted, findSwap };

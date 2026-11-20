@@ -19,6 +19,18 @@ export default function LiveTestReview() {
   const [busy, setBusy] = useState(false);
   const [openKey, setOpenKey] = useState(null);
   const [newEnd, setNewEnd] = useState("");
+  const [returning, setReturning] = useState(null); // section key being sent back
+  const [note, setNote] = useState("");
+  const [lecturers, setLecturers] = useState([]);
+  const [changing, setChanging] = useState(null); // section key whose lecturer is being changed
+  const [newLecturer, setNewLecturer] = useState("");
+  const [keepQs, setKeepQs] = useState(true);
+  useEffect(() => {
+    api
+      .get("/admin/lecturers")
+      .then((res) => setLecturers(res.data.lecturers.filter((l) => l.role === "lecturer" && l.status === "active")))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     api
@@ -50,6 +62,28 @@ export default function LiveTestReview() {
     run(() => api.post(`/lecturer/live-tests/${id}/sections/${s.key}/autopick`, { replace: true }), `${s.name}: new questions picked`);
   };
   const fill = (s) => run(() => api.post(`/lecturer/live-tests/${id}/sections/${s.key}/autopick`, {}), `${s.name}: the rest was filled automatically`);
+  const swapOne = (s, q, i) => run(() => api.post(`/lecturer/live-tests/${id}/sections/${s.key}/swap`, { questionId: q._id }), `${s.name}: question ${i + 1} swapped`);
+  const removeOne = (s, q, i) =>
+    run(() => api.put(`/lecturer/live-tests/${id}/sections/${s.key}`, { questionIds: s.questions.filter((x) => x._id !== q._id).map((x) => x._id) }), `${s.name}: question ${i + 1} removed`);
+  const clearSection = async (s) => {
+    if (!(await askConfirm(`Remove all ${s.questions.length} ${s.name} questions? The test goes back to "waiting for questions" until you fill it again.`, { title: "Clear this subject?", confirmText: "Remove all", danger: true }))) return;
+    run(() => api.put(`/lecturer/live-tests/${id}/sections/${s.key}`, { questionIds: [] }), `${s.name}: all questions removed`);
+  };
+  const sendBack = (s) =>
+    run(() => api.post(`/admin/live-tests/${id}/sections/${s.key}/reopen`, { note }), `${s.name} sent back to ${s.lecturer?.name || "the lecturer"}`).then(() => {
+      setReturning(null);
+      setNote("");
+    });
+  const openChange = (s) => {
+    setChanging(changing === s.key ? null : s.key);
+    setNewLecturer(s.picker === "lecturer" && s.lecturer ? s.lecturer._id : "");
+    setKeepQs(true);
+  };
+  const changeLecturer = (s) => {
+    const who = lecturers.find((l) => l._id === newLecturer);
+    run(() => api.put(`/admin/live-tests/${id}/sections/${s.key}/lecturer`, { lecturerId: newLecturer, keepQuestions: keepQs }), `${s.name} is now with ${who?.name || "the new lecturer"}`).then(() => setChanging(null));
+  };
+  const accept = (s) => run(() => api.post(`/admin/live-tests/${id}/sections/${s.key}/accept`), `${s.name} marked as ready`);
   const extend = () => run(() => api.put(`/admin/live-tests/${id}`, { endsAt: new Date(newEnd).toISOString() }), "Closing time changed");
   const remove = async () => {
     if (!(await askConfirm("Delete this live test? If students already took it, their results are kept but the test is hidden."))) return;
@@ -73,7 +107,7 @@ export default function LiveTestReview() {
   }
 
   const ph = PHASE[test.phase] || PHASE.draft;
-  const waiting = test.sections.filter((s) => !s.full);
+  const waiting = test.sections.filter((s) => !s.ready);
   const total = test.sections.reduce((a, s) => a + s.mcqCount + s.numericalCount, 0);
 
   // One clear sentence about where the test stands
@@ -81,7 +115,9 @@ export default function LiveTestReview() {
   if (test.phase === "draft") {
     banner = {
       cls: "border-amber-200 bg-amber-50 text-amber-900",
-      text: `Waiting for questions: ${waiting.map((s) => `${s.name} ${s.picked}/${s.mcqCount + s.numericalCount}`).join(", ")}. The test goes live by itself once every subject is full.`,
+      text: `Waiting for: ${waiting
+        .map((s) => (s.full ? `${s.name} (${s.lecturer?.name || "lecturer"} has to send it)` : `${s.name} ${s.picked}/${s.mcqCount + s.numericalCount}`))
+        .join(", ")}. The test goes live by itself once every subject is ready.`,
     };
   } else if (test.phase === "scheduled") {
     banner = { cls: "border-green-200 bg-green-50 text-green-900", text: `Ready ✓ Students can see it now, and it opens ${fmtUntil(test.startsAt)} (${fmtDateTime(test.startsAt)}). You can still change questions until then.` };
@@ -144,13 +180,18 @@ export default function LiveTestReview() {
           return (
             <section key={s.key} className="gp-card gp-card-hover flex flex-col gap-3 p-5">
               <div className="flex items-center gap-4">
-                <Ring value={need ? (s.picked / need) * 100 : 0} size={64} tone={s.full ? "green" : "gold"} label={s.full ? "✓" : undefined} />
+                <Ring value={need ? (s.picked / need) * 100 : 0} size={64} tone={s.ready ? "green" : "gold"} label={s.ready ? "✓" : undefined} />
                 <div className="min-w-0">
                   <h2 className="text-lg font-bold text-slate-900">{s.name}</h2>
                   <p className="text-sm text-slate-600">
-                    {s.full ? "Ready" : `${s.picked} of ${need} picked`} · {PICKER_LABEL[s.picker] || "Lecturer picks"}
+                    {s.ready ? "Ready" : s.full ? "Picked, not sent yet" : `${s.picked} of ${need} picked`} · {PICKER_LABEL[s.picker] || "Lecturer picks"}
                     {s.picker === "lecturer" && s.lecturer ? `: ${s.lecturer.name}` : ""}
                   </p>
+                  {s.picker === "lecturer" && (
+                    <p className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${s.submittedAt ? "bg-green-50 text-green-700" : s.returnedAt ? "bg-orange-50 text-orange-800" : "bg-slate-100 text-slate-600"}`}>
+                      {s.submittedAt ? `Sent ✓ ${fmtDateTime(s.submittedAt)}` : s.returnedAt ? "Sent back for changes" : "Not sent yet"}
+                    </p>
+                  )}
                 </div>
               </div>
               {s.missing > 0 && <p className="text-xs text-red-700">{s.missing} picked question(s) were deleted from the bank. Pick replacements.</p>}
@@ -160,7 +201,7 @@ export default function LiveTestReview() {
               </p>
               <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
                 <button type="button" onClick={() => setOpenKey(openKey === s.key ? null : s.key)} className="font-semibold text-amber-800 hover:underline">
-                  {openKey === s.key ? "Hide list" : "See list"}
+                  {openKey === s.key ? "Hide list" : test.editable ? "See, swap or remove" : "See list"}
                 </button>
                 {test.editable && (
                   <>
@@ -172,6 +213,19 @@ export default function LiveTestReview() {
                         Auto-fill the rest
                       </button>
                     )}
+                    <button type="button" disabled={busy} onClick={() => openChange(s)} className="font-semibold text-amber-800 hover:underline disabled:opacity-50">
+                      {s.picker === "lecturer" ? "Change lecturer" : "Give to a lecturer"}
+                    </button>
+                    {s.picker === "lecturer" && s.submittedAt && (
+                      <button type="button" disabled={busy} onClick={() => setReturning(returning === s.key ? null : s.key)} className="font-semibold text-orange-700 hover:underline disabled:opacity-50">
+                        Send back to lecturer
+                      </button>
+                    )}
+                    {s.picker === "lecturer" && !s.submittedAt && s.full && test.status === "draft" && (
+                      <button type="button" disabled={busy} onClick={() => accept(s)} className="font-semibold text-green-700 hover:underline disabled:opacity-50">
+                        Mark as ready
+                      </button>
+                    )}
                     {s.full && s.picker === "auto" && (
                       <button type="button" disabled={busy} onClick={() => reAuto(s)} className="font-semibold text-slate-600 hover:underline disabled:opacity-50">
                         Pick again
@@ -180,6 +234,64 @@ export default function LiveTestReview() {
                   </>
                 )}
               </div>
+              {changing === s.key && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                  <label className="block text-xs font-semibold text-slate-800">
+                    Who should pick the {s.name} questions?
+                    <select value={newLecturer} onChange={(e) => setNewLecturer(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal">
+                      <option value="">Choose a lecturer...</option>
+                      {lecturers.map((l) => (
+                        <option key={l._id} value={l._id}>
+                          {l.name} · {l.email}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {s.picked > 0 && (
+                    <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
+                      <input type="checkbox" className="h-4 w-4 accent-amber-600" checked={keepQs} onChange={(e) => setKeepQs(e.target.checked)} />
+                      Keep the {s.picked} questions already picked (untick to start empty)
+                    </label>
+                  )}
+                  <p className="mt-2 text-xs text-slate-500">
+                    The new lecturer sees this subject right away and has to send it to you again. Name or email typed wrong?{" "}
+                    <Link to="/admin/lecturers" className="font-semibold text-amber-800 hover:underline">
+                      Edit lecturers
+                    </Link>
+                  </p>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button type="button" onClick={() => setChanging(null)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-white">
+                      Cancel
+                    </button>
+                    <button type="button" disabled={busy || !newLecturer} onClick={() => changeLecturer(s)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-amber-200 hover:bg-black disabled:opacity-50">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+              {returning === s.key && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-3">
+                  <label className="block text-xs font-semibold text-orange-900">
+                    What should {s.lecturer?.name || "the lecturer"} change? (optional)
+                    <textarea
+                      rows={2}
+                      maxLength={500}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="e.g. Q4 and Q9 are too easy, add more diagram questions"
+                      className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-2 py-1.5 text-sm font-normal text-slate-800"
+                    />
+                  </label>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button type="button" onClick={() => setReturning(null)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-white">
+                      Cancel
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => sendBack(s)} className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
+                      Send back
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           );
         })}
@@ -190,18 +302,33 @@ export default function LiveTestReview() {
           const s = test.sections.find((x) => x.key === openKey);
           return (
             <section className="gp-card mt-5 overflow-x-auto p-5">
-              <h2 className="font-semibold text-slate-900">{s.name} questions</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-slate-900">{s.name} questions</h2>
+                {test.editable && (
+                  <div className="flex gap-3 text-sm">
+                    <Link to={`/lecturer/tests/${id}/${s.key}`} className="font-semibold text-amber-800 hover:underline">
+                      Read full questions
+                    </Link>
+                    {s.questions.length > 0 && (
+                      <button type="button" disabled={busy} onClick={() => clearSection(s)} className="font-semibold text-red-700 hover:underline disabled:opacity-50">
+                        Remove all
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               {s.questions.length === 0 ? (
                 <p className="mt-3 text-sm text-slate-500">No questions yet.</p>
               ) : (
-                <table className="mt-3 w-full min-w-[640px] text-sm">
+                <table className="mt-3 w-full min-w-[760px] text-sm">
                   <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
                     <tr>
                       <th className="py-2 pr-3">Q</th>
                       <th className="py-2 pr-3">Question</th>
                       <th className="py-2 pr-3">Chapter · concept</th>
                       <th className="py-2 pr-3">Class</th>
-                      <th className="py-2">Level</th>
+                      <th className="py-2 pr-3">Level</th>
+                      {test.editable && <th className="py-2 text-right">Change</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -217,7 +344,17 @@ export default function LiveTestReview() {
                           {q.chapter} · {q.topic}
                         </td>
                         <td className="py-2 pr-3">{q.classLevel}</td>
-                        <td className="py-2 capitalize">{q.difficulty}</td>
+                        <td className="py-2 pr-3 capitalize">{q.difficulty}</td>
+                        {test.editable && (
+                          <td className="whitespace-nowrap py-2 text-right">
+                            <button type="button" disabled={busy} onClick={() => swapOne(s, q, i)} className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-amber-200 hover:bg-black disabled:opacity-50" title="Replace with a similar question">
+                              ⇄ Swap
+                            </button>
+                            <button type="button" disabled={busy} onClick={() => removeOne(s, q, i)} className="ml-1.5 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+                              Remove
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

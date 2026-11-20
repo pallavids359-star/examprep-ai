@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { toast } from "../../components/Toaster";
 import { fmtDateTime, fmtDuration, toLocalInput } from "../../components/liveHelpers";
-import { Hero, Step } from "../../components/premium";
+import { Hero, ICONS, Step } from "../../components/premium";
 
 // Head lecturer: create a live test (or edit one before it opens) in one short form.
 const input = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none";
 
 const OPEN_FOR = [
-  ["3h", "3 hours"],
-  ["midnight", "Until midnight"],
-  ["24h", "24 hours"],
+  ["3h", "3 hrs"],
+  ["midnight", "Till 11:59 pm"],
+  ["24h", "24 hrs"],
   ["2d", "2 days"],
-  ["custom", "Pick a time"],
+  ["custom", "Custom"],
 ];
 const PICKERS = [
   ["auto", "Auto", "GenPrep picks the questions for you"],
@@ -33,7 +33,28 @@ const DAYS = [
   [1, "Tomorrow"],
   [2, "Day after"],
 ];
-const TIMES = ["06:00", "08:00", "10:00", "14:00", "17:00", "18:00", "19:00", "20:00", "20:30", "21:00"];
+const SLOTS = [
+  ["Morning", ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00"]],
+  ["Afternoon", ["12:00", "13:00", "14:00", "15:00", "16:00", "17:00"]],
+  ["Evening", ["18:00", "19:00", "20:00", "20:30", "21:00", "22:00"]],
+];
+const ALL_SLOTS = SLOTS.flatMap(([, l]) => l);
+const TIMES = ALL_SLOTS;
+const WEEK = [0, 1, 2, 3, 4, 5, 6];
+const LABEL = "mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500";
+const EXAM_META = {
+  JEE: { subjects: "Physics · Chemistry · Maths", info: "3 h · 75 questions" },
+  NEET: { subjects: "Physics · Chemistry · Biology", info: "3 h · 180 questions" },
+  KCET: { subjects: "Physics · Chemistry · Maths · Biology", info: "240 questions" },
+};
+const fmtSpan = (ms) => {
+  const min = Math.round(ms / 60000);
+  const d = Math.floor(min / 1440);
+  const h = Math.floor((min % 1440) / 60);
+  const m = min % 60;
+  return [d && `${d} day${d > 1 ? "s" : ""}`, h && `${h} h`, m && `${m} min`].filter(Boolean).join(" ") || "0 min";
+};
+const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ""}` : `${m} min`);
 const timeLabel = (t) => {
   const [h, m] = t.split(":").map(Number);
   return `${((h + 11) % 12) + 1}${m ? `:${pad(m)}` : ""} ${h < 12 ? "AM" : "PM"}`;
@@ -135,6 +156,9 @@ export default function LiveTestForm() {
   }, [pattern, split, loadedSections]);
 
   const exam = exams.find((e) => e._id === examId);
+  const dateRef = useRef(null);
+  const inWeek = WEEK.some((o) => dayString(o) === date);
+  const lengths = [...new Set([60, 90, 120, 180, pattern?.minutes].filter(Boolean))].sort((x, y) => x - y);
   // Suggested name until the admin types one
   useEffect(() => {
     if (titleTouched || !exam || !date) return;
@@ -185,7 +209,7 @@ export default function LiveTestForm() {
     try {
       const res = id ? await api.put(`/admin/live-tests/${id}`, body) : await api.post("/admin/live-tests", body);
       (res.data.notes || []).forEach((n) => toast(n, "error"));
-      toast(res.data.status === "published" ? "All set. The test opens by itself at the start time." : "Saved. The test opens once every subject has its questions.");
+      toast(res.data.status === "published" ? "All set. The test opens by itself at the start time." : "Saved. Lecturers can start picking. The test opens once every subject is ready.");
       navigate(`/admin/live-tests/${id || res.data.testId}`);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -208,140 +232,186 @@ export default function LiveTestForm() {
       </div>
       <form onSubmit={submit} className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
        <div className="min-w-0 space-y-5">
-        {/* 1. When */}
-        <section className="gp-card space-y-5 p-6">
-          <Step n={1} title="Exam and time" hint="When students can write it" />
-          <div className="flex flex-wrap gap-2">
-            {exams.map((e) => (
-              <button
-                key={e._id}
-                type="button"
-                disabled={Boolean(id)}
-                aria-pressed={examId === e._id} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
-                onClick={() => {
-                  setRows([]);
-                  setSplit(false);
-                  setExamId(e._id);
-                }}
-              >
-                {e.code}
-              </button>
-            ))}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-700">Which day?</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {DAYS.map(([o, l]) => (
+        {/* 1. Exam */}
+        <section className="gp-card space-y-4 p-6">
+          <Step n={1} title="Which exam?" hint={id ? "The exam can't change after creating the test" : "Subjects and question counts follow the real exam"} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {exams.map((e) => {
+              const meta = EXAM_META[e.code] || { subjects: e.name, info: "" };
+              const on = examId === e._id;
+              return (
                 <button
-                  key={o}
+                  key={e._id}
                   type="button"
-                  aria-pressed={!otherDate && date === dayString(o)} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
+                  disabled={Boolean(id) && !on}
+                  aria-pressed={on}
+                  className="gp-tile relative p-4 text-left disabled:opacity-40"
                   onClick={() => {
-                    setOtherDate(false);
-                    setDate(dayString(o));
+                    if (on) return;
+                    setRows([]);
+                    setSplit(false);
+                    setExamId(e._id);
                   }}
                 >
-                  {l} <span className="ml-1 text-xs font-normal opacity-70">{dayLabel(dayString(o))}</span>
+                  {on && <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-slate-900 text-[11px] text-amber-200">✓</span>}
+                  <span className="font-display text-2xl font-extrabold text-slate-900">{e.code}</span>
+                  <span className="mt-1 block text-xs text-slate-600">{meta.subjects}</span>
+                  {meta.info && <span className="mt-2 block text-xs font-semibold text-amber-800">{meta.info}</span>}
                 </button>
-              ))}
-              <button type="button" aria-pressed={otherDate} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setOtherDate(true)}>
-                Another day
-              </button>
-            </div>
-            {otherDate && <input type="date" aria-label="Date" min={today()} className={`${input} mt-2 max-w-xs`} value={date} onChange={(e) => setDate(e.target.value)} required />}
+              );
+            })}
           </div>
+        </section>
+
+        {/* 2. When */}
+        <section className="gp-card space-y-6 p-6">
+          <Step n={2} title="When can students write it?" hint="They start any time inside this window" />
+
           <div>
-            <p className="text-sm font-medium text-slate-700">Start time</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {TIMES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={!otherTime && time === t} className="gp-tile px-3 text-sm font-semibold text-slate-800 disabled:opacity-50"
-                  onClick={() => {
-                    setOtherTime(false);
-                    setTime(t);
-                  }}
-                >
-                  {timeLabel(t)}
-                </button>
-              ))}
-              <button type="button" aria-pressed={otherTime} className="gp-tile px-3 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setOtherTime(true)}>
-                Other
-              </button>
-            </div>
-            {otherTime && <input type="time" aria-label="Start time" className={`${input} mt-2 max-w-[10rem]`} value={time} onChange={(e) => setTime(e.target.value)} required />}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-700">Students can start it for</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {OPEN_FOR.map(([v, l]) => (
-                <button key={v} type="button" aria-pressed={openFor === v} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setOpenFor(v)}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            {openFor === "custom" && (
-              <input type="datetime-local" aria-label="Closes" className={`${input} mt-2 max-w-xs`} value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
-            )}
-            {startsAt && endsAt && endsAt > startsAt && (
-              <p className="mt-2 text-sm text-slate-600">
-                Open from <b>{fmtDateTime(startsAt)}</b> to <b>{fmtDateTime(endsAt)}</b>. Students start whenever they like in this time.
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-700">Test length</p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {[...new Set([60, 90, 120, 180, pattern?.minutes].filter(Boolean))]
-                .sort((x, y) => x - y)
-                .map((m) => (
+            <p className={LABEL}>Day</p>
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {WEEK.map((o) => {
+                const d = dayString(o);
+                const x = new Date(`${d}T00:00`);
+                const on = date === d;
+                return (
                   <button
-                    key={m}
+                    key={o}
                     type="button"
-                    aria-pressed={!otherLength && Number(duration) === m} className="gp-tile px-3 text-sm font-semibold text-slate-800 disabled:opacity-50"
-                    onClick={() => {
-                      setOtherLength(false);
-                      setDuration(m);
-                    }}
+                    aria-pressed={on}
+                    onClick={() => setDate(d)}
+                    className="gp-tile flex w-[72px] shrink-0 flex-col items-center py-2.5"
                   >
-                    {m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`}
-                    {m === pattern?.minutes ? <span className="ml-1 text-xs font-normal opacity-70">(real exam)</span> : null}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${on ? "text-amber-800" : "text-slate-500"}`}>
+                      {o === 0 ? "Today" : o === 1 ? "Tmrw" : x.toLocaleDateString("en-IN", { weekday: "short" })}
+                    </span>
+                    <span className="font-display text-2xl font-extrabold leading-tight text-slate-900">{x.getDate()}</span>
+                    <span className="text-[11px] text-slate-500">{x.toLocaleDateString("en-IN", { month: "short" })}</span>
                   </button>
-                ))}
-              <button type="button" aria-pressed={otherLength} className="gp-tile px-3 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setOtherLength(true)}>
-                Other
-              </button>
-            </div>
-            {otherLength && (
-              <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                <input type="number" min={5} max={360} aria-label="Minutes" className={`${input} w-28`} value={duration} onChange={(e) => setDuration(e.target.value)} required />
-                minutes
+                );
+              })}
+              <label
+                aria-pressed={!inWeek}
+                className="gp-tile relative flex w-[96px] shrink-0 cursor-pointer flex-col items-center justify-center py-2.5 text-center"
+                onClick={() => dateRef.current?.showPicker?.()}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-amber-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d={ICONS.calendar} />
+                </svg>
+                <span className="mt-1 text-xs font-semibold text-slate-800">{inWeek ? "Other date" : dayLabel(date)}</span>
+                <input
+                  ref={dateRef}
+                  type="date"
+                  aria-label="Pick another date"
+                  min={today()}
+                  value={date}
+                  onChange={(e) => e.target.value && setDate(e.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                />
               </label>
-            )}
+            </div>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Name
-              <input
-                className={`${input} mt-1`}
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleTouched(true);
-                }}
-                required
-                minLength={3}
-                maxLength={140}
-              />
-            </label>
+            <p className={LABEL}>Start time</p>
+            <div className="space-y-2">
+              {SLOTS.map(([part, list]) => (
+                <div key={part} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs font-semibold text-slate-500">{part}</span>
+                  <div className="grid flex-1 grid-cols-3 gap-2 sm:grid-cols-6">
+                    {list.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={time === t}
+                        onClick={() => setTime(t)}
+                        className="gp-tile py-2 text-sm font-semibold tabular-nums text-slate-800"
+                      >
+                        {timeLabel(t)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-xs font-semibold text-slate-500">Exact</span>
+                <input
+                  type="time"
+                  aria-label="Exact start time"
+                  value={time}
+                  onChange={(e) => e.target.value && setTime(e.target.value)}
+                  className={`${input} max-w-[9rem] ${ALL_SLOTS.includes(time) ? "" : "border-amber-500 ring-2 ring-amber-200"}`}
+                />
+              </div>
+            </div>
           </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <p className={LABEL}>Students can start it for</p>
+              <Segmented value={openFor} onChange={setOpenFor} options={OPEN_FOR} />
+              {openFor === "custom" && (
+                <input type="datetime-local" aria-label="Closes" className={`${input} mt-2`} value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+              )}
+            </div>
+            <div>
+              <p className={LABEL}>Each student gets</p>
+              <Segmented
+                value={lengths.includes(Number(duration)) && !otherLength ? Number(duration) : "other"}
+                onChange={(v) => {
+                  if (v === "other") return setOtherLength(true);
+                  setOtherLength(false);
+                  setDuration(v);
+                }}
+                options={[...lengths.map((m) => [m, fmtMin(m), m === pattern?.minutes ? "real exam" : ""]), ["other", "Other"]]}
+              />
+              {(otherLength || !lengths.includes(Number(duration))) && (
+                <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                  <input type="number" min={5} max={360} aria-label="Minutes" className={`${input} w-28`} value={duration} onChange={(e) => setDuration(e.target.value)} required />
+                  minutes
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Timeline */}
+          {startsAt && endsAt && endsAt > startsAt ? (
+            <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-white p-4 ring-1 ring-amber-200/70">
+              <div className="flex items-center gap-3">
+                <TimePoint label="Opens" d={startsAt} />
+                <div className="relative flex-1">
+                  <div className="h-1.5 rounded-full bg-gradient-to-r from-amber-300 via-amber-500 to-slate-900" />
+                  <p className="mt-2 text-center text-xs text-slate-600">
+                    Open for <b>{fmtSpan(endsAt - startsAt)}</b> · each student gets <b>{fmtMin(Number(duration) || 0)}</b>
+                  </p>
+                </div>
+                <TimePoint label="Closes" d={endsAt} right />
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">The closing time must be after the opening time.</p>
+          )}
+
+          <label className="block">
+            <span className={LABEL}>Test name</span>
+            <input
+              className={input}
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleTouched(true);
+              }}
+              required
+              minLength={3}
+              maxLength={140}
+            />
+          </label>
         </section>
 
         {/* 2. Questions */}
         {pattern && (
           <section className="gp-card space-y-4 p-6">
-            <Step n={2} title="Who picks the questions?" hint="Auto fills a subject instantly" right={<span className="gp-chip">{totalQs} questions</span>} />
+            <Step n={3} title="Who picks the questions?" hint="Auto fills a subject instantly" right={<span className="gp-chip">{totalQs} questions</span>} />
             {pattern.canSplitBiology && (
               <label className="flex items-center gap-3 text-sm text-slate-800">
                 <input type="checkbox" className="h-4 w-4 accent-amber-600" checked={split} onChange={(e) => setSplit(e.target.checked)} />
@@ -414,7 +484,7 @@ export default function LiveTestForm() {
 
         {/* 3. Results */}
         <section className="gp-card space-y-4 p-6">
-          <Step n={3} title="When do students see their result?" />
+          <Step n={4} title="When do students see their result?" />
           <div className="flex flex-wrap gap-2">
             <button type="button" aria-pressed={showResults === "after_close"} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setShowResults("after_close")}>
               After the test closes (with rank)
@@ -461,11 +531,45 @@ export default function LiveTestForm() {
               <button type="submit" disabled={saving || !examId || !pattern} className="gp-gold-btn mt-5 w-full px-6 py-3.5 text-sm disabled:opacity-50">
                 {saving ? "Saving..." : id ? "Save changes" : "Create live test"}
               </button>
-              <p className="mt-2 text-center text-xs text-amber-100/60">It opens by itself once every subject has its questions.</p>
+              <p className="mt-2 text-center text-xs text-amber-100/60">It opens by itself once every subject is ready (lecturers send theirs to you).</p>
             </div>
           </div>
         </aside>
       </form>
     </AdminLayout>
+  );
+}
+
+// Equal-width options in one bar
+function Segmented({ value, onChange, options }) {
+  return (
+    <div className="grid gap-1 rounded-2xl bg-amber-50/70 p-1 ring-1 ring-amber-200/70" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }} role="radiogroup">
+      {options.map(([v, l, sub]) => {
+        const on = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(v)}
+            className={`rounded-xl px-1 py-2 text-center text-[13px] font-semibold leading-tight transition ${on ? "bg-slate-900 text-amber-200 shadow-md" : "text-slate-700 hover:bg-white"}`}
+          >
+            {l}
+            {sub && <span className={`block text-[10px] font-medium ${on ? "text-amber-200/70" : "text-slate-400"}`}>{sub}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimePoint({ label, d, right = false }) {
+  return (
+    <div className={`shrink-0 ${right ? "text-right" : ""}`}>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-800">{label}</p>
+      <p className="font-display text-lg font-extrabold leading-tight text-slate-900">{d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</p>
+      <p className="text-xs text-slate-500">{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</p>
+    </div>
   );
 }

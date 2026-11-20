@@ -25,7 +25,8 @@ export default function LecturerHome() {
   }, []);
 
   const isFull = (i) => i.section.mcqPicked === i.section.mcqCount && i.section.numericalPicked === i.section.numericalCount;
-  const todo = (items || []).filter((i) => !isFull(i) && (i.phase === "draft" || i.phase === "scheduled"));
+  const isSent = (i) => i.section.picker !== "lecturer" || Boolean(i.section.submittedAt);
+  const todo = (items || []).filter((i) => (!isFull(i) || !isSent(i)) && (i.phase === "draft" || i.phase === "scheduled"));
   const rest = (items || []).filter((i) => !todo.includes(i));
   const left = todo.reduce((a, i) => a + i.section.mcqCount + i.section.numericalCount - i.section.mcqPicked - i.section.numericalPicked, 0);
   const next = todo.slice().sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
@@ -39,7 +40,7 @@ export default function LecturerHome() {
           title={`${greeting()}${firstName ? `, ${firstName}` : ""}`}
           subtitle={
             todo.length
-              ? `You have ${todo.length} subject${todo.length === 1 ? "" : "s"} waiting for questions. Fill each one and the test goes live by itself.`
+              ? `You have ${todo.length} subject${todo.length === 1 ? "" : "s"} to finish. Pick the questions, check them, then press "Send to head lecturer".`
               : "You're all caught up. New subjects show up here when the head lecturer adds you to a live test."
           }
           right={
@@ -100,10 +101,11 @@ function SectionList({ title, items }) {
           const total = s.mcqCount + s.numericalCount;
           const picked = s.mcqPicked + s.numericalPicked;
           const done = picked === total;
+          const sent = s.picker !== "lecturer" || Boolean(s.submittedAt);
           const ph = PHASE[i.phase] || PHASE.draft;
           return (
             <Link key={`${i.testId}-${s.key}`} to={`/lecturer/tests/${i.testId}/${s.key}`} className="gp-card gp-card-hover flex items-center gap-5 p-5">
-              <Ring value={total ? (picked / total) * 100 : 0} size={78} tone={done ? "green" : "gold"} label={`${picked}/${total}`} />
+              <Ring value={total ? (picked / total) * 100 : 0} size={78} tone={done && sent ? "green" : "gold"} label={done && sent ? "✓" : `${picked}/${total}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="gp-chip">{i.exam}</span>
@@ -114,11 +116,16 @@ function SectionList({ title, items }) {
                 </div>
                 <p className="mt-1.5 text-lg font-bold text-slate-900">{s.name}</p>
                 <p className="truncate text-sm text-slate-600">{i.title}</p>
+                {s.returnedAt && !s.submittedAt && (
+                  <p className="mt-1 rounded-lg bg-orange-50 px-2 py-1 text-xs text-orange-900">Sent back for changes{s.returnNote ? `: “${s.returnNote}”` : ""}</p>
+                )}
                 <p className="mt-1 text-xs text-slate-500">
                   {s.mcqPicked}/{s.mcqCount} MCQ{s.numericalCount ? ` · ${s.numericalPicked}/${s.numericalCount} numerical` : ""} · opens {fmtDateTime(i.startsAt)}
                 </p>
               </div>
-              <span className="hidden shrink-0 text-sm font-semibold text-amber-800 sm:block">{done ? "View" : "Pick →"}</span>
+              <span className={`hidden shrink-0 text-sm font-semibold sm:block ${done && sent ? "text-green-700" : "text-amber-800"}`}>
+                {!done ? "Pick →" : !sent ? "Check & send →" : "Sent ✓"}
+              </span>
             </Link>
           );
         })}
