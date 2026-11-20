@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 const POINTS = [
-  "66,000+ NEET, JEE and KCET questions, chapter by chapter",
+  "NEET, JEE and KCET questions, chapter by chapter",
   "Full mock tests with the real pattern, timer and marking",
   "Analytics and a revision list built from your mistakes",
 ];

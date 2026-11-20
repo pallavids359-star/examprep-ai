@@ -18,7 +18,7 @@ const NAV = [
 ];
 
 const STATS = [
-  { value: "66,000+", label: "Questions", d: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
+  { value: "Live", label: "Tests by lecturers", d: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
   { value: "3", label: "Exams", d: "M4 20V10M10 20V4M16 20v-6M2 20h20" },
   { value: "11 & 12", label: "Full syllabus", d: "M12 3l9 5-9 5-9-5 9-5zM5 10.5V16c0 1.7 3.1 3 7 3s7-1.3 7-3v-5.5" },
 ];
@@ -32,9 +32,9 @@ const SOCIAL = [
 ];
 
 const EXAMS = [
-  { name: "NEET", tag: "Medical entrance", subjects: ["Physics", "Chemistry", "Biology"], count: "16,000+" },
-  { name: "JEE", tag: "Engineering entrance", subjects: ["Physics", "Chemistry", "Maths"], count: "15,000+" },
-  { name: "KCET", tag: "Karnataka CET", subjects: ["Physics", "Chemistry", "Maths", "Biology"], count: "34,000+" },
+  { name: "NEET", tag: "Medical entrance", subjects: ["Physics", "Chemistry", "Biology"] },
+  { name: "JEE", tag: "Engineering entrance", subjects: ["Physics", "Chemistry", "Maths"] },
+  { name: "KCET", tag: "Karnataka CET", subjects: ["Physics", "Chemistry", "Maths", "Biology"] },
 ];
 
 const FEATURES = [
@@ -214,7 +214,6 @@ export default function Landing({ loggedIn }) {
                     <p className="text-2xl font-bold">{e.name}</p>
                     <p className="text-sm text-[#7a6e5b]">{e.tag}</p>
                   </div>
-                  <span className="text-lg font-bold text-[#8f6215]">{e.count}</span>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {e.subjects.map((s) => (

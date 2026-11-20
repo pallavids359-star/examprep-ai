@@ -624,9 +624,7 @@ export default function PickQuestions() {
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-slate-600">
-                  <b className="font-display text-lg text-slate-900">{results.total}</b> questions found{loadingResults ? " · loading..." : ""}
-                </p>
+                <p className="text-sm text-slate-600">{loadingResults ? "Loading..." : "Questions for your choices"}</p>
                 <Toggle on={showSolutions} onClick={() => setShowSolutions((v) => !v)} label="Show answers & solutions" />
               </div>
               {groups.map((g) => {
@@ -639,7 +637,6 @@ export default function PickQuestions() {
                         <h2 className="text-lg font-bold text-slate-900">{g.name}</h2>
                       </div>
                       <span className="flex gap-1.5 text-xs font-semibold">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-200">{g.total} questions</span>
                         {inTopic > 0 && <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-800 ring-1 ring-green-200">{inTopic} in paper</span>}
                       </span>
                     </div>
