@@ -91,7 +91,8 @@ export default function PickQuestions() {
   const [showConcepts, setShowConcepts] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
   const [testStatus, setTestStatus] = useState(null);
-  const [view, setView] = useState(search.get("view") === "paper" ? "paper" : "add"); // "add" = browse the bank, "paper" = the questions picked so far
+  const [view, setView] = useState(search.get("view") === "paper" ? "paper" : "add");
+  const [stage, setStage] = useState("class"); // add questions: class -> chapters -> topics -> questions // "add" = browse the bank, "paper" = the questions picked so far
   const [history, setHistory] = useState([]); // earlier versions of the paper, for Undo
   const [swapFor, setSwapFor] = useState(null); // the picked question being replaced by hand
   const [busyId, setBusyId] = useState(null);
@@ -128,7 +129,7 @@ export default function PickQuestions() {
 
   // Questions for the current filters
   useEffect(() => {
-    if (!info || chapterIds.length === 0) {
+    if (!info || chapterIds.length === 0 || stage !== "questions") {
       setResults(null);
       return;
     }
@@ -153,7 +154,7 @@ export default function PickQuestions() {
     return () => {
       cancelled = true;
     };
-  }, [info, id, key, classLevel, chapterIds, topicIds, type, difficulty, diagram, hideUsed, page]);
+  }, [info, id, key, classLevel, chapterIds, topicIds, type, difficulty, diagram, hideUsed, page, stage]);
 
   // Any filter change goes back to page 1
   const filtered = (fn) => (...args) => {
@@ -178,6 +179,14 @@ export default function PickQuestions() {
       setTopicIds((p) => p.filter((t) => !gone.has(t)));
       setChapterIds((p) => p.filter((c) => c !== cid));
     } else setChapterIds((p) => [...p, cid]);
+  };
+  const chooseClass = (cl) => {
+    setPage(1);
+    setClassLevel(cl);
+    const keep = new Set(chapters.filter((c) => cl === "both" || c.classLevel === cl).map((c) => c._id));
+    setChapterIds((p) => p.filter((c) => keep.has(c)));
+    setTopicIds([]);
+    setStage("chapters");
   };
   const setClassChapters = (cl, on) => {
     setPage(1);
@@ -278,6 +287,7 @@ export default function PickQuestions() {
   const startManualSwap = (q) => {
     setSwapFor(q);
     setView("add");
+    setStage("questions");
     setPage(1);
     setClassLevel("both");
     setChapterIds(q.chapterId ? [String(q.chapterId)] : []);
@@ -547,156 +557,45 @@ export default function PickQuestions() {
 
 
       {view === "add" && (
-      <div className="mx-auto flex max-w-7xl flex-wrap items-start gap-6 px-4 py-6">
-        {/* Filters */}
-        <aside className="w-full lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto" aria-label="Filters">
-          <div className="gp-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50/50 px-5 py-3.5">
-              <div>
-                <p className="font-bold text-slate-900">Find questions</p>
-                <p className="text-xs text-slate-500">{chapterIds.length ? `${chapterIds.length} chapter${chapterIds.length === 1 ? "" : "s"} ticked` : "Tick chapters to start"}</p>
-              </div>
-              {(chapterIds.length > 0 || type !== "all" || difficulty !== "any" || diagram) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPage(1);
-                    setChapterIds([]);
-                    setTopicIds([]);
-                    setType("all");
-                    setDifficulty("any");
-                    setDiagram(false);
-                  }}
-                  className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-white"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-
-            {/* Class */}
-            <div className="border-b border-amber-100 px-5 py-4">
-              <p className={FLABEL}>Class</p>
-              <Seg
-                value={classLevel}
-                onChange={filtered((v) => setClassLevel(v))}
-                options={[
-                  ["11", "Class 11"],
-                  ["12", "Class 12"],
-                  ["both", "Both"],
-                ]}
-              />
-            </div>
-
-            {/* Chapters */}
-            <div className="border-b border-amber-100 px-5 py-4">
-              <p className={FLABEL}>Chapters</p>
-              {classes.length === 0 && <p className="text-sm text-slate-500">No chapters for this class.</p>}
-              {classes.map((cl) => {
-                const list = visibleChapters.filter((c) => c.classLevel === cl);
-                const on = list.filter((c) => chapterIds.includes(c._id)).length;
-                const allOn = on === list.length;
-                return (
-                  <div key={cl} className="mb-3 last:mb-0">
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-700">
-                        Class {cl} <span className="font-normal text-slate-400">· {on} of {list.length}</span>
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setClassChapters(cl, !allOn)}
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${allOn ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"}`}
-                      >
-                        {allOn ? "Clear" : "Select all"}
-                      </button>
-                    </div>
-                    <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
-                      {list.map((c) => {
-                        const checked = chapterIds.includes(c._id);
-                        return (
-                          <button
-                            key={c._id}
-                            type="button"
-                            role="checkbox"
-                            aria-checked={checked}
-                            onClick={() => toggleChapter(c._id)}
-                            className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${checked ? "bg-amber-50 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                          >
-                            <Box on={checked} />
-                            <span>{c.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Concepts */}
-            {chapterIds.length > 0 && (
-              <Fold
-                title="Concepts"
-                badge={topicIds.length ? `${topicIds.length} ticked` : "All"}
-                open={showConcepts}
-                onToggle={() => setShowConcepts((v) => !v)}
-              >
-                <p className="mb-2 text-xs text-slate-500">Nothing ticked = every concept of the ticked chapters.</p>
-                <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
-                  {chapterIds.map((cid) => {
-                    const ch = chapters.find((c) => c._id === cid);
-                    const ts = topicsByChapter[cid];
-                    return (
-                      <div key={cid}>
-                        <p className="mb-1 text-xs font-semibold text-slate-600">{ch?.name}</p>
-                        {ts === "loading" || !ts ? (
-                          <p className="text-xs text-slate-400">Loading...</p>
-                        ) : (
-                          ts.map((t) => {
-                            const checked = topicIds.includes(t._id);
-                            return (
-                              <button
-                                key={t._id}
-                                type="button"
-                                role="checkbox"
-                                aria-checked={checked}
-                                onClick={filtered(() => setTopicIds((p) => (p.includes(t._id) ? p.filter((x) => x !== t._id) : [...p, t._id])))}
-                                className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-1 text-left text-sm ${checked ? "bg-amber-50 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
-                              >
-                                <Box on={checked} />
-                                <span>{t.name}</span>
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </Fold>
-            )}
-
-            {/* Type and level */}
-            <Fold
-              title="Type & level"
-              badge={[type !== "all" && (type === "mcq" ? "MCQ" : "Numerical"), difficulty !== "any" && difficulty, diagram && "Diagrams"].filter(Boolean).join(" · ") || "Any"}
-              open={moreFilters}
-              onToggle={() => setMoreFilters((v) => !v)}
-            >
-              <p className={FLABEL}>Type</p>
-              <Seg value={type} onChange={filtered((v) => setType(v))} options={TYPES} />
-              <p className={`${FLABEL} mt-3`}>Level</p>
-              <Seg value={difficulty} onChange={filtered((v) => setDifficulty(v))} options={DIFFS.map(([v, l]) => [v, v === "any" ? "Any" : l])} />
-              <div className="mt-3 space-y-2">
-                <Toggle on={diagram} onClick={filtered(() => setDiagram((v) => !v))} label="Only questions with a diagram" />
-                <Toggle on={hideUsed} onClick={filtered(() => setHideUsed((v) => !v))} label="Hide questions used in other live tests" />
-              </div>
-            </Fold>
-          </div>
-        </aside>
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+        {stage !== "questions" ? (
+          <SelectWizard
+            stage={stage}
+            setStage={setStage}
+            classLevel={classLevel}
+            chooseClass={chooseClass}
+            chapters={chapters}
+            chapterIds={chapterIds}
+            toggleChapter={toggleChapter}
+            setClassChapters={setClassChapters}
+            topicsByChapter={topicsByChapter}
+            topicIds={topicIds}
+            setTopicIds={setTopicIds}
+            onShow={() => {
+              setPage(1);
+              setStage("questions");
+            }}
+          />
+        ) : (
+          <QuestionsBar
+            classLevel={classLevel}
+            chapterCount={chapterIds.length}
+            topicCount={topicIds.length}
+            setStage={setStage}
+            type={type}
+            setType={filtered((v) => setType(v))}
+            difficulty={difficulty}
+            setDifficulty={filtered((v) => setDifficulty(v))}
+            diagram={diagram}
+            toggleDiagram={filtered(() => setDiagram((v) => !v))}
+            hideUsed={hideUsed}
+            toggleHideUsed={filtered(() => setHideUsed((v) => !v))}
+          />
+        )}
 
         {/* Questions grouped by concept */}
-        <main className="min-w-0 flex-[999_1_480px] space-y-4" ref={listTop}>
+        {stage === "questions" && (
+        <main className="min-w-0 space-y-4" ref={listTop}>
           {swapFor && (
             <div className="gp-hero flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="relative min-w-0">
@@ -823,6 +722,7 @@ export default function PickQuestions() {
             </>
           )}
         </main>
+        )}
 
       </div>
       )}
@@ -1023,5 +923,247 @@ function PaperSummary({ picked }) {
         </div>
       )}
     </section>
+  );
+}
+
+// Add questions, step by step: class -> chapters -> topics -> questions
+const STEPS = [
+  ["class", "Class"],
+  ["chapters", "Chapters"],
+  ["topics", "Topics"],
+  ["questions", "Questions"],
+];
+
+function Stepper({ stage, setStage, canGo }) {
+  const at = STEPS.findIndex(([k]) => k === stage);
+  return (
+    <ol className="flex flex-wrap items-center gap-2">
+      {STEPS.map(([k, l], i) => {
+        const done = i < at;
+        const here = i === at;
+        const ok = canGo(k);
+        return (
+          <li key={k} className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!ok || here}
+              onClick={() => setStage(k)}
+              className={`flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-semibold transition ${
+                here ? "bg-slate-900 text-amber-200 shadow" : done ? "bg-white text-slate-800 ring-1 ring-amber-300 hover:bg-amber-50" : "bg-white/60 text-slate-400 ring-1 ring-slate-200"
+              }`}
+            >
+              <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-extrabold ${here ? "bg-amber-300 text-slate-900" : done ? "bg-green-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+                {done ? "✓" : i + 1}
+              </span>
+              {l}
+            </button>
+            {i < STEPS.length - 1 && <span className="h-px w-6 bg-amber-300/70" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function SelectWizard({ stage, setStage, classLevel, chooseClass, chapters, chapterIds, toggleChapter, setClassChapters, topicsByChapter, topicIds, setTopicIds, onShow }) {
+  const classes = ["11", "12"].filter((c) => chapters.some((x) => x.classLevel === c));
+  const visible = chapters.filter((c) => classLevel === "both" || c.classLevel === classLevel);
+  const canGo = (k) => k === "class" || (k === "chapters" && classLevel) || ((k === "topics" || k === "questions") && chapterIds.length > 0);
+  const toggleTopic = (tid) => setTopicIds((p) => (p.includes(tid) ? p.filter((x) => x !== tid) : [...p, tid]));
+
+  return (
+    <div className="space-y-5">
+      <Stepper stage={stage} setStage={setStage} canGo={canGo} />
+
+      {stage === "class" && (
+        <section className="gp-card p-6 md:p-8">
+          <h2 className="text-2xl font-extrabold text-slate-900">Which class?</h2>
+          <p className="mt-1 text-sm text-slate-500">Choose the class whose chapters you want to pick questions from.</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {[...classes.map((c) => [c, `Class ${c}`]), ["both", "Both classes"]].map(([v, l]) => {
+              const n = chapters.filter((c) => v === "both" || c.classLevel === v).length;
+              return (
+                <button key={v} type="button" aria-pressed={classLevel === v} onClick={() => chooseClass(v)} className="gp-tile group p-6 text-left">
+                  <span className="font-display text-4xl font-extrabold text-slate-900">{v === "both" ? "11+12" : v}</span>
+                  <span className="mt-2 block font-semibold text-slate-800">{l}</span>
+                  <span className="text-sm text-slate-500">{n} chapters</span>
+                  <span className="mt-4 block text-sm font-semibold text-amber-800 group-hover:underline">Choose →</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {stage === "chapters" && (
+        <section className="gp-card p-6 md:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-extrabold text-slate-900">Tick the chapters</h2>
+              <p className="mt-1 text-sm text-slate-500">{classLevel === "both" ? "Class 11 and 12" : `Class ${classLevel}`} · tick one or more</p>
+            </div>
+          </div>
+          {(classLevel === "both" ? classes : [classLevel]).map((cl) => {
+            const list = visible.filter((c) => c.classLevel === cl);
+            const on = list.filter((c) => chapterIds.includes(c._id)).length;
+            return (
+              <div key={cl} className="mt-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-800">
+                    Class {cl} <span className="font-normal text-slate-400">· {on} of {list.length} ticked</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setClassChapters(cl, on !== list.length)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${on === list.length ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"}`}
+                  >
+                    {on === list.length ? "Clear all" : "Select all"}
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {list.map((c, i) => {
+                    const checked = chapterIds.includes(c._id);
+                    return (
+                      <button key={c._id} type="button" aria-pressed={checked} onClick={() => toggleChapter(c._id)} className="gp-tile flex items-start gap-3 p-3 text-left">
+                        <Box on={checked} />
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-semibold text-slate-400">Chapter {i + 1}</span>
+                          <span className={`block text-sm leading-snug ${checked ? "font-bold text-slate-900" : "text-slate-700"}`}>{c.name}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <WizardFooter
+            left={<button type="button" onClick={() => setStage("class")} className="text-sm font-semibold text-slate-600 hover:underline">← Change class</button>}
+            note={chapterIds.length ? `${chapterIds.length} chapter${chapterIds.length === 1 ? "" : "s"} ticked` : "Tick at least one chapter"}
+          >
+            <button type="button" disabled={!chapterIds.length} onClick={onShow} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-white disabled:opacity-40">
+              Skip, show all questions
+            </button>
+            <button type="button" disabled={!chapterIds.length} onClick={() => setStage("topics")} className="gp-gold-btn px-5 py-2.5 text-sm disabled:opacity-40">
+              Next: choose topics →
+            </button>
+          </WizardFooter>
+        </section>
+      )}
+
+      {stage === "topics" && (
+        <section className="gp-card p-6 md:p-8">
+          <h2 className="text-2xl font-extrabold text-slate-900">Choose the topics</h2>
+          <p className="mt-1 text-sm text-slate-500">Tap topics to narrow it down. Leave a chapter with nothing ticked to use all its topics.</p>
+          <div className="mt-6 space-y-5">
+            {chapterIds.map((cid) => {
+              const ch = chapters.find((c) => c._id === cid);
+              const ts = topicsByChapter[cid];
+              const list = Array.isArray(ts) ? ts : [];
+              const on = list.filter((t) => topicIds.includes(t._id)).length;
+              return (
+                <div key={cid} className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-bold text-slate-900">
+                      {ch?.name}
+                      <span className="ml-2 text-xs font-normal text-slate-400">Class {ch?.classLevel}</span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{on ? `${on} of ${list.length}` : "All topics"}</span>
+                      {list.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setTopicIds((p) => (on === list.length ? p.filter((x) => !list.some((t) => t._id === x)) : [...new Set([...p, ...list.map((t) => t._id)])]))}
+                          className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
+                        >
+                          {on === list.length ? "Clear" : "Select all"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {ts === "loading" || !ts ? (
+                    <p className="text-sm text-slate-400">Loading topics...</p>
+                  ) : list.length === 0 ? (
+                    <p className="text-sm text-slate-400">No topics in this chapter.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {list.map((t) => {
+                        const checked = topicIds.includes(t._id);
+                        return (
+                          <button
+                            key={t._id}
+                            type="button"
+                            aria-pressed={checked}
+                            onClick={() => toggleTopic(t._id)}
+                            className={`rounded-full px-3.5 py-1.5 text-sm transition ${checked ? "bg-slate-900 font-semibold text-amber-200 shadow" : "bg-amber-50/60 text-slate-700 ring-1 ring-amber-200/80 hover:bg-amber-100"}`}
+                          >
+                            {checked && "✓ "}
+                            {t.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <WizardFooter
+            left={<button type="button" onClick={() => setStage("chapters")} className="text-sm font-semibold text-slate-600 hover:underline">← Change chapters</button>}
+            note={topicIds.length ? `${topicIds.length} topic${topicIds.length === 1 ? "" : "s"} chosen` : "All topics of the ticked chapters"}
+          >
+            <button type="button" onClick={onShow} className="gp-gold-btn px-6 py-2.5 text-sm">
+              Show questions →
+            </button>
+          </WizardFooter>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function WizardFooter({ left, note, children }) {
+  return (
+    <div className="sticky bottom-0 -mx-6 -mb-6 mt-8 flex flex-wrap items-center justify-between gap-3 rounded-b-[inherit] border-t border-amber-100 bg-[#fffdf7]/95 px-6 py-4 backdrop-blur md:-mx-8 md:-mb-8 md:px-8">
+      <div className="flex items-center gap-4">
+        {left}
+        <span className="text-sm text-slate-500">{note}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+// Shown above the questions: what was chosen, with quick filters
+function QuestionsBar({ classLevel, chapterCount, topicCount, setStage, type, setType, difficulty, setDifficulty, diagram, toggleDiagram, hideUsed, toggleHideUsed }) {
+  return (
+    <div className="gp-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {[
+            ["class", classLevel === "both" ? "Class 11 + 12" : `Class ${classLevel}`],
+            ["chapters", `${chapterCount} chapter${chapterCount === 1 ? "" : "s"}`],
+            ["topics", topicCount ? `${topicCount} topic${topicCount === 1 ? "" : "s"}` : "All topics"],
+          ].map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setStage(k)} className="group flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-slate-800 ring-1 ring-amber-200 hover:bg-amber-100" title="Change">
+              {l}
+              <span className="text-xs text-amber-700 group-hover:underline">✎</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-56">
+            <Seg value={type} onChange={setType} options={TYPES.map(([v, l]) => [v, v === "all" ? "All" : l])} />
+          </div>
+          <div className="w-64">
+            <Seg value={difficulty} onChange={setDifficulty} options={DIFFS.map(([v, l]) => [v, v === "any" ? "Any" : l])} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-5 border-t border-amber-100 pt-3">
+        <Toggle on={diagram} onClick={toggleDiagram} label="Only with a diagram" />
+        <Toggle on={hideUsed} onClick={toggleHideUsed} label="Hide questions used in other live tests" />
+      </div>
+    </div>
   );
 }
