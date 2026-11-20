@@ -12,19 +12,27 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpe
   const hasRoll = sorted.some((r) => r.student?.rollNo);
 
   const switcher = (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-      <div className="flex rounded-lg bg-white p-0.5 ring-1 ring-slate-200">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+      <div className="flex gap-6">
         {[
-          ["board", "Leaderboard"],
-          ["list", "Merit list"],
-        ].map(([k, l]) => (
-          <button key={k} type="button" onClick={() => setView(k)} className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${view === k ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}>
+          ["board", "Leaderboard", "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3"],
+          ["list", "Merit list", "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"],
+        ].map(([k, l, d]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setView(k)}
+            className={`-mb-[13px] flex items-center gap-2 border-b-2 pb-3 text-sm font-semibold transition ${view === k ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={d} />
+            </svg>
             {l}
           </button>
         ))}
       </div>
       {view === "list" && (
-        <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-black">
           Print / Save as PDF
         </button>
       )}
