@@ -57,6 +57,7 @@ const finalizeAttempt = async (attempt, submittedAnswers, auto = false) => {
                 numericalValue: a.numericalValue,
                 timeSpentSec: a.timeSpentSec,
                 markedForReview: a.markedForReview,
+                visited: a.visited,
             }))
             : submittedAnswers;
 

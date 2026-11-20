@@ -45,6 +45,8 @@ router.delete("/tests/:id", deleteTest);
 
 // Students
 router.get("/students", admin.listStudents);
+router.get("/students/:id", admin.getStudent);
+router.get("/students/:id/history", admin.getStudentHistory);
 router.put("/students/:id/status", admin.setStudentStatus);
 
 const { questionBreakdown } = require("../controllers/questionStatsController");

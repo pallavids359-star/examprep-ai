@@ -53,7 +53,7 @@ function Trend({ tests }) {
 }
 
 // Marks of one test, split by subject and by chapter
-function TestDetail({ test }) {
+function TestDetail({ test, reviewLink = true }) {
   const facts = [
     ["Correct", test.correct, "text-emerald-700"],
     ["Wrong", test.incorrect, "text-red-700"],
@@ -123,15 +123,18 @@ function TestDetail({ test }) {
         </>
       )}
 
-      <Link to={`/result/${test.attemptId}`} className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:underline">
+      {reviewLink && (
+        <Link to={`/result/${test.attemptId}`} className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:underline">
         Review every question <Icon d={ICONS.arrow} className="h-4 w-4" />
       </Link>
+      )}
     </div>
   );
 }
 
-export default function Analytics() {
-  const { examId, exam } = useExam();
+// The analytics view. Used by the student's own Analytics page and, for any student,
+// by the admin's student page (historyUrl = /admin/students/:id/history).
+export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", reviewLink = true, showHeader = true }) {
   const [tab, setTab] = useState("practice");
   const [data, setData] = useState({}); // tab -> tests
   const [open, setOpen] = useState(null);
@@ -140,13 +143,16 @@ export default function Analytics() {
 
   useEffect(() => {
     if (!examId) return;
+    setData({});
+    setOpen(null);
+    setSubject("all");
     ["practice", "mock"].forEach((mode) =>
       api
-        .get("/progress/history", { params: { examId, mode } })
+        .get(historyUrl, { params: { examId, mode } })
         .then((res) => setData((d) => ({ ...d, [mode]: res.data.tests })))
         .catch((err) => setError(getErrorMessage(err)))
     );
-  }, [examId]);
+  }, [examId, historyUrl]);
 
   const allTests = data[tab];
 
@@ -226,10 +232,12 @@ export default function Analytics() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
-      <PageHeader eyebrow={`${exam?.code || ""} performance`} title="Analytics" subtitle="Every test you finished, with marks by subject and chapter." />
+    <div className={showHeader ? "mx-auto max-w-6xl px-4 py-6 md:py-8" : ""}>
+      {showHeader && (
+        <PageHeader eyebrow={`${exam?.code || ""} performance`} title="Analytics" subtitle="Every test you finished, with marks by subject and chapter." />
+      )}
 
-      <div className="mt-6 max-w-xl">
+      <div className={showHeader ? "mt-6 max-w-xl" : "max-w-xl"}>
         <Segmented
           label="Kind of test"
           value={tab}
@@ -359,7 +367,7 @@ export default function Analytics() {
                       <span className="text-right"><Pct value={t.percentage} /></span>
                       <Icon d={ICONS.chevron} className={cx("h-5 w-5 text-slate-400 transition", isOpen && "rotate-180")} />
                     </button>
-                    {isOpen && <TestDetail test={t} />}
+                    {isOpen && <TestDetail test={t} reviewLink={reviewLink} />}
                   </li>
                 );
               })}
@@ -369,4 +377,9 @@ export default function Analytics() {
       )}
     </div>
   );
+}
+
+export default function Analytics() {
+  const { examId, exam } = useExam();
+  return <AnalyticsView examId={examId} exam={exam} />;
 }

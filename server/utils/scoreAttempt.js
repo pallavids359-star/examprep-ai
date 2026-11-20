@@ -43,6 +43,7 @@ const scoreAttempt = (attempt, submitted, questionsById) => {
             typeof given.numericalValue === "number" ? given.numericalValue : undefined;
         answer.timeSpentSec = Math.max(0, Number(given.timeSpentSec) || 0);
         answer.markedForReview = Boolean(given.markedForReview);
+        answer.visited = Boolean(answer.visited || given.visited || answer.timeSpentSec > 0 || selected.length || typeof given.numericalValue === "number");
         totalTime += answer.timeSpentSec;
 
         // Decide: correct (true), wrong (false) or unanswered (null)

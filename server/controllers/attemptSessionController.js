@@ -31,6 +31,7 @@ const saveAnswers = async (req, res) => {
             if (typeof g.numericalValue === "number") answer.numericalValue = g.numericalValue;
             answer.markedForReview = Boolean(g.markedForReview);
             answer.timeSpentSec = Math.max(0, Number(g.timeSpentSec) || 0);
+            answer.visited = Boolean(answer.visited || g.visited);
         }
         await attempt.save();
         res.json({ message: "Saved", savedAt: new Date() });
@@ -50,6 +51,11 @@ const getAttempt = async (req, res) => {
         // A timed test left open past its deadline is submitted automatically
         if (attempt.status === "in_progress" && isExpired(attempt)) {
             await finalizeAttempt(attempt, null, true);
+        }
+
+        // Live tests: the result lives on the live report page (it may still be hidden)
+        if (attempt.mode === "live" && attempt.status !== "in_progress") {
+            return res.json({ attemptId: attempt._id, mode: "live", status: attempt.status, testId: attempt.testId });
         }
 
         if (attempt.status === "in_progress") {

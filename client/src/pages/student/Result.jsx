@@ -32,6 +32,11 @@ export default function Result() {
           navigate(`/attempt/${id}`, { replace: true });
           return;
         }
+        // Live tests have their own report (results may still be hidden)
+        if (res.data.mode === "live") {
+          navigate(`/live-tests/${res.data.testId}/report`, { replace: true });
+          return;
+        }
         setData(res.data);
       })
       .catch((err) => setError(getErrorMessage(err)));

@@ -103,7 +103,7 @@ const createTest = async (req, res) => {
 // ADMIN: GET /api/admin/tests?examId=...
 const listTestsAdmin = async (req, res) => {
     try {
-        const filter = { status: { $ne: "archived" } };
+        const filter = { status: { $ne: "archived" }, type: { $ne: "live" } }; // live tests have their own page
         if (isValidId(req.query.examId)) filter.examId = req.query.examId;
         const tests = await Test.find(filter).sort({ createdAt: -1 }).select("-sections.questionIds").lean();
         res.json({ tests });
@@ -130,7 +130,7 @@ const listTests = async (req, res) => {
         const { examId } = req.query;
         if (!isValidId(examId)) throw userError("A valid examId is required");
 
-        const tests = await Test.find({ examId, status: "published" })
+        const tests = await Test.find({ examId, status: "published", type: { $ne: "live" } })
             .sort({ createdAt: -1 })
             .select("title type durationMinutes totalQuestions totalMarks maxAttempts instructions markingScheme availability stats sections.name")
             .lean();
@@ -169,7 +169,7 @@ const listTests = async (req, res) => {
 const startTest = async (req, res) => {
     try {
         if (!isValidId(req.params.id)) throw userError("Invalid test id");
-        const test = await Test.findOne({ _id: req.params.id, status: "published" });
+        const test = await Test.findOne({ _id: req.params.id, status: "published", type: { $ne: "live" } });
         if (!test) throw userError("Test not found", 404);
 
         const now = new Date();

@@ -11,7 +11,7 @@ export const formatClock = (seconds) => {
 };
 
 // Answers in the shape the server expects
-const buildPayload = (questions, answers, marked, times) =>
+const buildPayload = (questions, answers, marked, times, visited = {}) =>
   questions.map((q) => {
     const given = answers[q._id] || [];
     // Numerical questions: the typed number is kept as the only item in the list
@@ -23,6 +23,7 @@ const buildPayload = (questions, answers, marked, times) =>
     ...(Number.isFinite(value) ? { numericalValue: value } : {}),
     markedForReview: Boolean(marked[q._id]),
     timeSpentSec: times[q._id] || 0,
+    visited: Boolean(visited[q._id]),
     };
   });
 
@@ -96,7 +97,7 @@ export default function useTestSession(id) {
 
   // 3. Keep a copy in this browser and note that something changed
   useEffect(() => {
-    latest.current = { questions, answers, marked, times };
+    latest.current = { questions, answers, marked, times, visited };
     if (questions.length === 0) return;
     localStorage.setItem(storageKey, JSON.stringify({ answers, marked, times, visited }));
     dirty.current = true;
@@ -109,7 +110,8 @@ export default function useTestSession(id) {
   }, [currentId]);
 
   // 4. Mock tests: autosave to the server every 10 seconds if something changed
-  const isMock = info?.mode === "mock";
+  // Mock and live tests are timed, autosaved and run under exam rules
+  const isMock = info?.mode === "mock" || info?.mode === "live";
   useEffect(() => {
     if (!isMock) return;
     const timer = setInterval(() => {
@@ -118,7 +120,7 @@ export default function useTestSession(id) {
       const l = latest.current;
       setSaveState("saving");
       api
-        .put(`/attempts/${id}/answers`, { answers: buildPayload(l.questions, l.answers, l.marked, l.times) })
+        .put(`/attempts/${id}/answers`, { answers: buildPayload(l.questions, l.answers, l.marked, l.times, l.visited) })
         .then(() => setSaveState("saved"))
         .catch((err) => {
           if (err.response?.status === 409) navigate(`/result/${id}`, { replace: true }); // time already up
@@ -171,7 +173,7 @@ export default function useTestSession(id) {
     setSubmitting(true);
     setError("");
     try {
-      await api.post(`/attempts/${id}/submit`, { answers: buildPayload(questions, answers, marked, finalTimes) });
+      await api.post(`/attempts/${id}/submit`, { answers: buildPayload(questions, answers, marked, finalTimes, visited) });
       localStorage.removeItem(storageKey);
       navigate(`/result/${id}`, { replace: true });
     } catch (err) {

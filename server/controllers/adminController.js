@@ -6,6 +6,8 @@ const Question = require("../models/Question");
 const Test = require("../models/Test");
 const User = require("../models/User");
 const TestAttempt = require("../models/TestAttempt");
+const Exam = require("../models/Exam");
+const { getHistory } = require("./historyController");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const slugify = (text) => text.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -146,6 +148,38 @@ const listStudents = handle("listStudents", async (req, res) => {
     res.json({ students: students.map((s) => ({ ...s, testsTaken: testsById.get(String(s._id)) || 0 })) });
 });
 
+// GET /api/admin/students/:id
+// One student, plus how many finished tests they have in each exam (for the exam switcher)
+const getStudent = handle("getStudent", async (req, res) => {
+    if (!isValidId(req.params.id)) throw userError("Invalid student id");
+    const student = await User.findOne({ _id: req.params.id, role: "student" })
+        .select("name email status createdAt lastLoginAt")
+        .lean();
+    if (!student) throw userError("Student not found", 404);
+
+    const [exams, counts] = await Promise.all([
+        Exam.find().sort({ order: 1, code: 1 }).select("code name").lean(),
+        TestAttempt.aggregate([
+            { $match: { userId: student._id, status: { $in: ["submitted", "auto_submitted"] } } },
+            { $group: { _id: "$examId", tests: { $sum: 1 }, last: { $max: "$submittedAt" } } },
+        ]),
+    ]);
+    const byExam = new Map(counts.map((c) => [String(c._id), c]));
+    res.json({
+        student,
+        exams: exams.map((e) => ({ ...e, tests: byExam.get(String(e._id))?.tests || 0, lastTestAt: byExam.get(String(e._id))?.last || null })),
+    });
+});
+
+// GET /api/admin/students/:id/history?examId=...&mode=practice|mock
+// The same data the student's own Analytics page shows, for this student
+const getStudentHistory = async (req, res) => {
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid student id" });
+    const student = await User.findOne({ _id: req.params.id, role: "student" }).select("_id").lean();
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    return getHistory({ ...req, query: req.query, user: { _id: student._id } }, res);
+};
+
 // PUT /api/admin/students/:id/status   { status: "active" | "suspended" }
 const setStudentStatus = handle("setStudentStatus", async (req, res) => {
     const { status } = req.body;
@@ -181,6 +215,8 @@ module.exports = {
     createTopic,
     deleteTopic,
     listStudents,
+    getStudent,
+    getStudentHistory,
     setStudentStatus,
     getOverview,
 };

@@ -11,6 +11,7 @@ const answerSchema = new mongoose.Schema(
         selectedOptionIds: { type: [String], default: [] },
         numericalValue: { type: Number },
         markedForReview: { type: Boolean, default: false },
+        visited: { type: Boolean, default: false }, // opened at least once (live test report)
         timeSpentSec: { type: Number, default: 0 },
         // Filled in when the attempt is submitted
         correctOptionIds: { type: [String], default: undefined },
@@ -64,7 +65,7 @@ const testAttemptSchema = new mongoose.Schema(
         examId: { type: ObjectId, ref: "Exam", required: true },
         mode: {
             type: String,
-            enum: ["mock", "practice", "wrong_answer_practice", "bookmark_practice"],
+            enum: ["mock", "practice", "wrong_answer_practice", "bookmark_practice", "live"],
             required: true,
         },
         testId: { type: ObjectId, ref: "Test" }, // mock tests only (later)
@@ -95,5 +96,7 @@ const testAttemptSchema = new mongoose.Schema(
 
 testAttemptSchema.index({ userId: 1, createdAt: -1 }); // "recent tests"
 testAttemptSchema.index({ testId: 1, status: 1, "result.score": -1 }); // ranking
+// One live-test attempt per student (also stops a double click making two)
+testAttemptSchema.index({ testId: 1, userId: 1 }, { unique: true, partialFilterExpression: { mode: "live" } });
 
 module.exports = mongoose.model("TestAttempt", testAttemptSchema);

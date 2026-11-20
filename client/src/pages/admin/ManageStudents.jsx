@@ -1,5 +1,6 @@
 import { askConfirm } from "../../components/ConfirmDialog";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 
@@ -77,7 +78,9 @@ export default function ManageStudents() {
                             students.map((s) => (
                                 <tr key={s._id} className="border-b border-slate-100 last:border-0">
                                     <td className="px-4 py-3">
-                                        <p className="font-medium text-slate-900">{s.name}</p>
+                                        <Link to={`/admin/students/${s._id}`} className="font-medium text-slate-900 hover:text-indigo-700 hover:underline">
+                                            {s.name}
+                                        </Link>
                                         <p className="text-xs text-slate-500">{s.email}</p>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(s.createdAt)}</td>
@@ -91,7 +94,10 @@ export default function ManageStudents() {
                                             {s.status}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                        <Link to={`/admin/students/${s._id}`} className="mr-4 font-medium text-indigo-600 hover:underline">
+                                            View analytics
+                                        </Link>
                                         <button
                                             onClick={() => toggleStatus(s)}
                                             className={s.status === "active" ? "text-red-600 hover:underline" : "text-green-700 hover:underline"}

@@ -72,7 +72,7 @@ const login = async (req, res) => {
 
         // 3. Compare the typed password with the scrambled one
         const passwordMatches =
-            user && (await bcrypt.compare(password, user.passwordHash));
+            user && typeof user.passwordHash === "string" && (await bcrypt.compare(String(password), user.passwordHash));
 
         // Same message for both cases, so attackers can't tell which emails exist
         if (!passwordMatches) {

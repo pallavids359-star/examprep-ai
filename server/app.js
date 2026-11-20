@@ -14,6 +14,7 @@ const progressRoutes = require("./routes/progressRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
 const testRoutes = require("./routes/testRoutes");
 const syncRoutes = require("./routes/syncRoutes");
+const liveRoutes = require("./routes/liveRoutes");
 
 const {
     securityHeaders,
@@ -93,7 +94,10 @@ app.use("/api", rateLimit({
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api", examRoutes);
+app.use("/api/admin", liveRoutes.adminRouter); // live tests and lecturers
 app.use("/api/admin", adminRoutes);
+app.use("/api/lecturer", liveRoutes.lecturerRouter);
+app.use("/api/live-tests", liveRoutes.studentRouter);
 app.use("/api/attempts", attemptRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);

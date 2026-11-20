@@ -101,6 +101,11 @@ const submitAttempt = async (req, res) => {
         const timeUp = isExpired(attempt);
         const questionsById = await finalizeAttempt(attempt, req.body.answers, timeUp);
 
+        // Live tests: no answers here; the report page shows them when the head allows
+        if (attempt.mode === "live") {
+            return res.json({ message: timeUp ? "Time was up, so your last saved answers were submitted" : "Submitted", attemptId: attempt._id, mode: "live", status: attempt.status, testId: attempt.testId });
+        }
+
         res.json({
             message: timeUp ? "Time was up, so your last saved answers were submitted" : "Submitted",
             ...buildReview(attempt, questionsById, await mockExtras(attempt)),

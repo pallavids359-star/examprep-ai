@@ -7,6 +7,7 @@ const LINKS = [
   { to: "/dashboard", label: "Dashboard", icon: "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" },
   { to: "/practice", label: "Practice", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
   { to: "/mock-tests", label: "Mock tests", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" },
+  { to: "/live-tests", label: "Live tests", icon: "M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 100 8 4 4 0 000-8z" },
   { to: "/analytics", label: "Analytics", icon: "M4 20V10M10 20V4M16 20v-6M2 20h20" },
   { to: "/revise", label: "Revise", icon: "M4 4v6h6M20 20v-6h-6M5.5 15a7.5 7.5 0 0013.5 2M18.5 9A7.5 7.5 0 005 7" },
 ];
