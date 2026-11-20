@@ -164,7 +164,7 @@ export default function LiveTestReview() {
               )}
               {test.phase !== "draft" && (
                 <Link to={`/admin/live-tests/${id}/results`} className="gp-gold-btn px-5 py-2.5 text-sm">
-                  🏆 Leaderboard
+                  Leaderboard
                 </Link>
               )}
             </div>

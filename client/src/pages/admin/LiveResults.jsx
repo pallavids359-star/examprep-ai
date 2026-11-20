@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
-import { PHASE, fmtDateTime, fmtDuration } from "../../components/liveHelpers";
-import { ICONS, Stat } from "../../components/premium";
+import { PHASE, fmtDuration } from "../../components/liveHelpers";
 
 // Head lecturer: leaderboard of a live test
 export default function LiveResults() {
@@ -48,134 +47,107 @@ export default function LiveResults() {
     );
   }
   const ph = PHASE[data.test.phase] || PHASE.draft;
-  const top = data.rows.filter((r) => r.rank <= 3).slice(0, 3);
-  // Podium order: 2nd, 1st, 3rd
-  const podium = [top[1], top[0], top[2]];
-  const MEDAL = {
-    1: { ring: "from-amber-200 to-amber-500", h: "h-36", label: "1st", crown: "👑" },
-    2: { ring: "from-slate-200 to-slate-400", h: "h-28", label: "2nd", crown: "" },
-    3: { ring: "from-orange-200 to-orange-400", h: "h-24", label: "3rd", crown: "" },
-  };
-  const initials = (n = "") => n.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
+  const top = data.rows.slice(0, 3);
+  const MEDAL = ["🥇", "🥈", "🥉"];
 
   return (
     <AdminLayout>
-      <Link to={`/admin/live-tests/${id}`} className="text-sm font-semibold text-amber-800 hover:underline">
-        ← Back to the test
+      <Link to={`/admin/live-tests/${id}`} className="text-sm text-slate-500 hover:text-slate-900">
+        ← {data.test.title}
       </Link>
 
-      <section className="gp-hero mt-3 p-6 md:p-8">
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">Leaderboard</p>
-            <h1 className="mt-2 text-2xl font-extrabold text-white md:text-3xl">{data.test.title}</h1>
-            <p className="gp-muted mt-1 flex flex-wrap items-center gap-2 text-sm">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ph.cls}`}>{ph.label}</span>
-              {fmtDateTime(data.test.startsAt)} → {fmtDateTime(data.test.endsAt)}
-            </p>
-          </div>
-          {data.rows.length > 0 && (
-            <button type="button" onClick={download} className="rounded-xl px-4 py-2 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10">
-              ⬇ Download Excel (CSV)
-            </button>
-          )}
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Leaderboard</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${ph.cls}`}>{ph.label}</span>
+            {data.stats.finished} finished
+            {data.stats.inProgress ? ` · ${data.stats.inProgress} writing now` : ""}
+            {data.stats.average !== null ? ` · average ${data.stats.average} / ${data.test.totalMarks}` : ""}
+          </p>
         </div>
-
-        {/* Podium */}
-        {top.length > 0 && (
-          <div className="relative mx-auto mt-8 grid max-w-2xl grid-cols-3 items-end gap-3 md:gap-5">
-            {podium.map((r, i) =>
-              r ? (
-                <div key={r.attemptId} className="flex flex-col items-center text-center">
-                  <span className="text-2xl leading-none">{MEDAL[r.rank]?.crown}</span>
-                  <span className={`mt-1 grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br p-[3px] md:h-20 md:w-20 ${MEDAL[r.rank]?.ring}`}>
-                    <span className="grid h-full w-full place-items-center rounded-full bg-slate-900 font-display text-lg font-extrabold text-amber-100 md:text-xl">{initials(r.student?.name)}</span>
-                  </span>
-                  <p className="mt-2 max-w-full truncate text-sm font-bold text-white">{r.student?.name || "Deleted account"}</p>
-                  <p className="font-display text-lg font-extrabold">
-                    <span className="gp-gold-text">{r.score}</span>
-                    <span className="text-xs text-amber-100/60"> / {r.maxScore}</span>
-                  </p>
-                  <div className={`mt-2 flex w-full flex-col items-center justify-start rounded-t-2xl bg-gradient-to-b pt-3 ${MEDAL[r.rank]?.ring} ${MEDAL[r.rank]?.h}`}>
-                    <span className="font-display text-3xl font-extrabold text-slate-900">{r.rank}</span>
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-800/80">{MEDAL[r.rank]?.label}</span>
-                  </div>
-                </div>
-              ) : (
-                <div key={`empty-${i}`} />
-              )
-            )}
-          </div>
+        {data.rows.length > 0 && (
+          <button type="button" onClick={download} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Download CSV
+          </button>
         )}
-      </section>
-
-      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Finished" value={data.stats.finished} sub="students" icon={ICONS.users} accent />
-        <Stat label="Writing now" value={data.stats.inProgress} sub="in progress" icon={ICONS.clock} />
-        <Stat label="Average" value={data.stats.average ?? "—"} sub={`out of ${data.test.totalMarks}`} icon={ICONS.target} />
-        <Stat label="Highest" value={data.stats.highest ?? "—"} sub={`out of ${data.test.totalMarks}`} icon={ICONS.trophy} />
       </div>
 
       {data.rows.length === 0 ? (
-        <p className="gp-card mt-6 p-10 text-center text-sm text-slate-500">No one has finished yet. The leaderboard fills in as students submit.</p>
+        <p className="py-16 text-center text-sm text-slate-400">No one has finished yet. Ranks appear here as students submit.</p>
       ) : (
-        <section className="mt-6">
-          <h2 className="text-xl font-extrabold text-slate-900">All students</h2>
-          <div className="mt-3 space-y-2">
-            {data.rows.map((r) => (
-              <div key={r.attemptId} className={`gp-card flex flex-wrap items-center gap-4 p-4 ${r.rank <= 3 ? "ring-1 ring-amber-300" : ""}`}>
-                <span
-                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl font-display text-lg font-extrabold ${
-                    r.rank === 1 ? "bg-gradient-to-br from-amber-200 to-amber-500 text-slate-900" : r.rank === 2 ? "bg-slate-200 text-slate-800" : r.rank === 3 ? "bg-orange-200 text-orange-900" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {r.rank}
-                </span>
-                <div className="min-w-0 flex-1">
-                  {r.student ? (
-                    <Link to={`/admin/students/${r.student._id}`} className="font-bold text-slate-900 hover:underline">
-                      {r.student.name}
-                    </Link>
-                  ) : (
-                    <span className="font-bold text-slate-500">Deleted account</span>
-                  )}
-                  <p className="truncate text-xs text-slate-500">
-                    {r.student?.email} · {fmtDateTime(r.submittedAt)}
-                    {r.autoSubmitted ? " · time ran out" : ""}
-                  </p>
+        <>
+          {/* Top 3 */}
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {top.map((r, i) => (
+              <div key={r.attemptId} className={`rounded-xl border bg-white p-5 ${i === 0 ? "border-amber-300 shadow-sm" : "border-slate-200"}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">{MEDAL[r.rank - 1] || ""}</span>
+                  <span className="text-xs font-medium text-slate-400">Rank {r.rank}</span>
                 </div>
-                <div className="flex items-center gap-5 text-center">
-                  <div>
-                    <p className="font-display text-lg font-extrabold tabular-nums text-green-700">{r.correct}</p>
-                    <p className="text-[11px] text-slate-500">correct</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-lg font-extrabold tabular-nums text-orange-700">{r.incorrect}</p>
-                    <p className="text-[11px] text-slate-500">wrong</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-lg font-extrabold tabular-nums text-slate-500">{r.unanswered}</p>
-                    <p className="text-[11px] text-slate-500">blank</p>
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="font-display text-lg font-extrabold tabular-nums text-slate-700">{fmtDuration(r.timeTakenSec)}</p>
-                    <p className="text-[11px] text-slate-500">time</p>
-                  </div>
-                  <div className="border-l border-slate-200 pl-5">
-                    <p className="font-display text-xl font-extrabold tabular-nums text-slate-900">
-                      {r.score}
-                      <span className="text-sm text-slate-400">/{r.maxScore}</span>
-                    </p>
-                    <p className="text-[11px] text-slate-500">{r.percentage}%</p>
-                  </div>
-                </div>
-                <Link to={`/admin/attempts/${r.attemptId}`} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-amber-200 hover:bg-black">
-                  View answers →
+                <p className="mt-3 truncate text-base font-semibold text-slate-900">{r.student?.name || "Deleted account"}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+                  {r.score}
+                  <span className="ml-1 text-sm font-normal text-slate-400">/ {r.maxScore}</span>
+                </p>
+                <Link to={`/admin/attempts/${r.attemptId}`} className="mt-3 inline-block text-sm font-medium text-amber-800 hover:underline">
+                  View answers
                 </Link>
               </div>
             ))}
           </div>
-        </section>
+
+          {/* Everyone */}
+          <h2 className="mt-10 text-lg font-bold text-slate-900">All ranks</h2>
+          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                  <th className="w-16 px-4 py-2.5 font-medium">Rank</th>
+                  <th className="px-4 py-2.5 font-medium">Student</th>
+                  <th className="px-4 py-2.5 font-medium">Score</th>
+                  <th className="px-4 py-2.5 font-medium">Correct</th>
+                  <th className="px-4 py-2.5 font-medium">Wrong</th>
+                  <th className="px-4 py-2.5 font-medium">Blank</th>
+                  <th className="px-4 py-2.5 font-medium">Time</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r.attemptId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                    <td className="px-4 py-3 font-semibold tabular-nums text-slate-900">
+                      {r.rank <= 3 ? `${MEDAL[r.rank - 1]} ` : ""}
+                      {r.rank}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.student ? (
+                        <Link to={`/admin/students/${r.student._id}`} className="font-medium text-slate-900 hover:underline">
+                          {r.student.name}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">Deleted account</span>
+                      )}
+                      <p className="text-xs text-slate-500">{r.student?.email}</p>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-slate-900">
+                      {r.score} <span className="text-slate-400">/ {r.maxScore}</span>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">{r.correct}</td>
+                    <td className="px-4 py-3 tabular-nums">{r.incorrect}</td>
+                    <td className="px-4 py-3 tabular-nums">{r.unanswered}</td>
+                    <td className="px-4 py-3 tabular-nums text-slate-600">{fmtDuration(r.timeTakenSec)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Link to={`/admin/attempts/${r.attemptId}`} className="font-medium text-amber-800 hover:underline">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </AdminLayout>
   );

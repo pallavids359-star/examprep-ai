@@ -95,8 +95,8 @@ export default function ManageStudents() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                                        <Link to={`/admin/students/${s._id}`} className="mr-4 inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-amber-200 hover:bg-black">
-                                            View details →
+                                        <Link to={`/admin/students/${s._id}`} className="mr-4 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+                                            View
                                         </Link>
                                         <button
                                             onClick={() => toggleStatus(s)}
