@@ -32,6 +32,7 @@ const ManageTests = lazy(() => import("./pages/admin/ManageTests"));
 const ManageStudents = lazy(() => import("./pages/admin/ManageStudents"));
 const StudentDetail = lazy(() => import("./pages/admin/StudentDetail"));
 const AttemptDetail = lazy(() => import("./pages/admin/AttemptDetail"));
+const Results = lazy(() => import("./pages/admin/Results"));
 const Lecturers = lazy(() => import("./pages/admin/Lecturers"));
 const LiveTestsAdmin = lazy(() => import("./pages/admin/LiveTests"));
 const LiveTestForm = lazy(() => import("./pages/admin/LiveTestForm"));
@@ -91,6 +92,7 @@ export default function App() {
       <Route path="/admin/students" element={adminOnly(<ManageStudents />)} />
       <Route path="/admin/students/:id" element={adminOnly(<StudentDetail />)} />
       <Route path="/admin/attempts/:id" element={adminOnly(<AttemptDetail />)} />
+      <Route path="/admin/results" element={adminOnly(<Results />)} />
       <Route path="/admin/lecturers" element={adminOnly(<Lecturers />)} />
       <Route path="/admin/live-tests" element={adminOnly(<LiveTestsAdmin />)} />
       <Route path="/admin/live-tests/new" element={adminOnly(<LiveTestForm />)} />
