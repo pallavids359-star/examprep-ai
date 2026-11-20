@@ -48,13 +48,22 @@ const listStudentAttempts = handle("listStudentAttempts", async (req, res) => {
     const attempts = await TestAttempt.find({ userId: student._id })
         .sort({ startedAt: -1 })
         .limit(200)
-        .select("mode status testId examId startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec result.rank answers.questionId")
+        .select("mode status testId examId startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec result.rank answers.questionId answers.chapterId answers.subjectId")
         .lean();
     const [tests, exams] = await Promise.all([
         Test.find({ _id: { $in: attempts.map((a) => a.testId).filter(Boolean) } }).select("title").lean(),
         Exam.find({ _id: { $in: attempts.map((a) => a.examId) } }).select("code").lean(),
     ]);
     const title = new Map(tests.map((t) => [String(t._id), t.title]));
+    // Practice has no test name: name it after its chapters ("Laws of Motion + 2 more")
+    const chapterIds = [...new Set(attempts.filter((a) => !a.testId).flatMap((a) => (a.answers || []).map((x) => String(x.chapterId))).filter((x) => x && x !== "undefined"))];
+    const chapterDocs = chapterIds.length ? await Chapter.find({ _id: { $in: chapterIds } }).select("name").lean() : [];
+    const chapterName = new Map(chapterDocs.map((c) => [String(c._id), c.name]));
+    const practiceTitle = (a) => {
+        const names = [...new Set((a.answers || []).map((x) => chapterName.get(String(x.chapterId))).filter(Boolean))];
+        if (!names.length) return null;
+        return names.length === 1 ? names[0] : `${names[0]} + ${names.length - 1} more`;
+    };
     const code = new Map(exams.map((e) => [String(e._id), e.code]));
     const rows = [];
     for (const a of attempts) {
@@ -63,7 +72,7 @@ const listStudentAttempts = handle("listStudentAttempts", async (req, res) => {
             attemptId: a._id,
             mode: a.mode,
             modeLabel: MODE_LABEL[a.mode] || a.mode,
-            title: title.get(String(a.testId)) || MODE_LABEL[a.mode] || "Test",
+            title: title.get(String(a.testId)) || practiceTitle(a) || MODE_LABEL[a.mode] || "Test",
             exam: code.get(String(a.examId)) || "",
             status: a.status,
             startedAt: a.startedAt,
@@ -144,7 +153,12 @@ const getAttemptDetail = handle("getAttemptDetail", async (req, res) => {
     res.json({
         attemptId: attempt._id,
         student: student ? { _id: student._id, name: student.name, email: student.email } : null,
-        title: test?.title || MODE_LABEL[attempt.mode] || "Test",
+        title:
+            test?.title ||
+            (() => {
+                const names = [...new Set(questions.map((q) => q.chapter).filter(Boolean))];
+                return names.length ? `${MODE_LABEL[attempt.mode] || "Practice"}: ${names.length === 1 ? names[0] : `${names[0]} + ${names.length - 1} more`}` : MODE_LABEL[attempt.mode] || "Test";
+            })(),
         mode: attempt.mode,
         modeLabel: MODE_LABEL[attempt.mode] || attempt.mode,
         exam: exam?.code || "",

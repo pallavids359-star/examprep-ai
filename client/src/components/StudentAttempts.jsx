@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api, { getErrorMessage } from "../api/axios";
 
 const KINDS = [
@@ -15,6 +15,7 @@ export default function StudentAttempts({ studentId }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const [kind, setKind] = useState("all");
+  const navigate = useNavigate();
 
   useEffect(() => {
     api
@@ -75,7 +76,12 @@ export default function StudentAttempts({ studentId }) {
             {shown.map((r) => {
               const done = r.status === "submitted" || r.status === "auto_submitted";
               return (
-                <tr key={r.attemptId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                <tr
+                  key={r.attemptId}
+                  onClick={() => navigate(`/admin/attempts/${r.attemptId}`)}
+                  className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-amber-50/50"
+                  title="Open every question of this test"
+                >
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{r.title}</p>
                     <p className="text-xs text-slate-500">
@@ -88,8 +94,12 @@ export default function StudentAttempts({ studentId }) {
                   <td className="px-4 py-3 tabular-nums text-slate-700">{done ? r.wrong : "—"}</td>
                   <td className="px-4 py-3 tabular-nums text-slate-700">{r.rank ? `${r.rank.rank} of ${r.rank.total}` : "—"}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link to={`/admin/attempts/${r.attemptId}`} className="font-medium text-amber-800 hover:underline">
-                      View
+                    <Link
+                      to={`/admin/attempts/${r.attemptId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-black"
+                    >
+                      View details
                     </Link>
                   </td>
                 </tr>
