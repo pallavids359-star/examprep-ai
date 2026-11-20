@@ -1,4 +1,5 @@
 import MathText from "../../components/MathText";
+import BackLink from "../../components/BackLink";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
@@ -134,7 +135,7 @@ export default function QuestionForm() {
     return (
         <AdminLayout
             title={isNew ? "Add question" : "Edit question"}
-            actions={<Link to={back} className="text-sm text-slate-600 hover:text-slate-900">{back === "/admin/questions" ? "← All questions" : "← Back to the paper"}</Link>}
+            actions={<BackLink to={back}>{back === "/admin/questions" ? "All questions" : "Back to the paper"}</BackLink>}
         >
             <form onSubmit={(e) => save(e)} className="mt-6 space-y-4">
                 {error && <div className="rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}

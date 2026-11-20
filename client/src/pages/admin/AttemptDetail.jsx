@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -47,9 +48,7 @@ export default function AttemptDetail() {
   return (
     <AdminLayout>
       {data.student && (
-        <Link to={`/admin/students/${data.student._id}`} className="text-sm text-slate-500 hover:text-slate-900">
-          ← {data.student.name}
-        </Link>
+        <BackLink to={`/admin/students/${data.student._id}`}>{data.student.name}</BackLink>
       )}
 
       {/* Header */}

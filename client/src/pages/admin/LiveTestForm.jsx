@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -225,9 +226,7 @@ export default function LiveTestForm() {
 
   return (
     <AdminLayout>
-      <Link to={id ? `/admin/live-tests/${id}` : "/admin/live-tests"} className="text-sm font-semibold text-amber-800 hover:underline">
-        ← Back
-      </Link>
+      <BackLink to={id ? `/admin/live-tests/${id}` : "/admin/live-tests"}>{id ? "Back to the test" : "All live tests"}</BackLink>
       <div className="mt-3">
         <Hero
           eyebrow={id ? "Edit live test" : "New live test"}
@@ -635,9 +634,7 @@ function OpenTestEdit({ test }) {
 
   return (
     <AdminLayout>
-      <Link to={`/admin/live-tests/${test._id}`} className="text-sm font-semibold text-amber-800 hover:underline">
-        ← Back
-      </Link>
+      <BackLink to={`/admin/live-tests/${test._id}`}>Back to the test</BackLink>
       <div className="mt-3">
         <Hero eyebrow="Edit live test" title={test.title} subtitle="Students have already started this test, so its start time, length and questions are fixed. You can rename it and change the closing time as many times as you need." />
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -25,9 +26,7 @@ export default function StudentDetail() {
 
     return (
         <AdminLayout title={student ? student.name : "Student"}>
-            <Link to="/admin/students" className="mt-2 inline-block text-sm font-medium text-indigo-600 hover:underline">
-                ← All students
-            </Link>
+            <BackLink to="/admin/students">All students</BackLink>
 
             {error && <div className="mt-4 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
             {!info && !error && <p className="mt-6 text-sm text-slate-500">Loading...</p>}

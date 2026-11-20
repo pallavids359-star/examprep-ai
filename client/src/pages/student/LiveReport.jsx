@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import QuestionBody from "../../components/QuestionBody";
@@ -62,9 +63,7 @@ export default function LiveReport() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        <Link to="/live-tests" className="mt-4 inline-block text-sm font-medium text-indigo-700 hover:underline">
-          ← Live tests
-        </Link>
+        <BackLink to="/live-tests">Live tests</BackLink>
       </div>
     );
   }
@@ -72,9 +71,7 @@ export default function LiveReport() {
 
   const t = data.test;
   const back = (
-    <Link to="/live-tests" className="text-sm font-medium text-indigo-700 hover:underline">
-      ← Live tests
-    </Link>
+    <BackLink to="/live-tests">Live tests</BackLink>
   );
 
   if (data.state === "in_progress") {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -49,9 +50,7 @@ export default function LiveResults() {
   return (
     <AdminLayout>
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link to={`/admin/live-tests/${id}`} className="text-sm text-slate-500 hover:text-slate-900">
-          ← {data.test.title}
-        </Link>
+        <BackLink to={`/admin/live-tests/${id}`}>{data.test.title}</BackLink>
         {data.rows.length > 0 && (
           <button type="button" onClick={download} className="text-sm font-medium text-slate-600 hover:text-slate-900">
             Download CSV

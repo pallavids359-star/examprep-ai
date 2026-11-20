@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -132,9 +133,7 @@ export default function LiveTestReview() {
 
   return (
     <AdminLayout>
-      <Link to="/admin/live-tests" className="text-sm font-semibold text-amber-800 hover:underline">
-        ← All live tests
-      </Link>
+      <BackLink to="/admin/live-tests">All live tests</BackLink>
 
       <section className="gp-hero mt-3 p-6 md:p-8">
         <div className="relative flex flex-wrap items-center justify-between gap-6">

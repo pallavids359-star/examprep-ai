@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import ClassLeaderboard from "../../components/ClassLeaderboard";
@@ -19,9 +20,7 @@ export default function LiveLeaderboard() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-6 md:py-8">
       <div className="mb-3 flex flex-wrap gap-4 text-sm print:hidden">
-        <Link to="/live-tests" className="text-slate-500 hover:text-slate-900">
-          ← Live tests
-        </Link>
+        <BackLink to="/live-tests">Live tests</BackLink>
         <Link to={`/live-tests/${id}/report`} className="text-slate-500 hover:text-slate-900">
           My report
         </Link>

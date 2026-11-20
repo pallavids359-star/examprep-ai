@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import BackLink from "../../components/BackLink";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
@@ -352,9 +353,7 @@ export default function PickQuestions() {
       <LecturerLayout>
         <div className="mx-auto max-w-3xl px-4 py-10">
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          <Link to="/lecturer" className="mt-4 inline-block text-sm font-medium text-indigo-700 hover:underline">
-            ← Your sections
-          </Link>
+          <BackLink to="/lecturer">Your sections</BackLink>
         </div>
       </LecturerLayout>
     );
@@ -1069,7 +1068,7 @@ function SelectWizard({ stage, setStage, classLevel, chooseClass, chapters, chap
             );
           })}
           <WizardFooter
-            left={<button type="button" onClick={() => setStage("class")} className="text-sm font-semibold text-slate-600 hover:underline">← Change class</button>}
+            left={<button type="button" onClick={() => setStage("class")} className="group inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"><span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[#e7dcc3] transition group-hover:bg-[#17140f] group-hover:text-[#e5c372]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg></span>Change class</button>}
             note={chapterIds.length ? `${chapterIds.length} chapter${chapterIds.length === 1 ? "" : "s"} ticked` : "Tick at least one chapter"}
           >
             <button type="button" disabled={!chapterIds.length} onClick={onShow} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-white disabled:opacity-40">
@@ -1088,7 +1087,7 @@ function SelectWizard({ stage, setStage, classLevel, chooseClass, chapters, chap
           <p className="mt-1 text-sm text-slate-500">Pick a chapter on the left, then tick its topics. A chapter with nothing ticked uses all its topics.</p>
           <TopicPicker chapters={chapters} chapterIds={chapterIds} topicsByChapter={topicsByChapter} topicIds={topicIds} setTopicIds={setTopicIds} toggleTopic={toggleTopic} />
           <WizardFooter
-            left={<button type="button" onClick={() => setStage("chapters")} className="text-sm font-semibold text-slate-600 hover:underline">← Change chapters</button>}
+            left={<button type="button" onClick={() => setStage("chapters")} className="group inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"><span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[#e7dcc3] transition group-hover:bg-[#17140f] group-hover:text-[#e5c372]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg></span>Change chapters</button>}
             note={topicIds.length ? `${topicIds.length} topic${topicIds.length === 1 ? "" : "s"} chosen` : "All topics of the ticked chapters"}
           >
             <button type="button" onClick={onShow} className="gp-gold-btn px-6 py-2.5 text-sm">
