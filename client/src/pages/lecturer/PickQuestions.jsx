@@ -6,7 +6,6 @@ import QuestionBody from "../../components/QuestionBody";
 import { toast } from "../../components/Toaster";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { fmtUntil, preview } from "../../components/liveHelpers";
-import { Ring } from "../../components/premium";
 
 // The lecturer picks questions for one section of a live test:
 // class -> chapters -> concepts -> questions grouped by concept, with answers and solutions.
@@ -321,71 +320,118 @@ export default function PickQuestions() {
 
   return (
     <LecturerLayout>
-      {/* Section header with progress */}
-      <div className="gp-topbar sticky top-0 z-20">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-          <div className="min-w-0">
-            <Link to={info.isAdmin ? `/admin/live-tests/${id}` : "/lecturer"} className="text-xs font-semibold text-amber-200 hover:underline">
-              {info.isAdmin ? "← Back to the live test" : "← Your sections"}
-            </Link>
-            <p className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-amber-100/60">
-              {info.exam?.code} · {info.test.title}
-            </p>
-            <h1 className="text-xl font-extrabold text-white">
-              {sec.name}: {info.isAdmin && sec.picker === "lecturer" ? `review ${sec.lecturerName ? `${sec.lecturerName}'s` : "the lecturer's"} questions` : "pick the questions"}
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <Ring value={total ? (pickedCount / total) * 100 : 0} size={52} stroke={6} dark tone={complete ? "green" : "gold"} />
-            <div className="min-w-[200px]">
-              <p className="text-sm text-amber-50">
-                <b>
-                  {pickedCount} of {total}
-                </b>{" "}
-                picked · {mcqPicked}/{sec.mcqCount} MCQ{sec.numericalCount ? ` · ${numPicked}/${sec.numericalCount} numerical` : ""}
-                {saving && <span className="ml-2 text-xs text-amber-200/60">Saving...</span>}
-              </p>
+      {/* Header */}
+      <div className="mx-auto max-w-7xl px-4 pt-6">
+        <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+          <Link to={info.isAdmin ? `/admin/live-tests/${id}` : "/lecturer"} className="font-semibold text-amber-800 hover:underline">
+            {info.isAdmin ? "Live test" : "My subjects"}
+          </Link>
+          <span>/</span>
+          <span className="truncate">{info.test.title}</span>
+          <span>/</span>
+          <span className="font-semibold text-slate-800">{sec.name}</span>
+        </nav>
+
+        <section className="gp-hero mt-3 p-6 md:p-7">
+          <div className="relative flex flex-wrap items-center justify-between gap-6">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-200 to-amber-500 font-display text-3xl font-extrabold text-slate-900 shadow-lg">
+                {sec.name[0]}
+              </span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-amber-200">{info.exam?.code}</span>
+                  {needsSend && (
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        sentAt ? "bg-green-400/15 text-green-300" : sec.returnedAt ? "bg-orange-400/15 text-orange-300" : "bg-white/10 text-amber-100/80"
+                      }`}
+                    >
+                      {sentAt ? "Sent ✓" : sec.returnedAt ? "Sent back for changes" : "Not sent yet"}
+                    </span>
+                  )}
+                  {info.test.phase !== "open" && info.test.phase !== "closed" && <span className="text-xs text-amber-100/60">Opens {fmtUntil(info.test.startsAt)}</span>}
+                </div>
+                <h1 className="mt-1 text-3xl font-extrabold text-white">{sec.name}</h1>
+                <p className="gp-muted text-sm">
+                  {sec.picker === "lecturer" ? `Picked by ${sec.lecturerName || "the lecturer"}` : sec.picker === "auto" ? "Filled automatically" : "Picked by the head lecturer"}
+                  {saving && <span className="ml-2 text-amber-200/70">· saving…</span>}
+                </p>
+              </div>
             </div>
-            {needsSend && sentAt ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="rounded-xl bg-green-500/15 px-3 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
-                  Sent to head lecturer ✓ {testStatus === "published" ? `· opens ${fmtUntil(info.test.startsAt)}` : "· waiting for the other subjects"}
-                </span>
-                {info.canChange && (
-                  <button type="button" disabled={saving} onClick={takeBack} className="rounded-xl px-3 py-2 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10 disabled:opacity-50">
+
+            <div className="flex flex-wrap items-center gap-2">
+              {needsSend && sentAt ? (
+                info.canChange && (
+                  <button type="button" disabled={saving} onClick={takeBack} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10 disabled:opacity-50">
                     {info.isAdmin ? "Send back to lecturer" : "Take back to edit"}
                   </button>
-                )}
-              </span>
-            ) : needsSend && complete && editable ? (
-              <button type="button" disabled={saving} onClick={sendToHead} className="gp-gold-btn px-5 py-2.5 text-sm disabled:opacity-50">
-                {info.isAdmin ? "Mark as ready" : "Send to head lecturer →"}
-              </button>
-            ) : complete ? (
-              <span className="rounded-xl bg-green-500/15 px-3 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
-                Done ✓ {testStatus === "published" ? `Opens ${fmtUntil(info.test.startsAt)}` : "Waiting for the other subjects"}
-              </span>
-            ) : (
-              editable && (
+                )
+              ) : needsSend && complete && editable ? (
+                <button type="button" disabled={saving} onClick={sendToHead} className="gp-gold-btn px-5 py-3 text-sm disabled:opacity-50">
+                  {info.isAdmin ? "Mark as ready" : "Send to head lecturer →"}
+                </button>
+              ) : !complete && editable ? (
                 <button
                   type="button"
                   disabled={saving}
                   onClick={autoFill}
-                  className="gp-gold-btn px-4 py-2.5 text-sm disabled:opacity-50"
+                  className="gp-gold-btn px-5 py-3 text-sm disabled:opacity-50"
                   title={chapterIds.length ? "Picks from the ticked chapters" : "Picks from the whole syllabus"}
                 >
                   Auto-fill the rest{chapterIds.length ? " from ticked chapters" : ""}
                 </button>
-              )
-            )}
+              ) : null}
+            </div>
           </div>
-        </div>
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 pb-3">
-          <div className="flex gap-1 rounded-xl bg-white/5 p-1 ring-1 ring-amber-200/15" role="tablist">
+
+          {/* Progress */}
+          <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
             {[
-              ["add", "Add questions"],
-              ["paper", `Your paper · ${pickedCount}/${total}`],
-            ].map(([v, l]) => (
+              ["Questions", pickedCount, total],
+              ["MCQ", mcqPicked, sec.mcqCount],
+              ...(sec.numericalCount ? [["Numerical", numPicked, sec.numericalCount]] : []),
+            ].map(([l, n, of]) => (
+              <div key={l} className="rounded-2xl bg-white/5 p-4 ring-1 ring-amber-200/15">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold uppercase tracking-widest text-amber-200/70">{l}</span>
+                  <span className={`text-xs font-semibold ${n === of ? "text-green-300" : "text-amber-100/60"}`}>{n === of ? "Complete" : `${of - n} to go`}</span>
+                </div>
+                <p className="mt-1 font-display text-2xl font-extrabold tabular-nums text-white">
+                  {n}
+                  <span className="text-base text-amber-100/50"> / {of}</span>
+                </p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className={`h-full rounded-full transition-all ${n === of ? "bg-green-400" : "bg-gradient-to-r from-amber-200 to-amber-500"}`} style={{ width: `${of ? Math.min(100, (n / of) * 100) : 0}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {!editable && !info.canChange && (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">The test has opened, so its questions can't change now.</p>
+        )}
+        {!editable && info.canChange && needsSend && sentAt && (
+          <p className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            This paper is with the head lecturer. To change anything, press <b>Take back to edit</b>.
+          </p>
+        )}
+        {editable && needsSend && !sentAt && sec.returnedAt && (
+          <p className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+            The head lecturer sent this back for changes{sec.returnNote ? <>: <b>“{sec.returnNote}”</b></> : "."} Fix it, then press <b>Send to head lecturer</b> again.
+          </p>
+        )}
+      </div>
+
+      {/* Toolbar */}
+      <div className="sticky top-0 z-20 mt-4 border-y border-amber-200/60 bg-[#fbf7ee]/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-amber-200/70" role="tablist">
+            {[
+              ["add", "Add questions", null],
+              ["paper", "Paper", `${pickedCount}/${total}`],
+            ].map(([v, l, n]) => (
               <button
                 key={v}
                 type="button"
@@ -395,46 +441,32 @@ export default function PickQuestions() {
                   setView(v);
                   if (v === "paper") setSwapFor(null);
                 }}
-                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${view === v ? "bg-amber-200 text-slate-900" : "text-amber-100/80 hover:text-white"}`}
+                className={`flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-semibold transition ${view === v ? "bg-slate-900 text-amber-200" : "text-slate-600 hover:text-slate-900"}`}
               >
                 {l}
+                {n && <span className={`rounded-full px-1.5 text-xs ${view === v ? "bg-amber-200/20" : "bg-amber-100 text-amber-900"}`}>{n}</span>}
               </button>
             ))}
           </div>
           {editable && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={undo}
                 disabled={!history.length || saving}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/30 hover:bg-white/10 disabled:opacity-40"
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-35"
                 title="Bring back the paper as it was before your last change"
               >
                 ↶ Undo
               </button>
               {picked.length > 0 && (
-                <button type="button" onClick={clearAll} disabled={saving} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-300 ring-1 ring-red-300/30 hover:bg-red-500/10 disabled:opacity-40">
+                <button type="button" onClick={clearAll} disabled={saving} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40">
                   Remove all
                 </button>
               )}
             </div>
           )}
         </div>
-        {!editable && !info.canChange && (
-          <p className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-800">
-            The test has opened, so its questions can't change now.
-          </p>
-        )}
-        {!editable && info.canChange && needsSend && sentAt && (
-          <p className="bg-green-50 px-4 py-2 text-center text-sm text-green-800">
-            You sent this paper to the head lecturer. To change anything, press <b>Take back to edit</b>.
-          </p>
-        )}
-        {editable && needsSend && !sentAt && sec.returnedAt && (
-          <p className="bg-orange-50 px-4 py-2 text-center text-sm text-orange-900">
-            The head lecturer sent this back for changes{sec.returnNote ? <>: <b>“{sec.returnNote}”</b></> : "."} Fix it, then press <b>Send to head lecturer</b> again.
-          </p>
-        )}
       </div>
 
       {view === "paper" && (
