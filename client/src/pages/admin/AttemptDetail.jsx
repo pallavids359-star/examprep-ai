@@ -124,21 +124,29 @@ export default function AttemptDetail() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
           {sections.length > 1 && (
-            <select value={section} onChange={(e) => setSection(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" aria-label="Subject">
-              <option value="all">All subjects</option>
-              {sections.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
+            <div className="flex rounded-xl bg-white p-1 ring-1 ring-[#e7dcc3]" role="radiogroup" aria-label="Subject">
+              {["all", ...sections].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={section === n}
+                  onClick={() => setSection(n)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${section === n ? "bg-[#17140f] text-[#e5c372]" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  {n === "all" ? "All subjects" : n}
+                </button>
               ))}
-            </select>
+            </div>
           )}
-          <label className="flex items-center gap-2 text-slate-600">
-            <input type="checkbox" className="h-4 w-4 accent-slate-900" checked={showSolutions} onChange={(e) => setShowSolutions(e.target.checked)} />
+          <button type="button" role="switch" aria-checked={showSolutions} onClick={() => setShowSolutions((v) => !v)} className="flex items-center gap-2.5 font-medium text-slate-700">
+            <span className={`relative h-6 w-11 rounded-full transition ${showSolutions ? "bg-[#c9a24a]" : "bg-slate-300"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${showSolutions ? "left-[22px]" : "left-0.5"}`} />
+            </span>
             Solutions
-          </label>
+          </button>
         </div>
       </div>
 
