@@ -8,6 +8,7 @@ const User = require("../models/User");
 const Question = require("../models/Question");
 const TestAttempt = require("../models/TestAttempt");
 const { sectionsFor, patternFor, canSplitBiology, subjectKey } = require("../utils/livePattern");
+const { syncLiveStatus, canEditQuestions, autoPick, sectionState } = require("../utils/liveSchedule");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -40,6 +41,7 @@ const sectionSummary = (s, lecturersById) => {
         name: s.name,
         subjectId: s.subjectId,
         lecturer: lecturer ? { _id: lecturer._id, name: lecturer.name, email: lecturer.email } : null,
+        picker: s.picker || "lecturer",
         mcqCount: s.mcqCount || 0,
         numericalCount: s.numericalCount || 0,
         picked: (s.questionIds || []).length,
@@ -143,7 +145,7 @@ const getPattern = handle("getPattern", async (req, res) => {
 });
 
 // Builds and checks the parts of a live test from the form
-const buildDetails = async (body, exam, existing) => {
+const buildDetails = async (body, exam, existing, me) => {
     const title = String(body.title || "").trim();
     if (title.length < 3) throw userError("Give the test a name");
     if (title.length > 140) throw userError("The name is too long");
@@ -161,7 +163,7 @@ const buildDetails = async (body, exam, existing) => {
     if (!wanted.length) throw userError("Add at least one section");
 
     const subjects = await Subject.find({ examId: exam._id }).select("name").lean();
-    const lecturerIds = [...new Set(wanted.map((s) => String(s.lecturerId || "")).filter(isValidId))];
+    const lecturerIds = [...new Set(wanted.filter((s) => s.picker === "lecturer" || !s.picker).map((s) => String(s.lecturerId || "")).filter(isValidId))];
     const lecturers = lecturerIds.length
         ? await User.find({ _id: { $in: lecturerIds }, role: { $in: ["lecturer", "admin"] }, status: "active" }).select("_id").lean()
         : [];
@@ -175,18 +177,25 @@ const buildDetails = async (body, exam, existing) => {
         if (sections.some((s) => s.key === def.key)) throw userError(`${def.name} is listed twice`);
         const subject = subjects.find((s) => subjectKey(s.name) === def.subjectKey);
         if (!subject) throw userError(`${exam.code} has no ${def.name} subject in the syllabus yet`);
-        if (!isValidId(w.lecturerId) || !okLecturers.has(String(w.lecturerId))) throw userError(`Choose an active lecturer for ${def.name}`);
+        // Who picks: "auto" (the system), "me" (the head lecturer) or "lecturer" (someone else)
+        const picker = ["auto", "me", "lecturer"].includes(w.picker) ? w.picker : w.lecturerId ? "lecturer" : "auto";
+        let lecturerId = me;
+        if (picker === "lecturer") {
+            if (!isValidId(w.lecturerId) || !okLecturers.has(String(w.lecturerId))) throw userError(`Choose an active lecturer for ${def.name}`);
+            lecturerId = w.lecturerId;
+        }
         const mcqCount = clampInt(w.mcqCount, 0, 200, def.mcqCount);
         const numericalCount = clampInt(w.numericalCount, 0, 50, def.numericalCount);
         if (mcqCount + numericalCount < 1) throw userError(`${def.name} needs at least one question`);
         const old = oldByKey.get(def.key);
         // Changing the lecturer or the counts re-opens the section for picking
-        const same = old && String(old.lecturerId) === String(w.lecturerId) && old.mcqCount === mcqCount && old.numericalCount === numericalCount;
+        const same = old && String(old.lecturerId) === String(lecturerId) && old.mcqCount === mcqCount && old.numericalCount === numericalCount;
         sections.push({
             key: def.key,
             name: def.name,
             subjectId: subject._id,
-            lecturerId: w.lecturerId,
+            lecturerId,
+            picker,
             mcqCount,
             numericalCount,
             dueAt: w.dueAt ? toDate(w.dueAt, `${def.name} due time`) : undefined,
@@ -213,6 +222,18 @@ const buildDetails = async (body, exam, existing) => {
     };
 };
 
+// Auto sections with missing questions get them picked now. Returns notes about shortages.
+const fillAutoSections = async (test) => {
+    const notes = [];
+    for (const s of test.sections) {
+        if (s.picker !== "auto") continue;
+        const r = await autoPick(test, s, {});
+        if (r.shortMcq || r.shortNumerical) notes.push(`${s.name}: the bank is ${r.shortMcq} MCQ and ${r.shortNumerical} numerical short`);
+    }
+    await test.save();
+    return notes;
+};
+
 // GET /api/admin/live-tests?examId=...
 const listLiveTests = handle("listLiveTests", async (req, res) => {
     const filter = { type: "live", status: { $ne: "archived" } };
@@ -228,6 +249,8 @@ const listLiveTests = handle("listLiveTests", async (req, res) => {
     ]);
     const examCode = new Map(exams.map((e) => [String(e._id), e.code]));
     const byTest = new Map(counts.map((c) => [String(c._id), c]));
+    const states = new Map();
+    for (const t of tests) if (t.status === "draft" || new Date() < new Date(t.availability.startsAt)) states.set(String(t._id), await sectionState(t));
     res.json({
         tests: tests.map((t) => ({
             _id: t._id,
@@ -240,7 +263,7 @@ const listLiveTests = handle("listLiveTests", async (req, res) => {
             endsAt: t.availability.endsAt,
             durationMinutes: t.durationMinutes,
             totalQuestions: t.sections.reduce((a, s) => a + (s.mcqCount || 0) + (s.numericalCount || 0), 0),
-            sections: t.sections.map((s) => sectionSummary(s, lecturers)),
+            sections: t.sections.map((s) => ({ ...sectionSummary(s, lecturers), full: t.status === "published" || states.get(String(t._id))?.sections.find((x) => x.key === s.key)?.full || false })),
             started: byTest.get(String(t._id))?.started || 0,
             finished: byTest.get(String(t._id))?.finished || 0,
         })),
@@ -261,6 +284,8 @@ const getLiveTest = handle("getLiveTest", async (req, res) => {
         .populate("topicId", "name")
         .lean();
     const byId = new Map(questions.map((q) => [String(q._id), q]));
+    const state = await sectionState(test);
+    const editable = await canEditQuestions(test);
     const hasDiagram = (q) => /\{\{IMG::/.test(q.text || "") || (q.images || []).length > 0 || (q.options || []).some((o) => /\{\{IMG::/.test(o.text || "") || o.image?.url);
 
     res.json({
@@ -276,8 +301,11 @@ const getLiveTest = handle("getLiveTest", async (req, res) => {
             startsAt: test.availability.startsAt,
             endsAt: test.availability.endsAt,
             live: test.live,
+            editable,
             sections: test.sections.map((s) => ({
                 ...sectionSummary(s, lecturers),
+                full: state.sections.find((x) => x.key === s.key)?.full || false,
+                missing: state.sections.find((x) => x.key === s.key)?.missing || 0,
                 questions: s.questionIds
                     .map((id) => byId.get(String(id)))
                     .filter(Boolean)
@@ -301,7 +329,7 @@ const createLiveTest = handle("createLiveTest", async (req, res) => {
     if (!isValidId(req.body.examId)) throw userError("Choose an exam");
     const exam = await Exam.findById(req.body.examId).lean();
     if (!exam) throw userError("Exam not found", 404);
-    const details = await buildDetails(req.body, exam, null);
+    const details = await buildDetails(req.body, exam, null, req.user._id);
     const test = await Test.create({
         ...details,
         status: "draft",
@@ -312,7 +340,9 @@ const createLiveTest = handle("createLiveTest", async (req, res) => {
         },
         createdBy: req.user._id,
     });
-    res.status(201).json({ testId: test._id });
+    const notes = await fillAutoSections(test);
+    const { status } = await syncLiveStatus(test);
+    res.status(201).json({ testId: test._id, status, notes });
 });
 
 // PUT /api/admin/live-tests/:id   (everything while a draft; only name, instructions and closing time once published)
@@ -322,10 +352,15 @@ const updateLiveTest = handle("updateLiveTest", async (req, res) => {
     if (!test) throw userError("Live test not found", 404);
     if (test.status === "archived") throw userError("This test was deleted");
 
-    if (test.status === "draft") {
+    // The whole form (with its subjects) can be changed until the test opens
+    if (Array.isArray(req.body.sections) && (await canEditQuestions(test))) {
         const exam = await Exam.findById(test.examId).lean();
-        const details = await buildDetails({ ...req.body, examId: test.examId }, exam, test.toObject());
+        const details = await buildDetails({ ...req.body, examId: test.examId }, exam, test.toObject(), req.user._id);
         Object.assign(test, details);
+        await test.save();
+        const notes = await fillAutoSections(test);
+        const { status } = await syncLiveStatus(test);
+        return res.json({ message: "Saved", status, notes });
     } else {
         // Published: students may already be writing it
         if (req.body.title !== undefined) {
@@ -336,7 +371,10 @@ const updateLiveTest = handle("updateLiveTest", async (req, res) => {
         if (req.body.instructions !== undefined) test.instructions = String(req.body.instructions).trim().slice(0, 4000);
         if (req.body.endsAt !== undefined) {
             const endsAt = toDate(req.body.endsAt, "Closing time");
-            if (endsAt < test.availability.endsAt) throw userError("Once published, the closing time can only be moved later");
+            if (endsAt <= test.availability.startsAt) throw userError("The test must close after it opens");
+            if (test.status === "published" && new Date() >= test.availability.startsAt && endsAt < test.availability.endsAt) {
+                throw userError("Once the test has opened, the closing time can only be moved later");
+            }
             test.availability.endsAt = endsAt;
         }
     }
@@ -344,37 +382,26 @@ const updateLiveTest = handle("updateLiveTest", async (req, res) => {
     res.json({ message: "Saved" });
 });
 
-// POST /api/admin/live-tests/:id/publish
+// POST /api/admin/live-tests/:id/publish   (normally not needed: full tests publish themselves)
 const publishLiveTest = handle("publishLiveTest", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
     const test = await Test.findOne({ _id: req.params.id, type: "live" });
     if (!test) throw userError("Live test not found", 404);
-    if (test.status !== "draft") throw userError("Only a draft can be published");
+    if (test.status !== "draft") throw userError("This test is already published");
     if (test.availability.endsAt <= new Date()) throw userError("The closing time has already passed. Change it first.");
-
-    const problems = [];
-    let totalMarks = 0;
     const allIds = test.sections.flatMap((s) => s.questionIds.map(String));
-    if (new Set(allIds).size !== allIds.length) problems.push("the same question is in two sections");
-    const questions = await Question.find({ _id: { $in: allIds } }).select("type status marks").lean();
-    const byId = new Map(questions.map((q) => [String(q._id), q]));
-    for (const s of test.sections) {
-        const qs = s.questionIds.map((id) => byId.get(String(id)));
-        const mcq = qs.filter((q) => q && q.type !== "numerical").length;
-        const num = qs.filter((q) => q && q.type === "numerical").length;
-        if (qs.some((q) => !q || q.status !== "published")) problems.push(`${s.name} has a question that was deleted or unpublished`);
-        if (!s.submittedAt) problems.push(`${s.name} is not handed in yet`);
-        if (mcq !== s.mcqCount || num !== s.numericalCount) problems.push(`${s.name} has ${mcq} MCQ + ${num} numerical, needs ${s.mcqCount} + ${s.numericalCount}`);
-        for (const q of qs) if (q) totalMarks += q.marks?.correct ?? test.markingScheme.correct;
+    if (new Set(allIds).size !== allIds.length) throw userError("The same question is in two sections");
+    const { status, state } = await syncLiveStatus(test);
+    if (status !== "published") {
+        const missing = state.sections
+            .filter((x) => !x.full)
+            .map((x) => {
+                const sec = test.sections.find((y) => y.key === x.key);
+                return `${sec.name} has ${x.mcq} + ${x.numerical}, needs ${sec.mcqCount} + ${sec.numericalCount}`;
+            });
+        throw userError(`Can't publish yet: ${missing.join("; ")}`);
     }
-    if (problems.length) throw userError(`Can't publish yet: ${problems.join("; ")}`);
-
-    test.status = "published";
-    test.totalQuestions = allIds.length;
-    test.totalMarks = totalMarks;
-    test.live.publishedAt = new Date();
-    await test.save();
-    res.json({ message: "Published", status: test.status });
+    res.json({ message: "Published", status });
 });
 
 // POST /api/admin/live-tests/:id/unpublish   (only before it opens)

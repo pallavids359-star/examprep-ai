@@ -1,0 +1,309 @@
+/* GenPrep premium layer: dark sidebar, refined surfaces, buttons, fields, tables
+   and a few showcase pieces (hero panels, rings, steppers). Loaded after theme.css. */
+
+:root {
+  --ink: #17140f;
+  --ink-2: #221d15;
+  --ink-3: #2e271c;
+  --gold: #b8862b;
+  --gold-soft: #e5c372;
+  --gold-glow: rgba(229, 195, 114, 0.18);
+  --paper: #f7f3ea;
+  --card: #fffdf8;
+  --line: #e7dcc3;
+  --radius: 18px;
+  --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.05);
+  --shadow-md: 0 1px 2px rgba(23, 20, 15, 0.04), 0 12px 32px -18px rgba(70, 48, 10, 0.35);
+  --shadow-lg: 0 2px 4px rgba(23, 20, 15, 0.05), 0 24px 48px -24px rgba(70, 48, 10, 0.45);
+}
+
+/* ---------- Page background: soft gold light in the corner ---------- */
+body {
+  background:
+    radial-gradient(1200px 500px at 100% -10%, rgba(229, 195, 114, 0.18), transparent 60%),
+    radial-gradient(900px 400px at -10% 110%, rgba(184, 134, 43, 0.08), transparent 60%),
+    var(--paper);
+  background-attachment: fixed;
+}
+.min-h-screen.bg-slate-50 {
+  background: transparent !important;
+}
+
+/* ---------- Sidebar (admin, lecturer and student) ---------- */
+.gp-sidebar {
+  background:
+    radial-gradient(420px 220px at 0% 0%, rgba(229, 195, 114, 0.16), transparent 70%),
+    linear-gradient(180deg, var(--ink-2), var(--ink) 60%);
+  color: #e9e2d2;
+  border-right: 1px solid rgba(229, 195, 114, 0.12);
+}
+.gp-sidebar .gp-brand {
+  color: #fffaf0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.gp-sidebar .gp-role {
+  background: linear-gradient(135deg, #e5c372, #b8862b);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+.gp-sidebar .gp-label {
+  color: #8e826b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.gp-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #cfc5b0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  position: relative;
+}
+.gp-nav-link:hover {
+  color: #fffaf0 !important;
+  background: rgba(255, 250, 240, 0.06) !important;
+}
+.gp-nav-link.active,
+.gp-nav-link[aria-current="page"] {
+  color: var(--ink) !important;
+  background: linear-gradient(135deg, #f0d48d, #d2a446) !important;
+  font-weight: 700;
+  box-shadow: 0 8px 20px -10px rgba(229, 195, 114, 0.7) !important;
+}
+.gp-sidebar select {
+  background: rgba(255, 250, 240, 0.06) !important;
+  border: 1px solid rgba(229, 195, 114, 0.25) !important;
+  color: #fffaf0 !important;
+  font-weight: 700;
+}
+.gp-sidebar select option {
+  color: var(--ink);
+  background: var(--card);
+}
+.gp-user {
+  border: 1px solid rgba(229, 195, 114, 0.14);
+  background: rgba(255, 250, 240, 0.04);
+  border-radius: 14px;
+}
+.gp-avatar {
+  background: linear-gradient(135deg, #f0d48d, #b8862b);
+  color: var(--ink);
+  font-weight: 800;
+  box-shadow: 0 0 0 2px rgba(23, 20, 15, 0.9), 0 0 0 3px rgba(229, 195, 114, 0.6);
+}
+.gp-ghost-btn {
+  border: 1px solid rgba(229, 195, 114, 0.25);
+  color: #e9e2d2;
+  border-radius: 10px;
+}
+.gp-ghost-btn:hover {
+  background: rgba(255, 250, 240, 0.08);
+  color: #fffaf0;
+}
+
+/* Phone top bar and bottom tabs */
+.gp-topbar {
+  background: rgba(23, 20, 15, 0.96);
+  color: #fffaf0;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(229, 195, 114, 0.15);
+}
+.gp-tabbar {
+  background: rgba(255, 253, 248, 0.96);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -18px rgba(70, 48, 10, 0.4);
+}
+
+/* ---------- Surfaces ---------- */
+.rounded-2xl.border.bg-white,
+.bg-white.rounded-2xl.border {
+  border-color: var(--line);
+  box-shadow: var(--shadow-md);
+}
+.gp-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.gp-card-hover {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.gp-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: #dfbd6c;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Dark showcase panel with a gold glow (headlines, live-now cards, scores) */
+.gp-hero {
+  position: relative;
+  overflow: hidden;
+  color: #fffaf0;
+  border-radius: 22px;
+  background:
+    radial-gradient(500px 240px at 100% 0%, rgba(229, 195, 114, 0.28), transparent 70%),
+    radial-gradient(400px 200px at 0% 100%, rgba(184, 134, 43, 0.18), transparent 70%),
+    linear-gradient(135deg, #251f16, #120f0a);
+  border: 1px solid rgba(229, 195, 114, 0.22);
+  box-shadow: var(--shadow-lg);
+}
+.gp-hero .gp-muted {
+  color: #cdbf9f;
+}
+.gp-gold-text {
+  background: linear-gradient(135deg, #f6e1a6, #d2a446 60%, #b8862b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.gp-gold-btn {
+  background: linear-gradient(135deg, #f3d995, #d2a446) !important;
+  color: var(--ink) !important;
+  font-weight: 700;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px -12px rgba(229, 195, 114, 0.8);
+}
+.gp-gold-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+/* ---------- Buttons ---------- */
+.bg-indigo-600,
+.bg-indigo-500 {
+  background: linear-gradient(180deg, #262016, #0f0c08) !important;
+  border: 1px solid rgba(229, 195, 114, 0.25);
+  box-shadow: 0 8px 18px -12px rgba(23, 20, 15, 0.8), inset 0 1px 0 rgba(255, 250, 240, 0.08);
+  border-radius: 12px;
+}
+.bg-indigo-600:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* ---------- Form fields ---------- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  border-radius: 12px;
+  min-height: 42px;
+}
+
+/* ---------- Tables ---------- */
+table thead {
+  background: linear-gradient(180deg, #fbf6ea, #f5ecd8);
+}
+table thead th {
+  color: #7a6e5b;
+  font-weight: 700;
+}
+table tbody tr {
+  transition: background-color 0.15s;
+}
+table tbody tr:hover {
+  background-color: #fbf6ea;
+}
+
+/* ---------- Chips ---------- */
+.gp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.gp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.gp-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #3ddc84;
+  box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.7);
+  animation: gp-pulse 1.8s infinite;
+}
+@keyframes gp-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(61, 220, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); }
+}
+
+/* ---------- Stepper ---------- */
+.gp-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gp-step-num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+  background: linear-gradient(135deg, #f3d995, #d2a446);
+  color: var(--ink);
+  box-shadow: 0 6px 14px -8px rgba(184, 134, 43, 0.9);
+  flex-shrink: 0;
+}
+
+/* Choice tiles (big tappable options) */
+.gp-tile {
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  border-radius: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s, background-color 0.15s;
+}
+.gp-tile:hover {
+  border-color: #dfbd6c;
+}
+.gp-tile[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, #fffaf0, #fbf1da);
+  box-shadow: 0 0 0 3px rgba(184, 134, 43, 0.14), 0 10px 22px -16px rgba(184, 134, 43, 0.9);
+}
+
+/* Countdown digits */
+.gp-clock {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gp-live-dot { animation: none; }
+  .gp-card-hover:hover, .gp-gold-btn:hover, .bg-indigo-600:hover:not(:disabled) { transform: none; }
+}
+
+.gp-topbar select {
+  background: rgba(255, 250, 240, 0.08) !important;
+  border: 1px solid rgba(229, 195, 114, 0.3) !important;
+  color: #fffaf0 !important;
+  font-weight: 700;
+}
+.gp-topbar select option {
+  color: var(--ink);
+  background: var(--card);
+}

@@ -32,6 +32,7 @@ lecturerRouter.get("/live-tests/:id/sections/:key", lecturer.getSection);
 lecturerRouter.get("/live-tests/:id/sections/:key/questions", lecturer.browseQuestions);
 lecturerRouter.put("/live-tests/:id/sections/:key", lecturer.savePicks);
 lecturerRouter.post("/live-tests/:id/sections/:key/submit", lecturer.submitSection);
+lecturerRouter.post("/live-tests/:id/sections/:key/autopick", lecturer.autoPickSection);
 
 // /api/live-tests/... (students)
 const studentRouter = express.Router();

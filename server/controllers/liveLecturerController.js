@@ -8,6 +8,7 @@ const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const Question = require("../models/Question");
 const { phase } = require("./liveAdminController");
+const { syncLiveStatus, canEditQuestions, autoPick } = require("../utils/liveSchedule");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const toId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -36,8 +37,8 @@ const loadSection = async (req) => {
     if (!section) throw userError("Section not found", 404);
     const isAdmin = req.user.role === "admin";
     if (!isAdmin && String(section.lecturerId) !== String(req.user._id)) throw userError("This section is assigned to another lecturer", 403);
-    // Lecturers change picks only while the test is a draft and before handing in; admins until publishing
-    const editable = test.status === "draft" && (isAdmin || !section.submittedAt);
+    // Questions can change until the test opens and nobody has started it
+    const editable = await canEditQuestions(test);
     return { test, section, isAdmin, editable };
 };
 
@@ -235,7 +236,7 @@ const browseQuestions = handle("browseQuestions", async (req, res) => {
 // PUT /api/lecturer/live-tests/:id/sections/:key   { questionIds: [...] }  (saves the picks)
 const savePicks = handle("savePicks", async (req, res) => {
     const { test, section, editable } = await loadSection(req);
-    if (!editable) throw userError(test.status !== "draft" ? "The test is already published" : "You handed this section in. Ask the head lecturer to re-open it.");
+    if (!editable) throw userError("The test has already opened, so its questions can't change");
 
     const ids = [...new Set((Array.isArray(req.body.questionIds) ? req.body.questionIds : []).map(String))];
     if (ids.some((id) => !isValidId(id))) throw userError("Invalid question id");
@@ -260,7 +261,21 @@ const savePicks = handle("savePicks", async (req, res) => {
     // MCQs first, numericals at the end, otherwise in the order given
     section.questionIds = [...ids.filter((id) => byId.get(id).type !== "numerical"), ...ids.filter((id) => byId.get(id).type === "numerical")].map(toId);
     await test.save();
-    res.json({ message: "Saved", mcqPicked: c.mcq, numericalPicked: c.numerical, questionIds: section.questionIds });
+    const { status } = await syncLiveStatus(test); // goes live by itself once every section is full
+    res.json({ message: "Saved", mcqPicked: c.mcq, numericalPicked: c.numerical, questionIds: section.questionIds, testStatus: status });
+});
+
+// POST /api/lecturer/live-tests/:id/sections/:key/autopick
+//   { chapterIds?: [...], classLevel?: "11"|"12"|"both", replace?: boolean }
+// Fills the rest of the section (or all of it) with random questions from those chapters.
+const autoPickSection = handle("autoPickSection", async (req, res) => {
+    const { test, section, editable } = await loadSection(req);
+    if (!editable) throw userError("The test has already opened, so its questions can't change");
+    const chapterIds = asList(req.body.chapterIds).filter(isValidId).map(toId);
+    const result = await autoPick(test, section, { chapterIds, classLevel: req.body.classLevel, replace: req.body.replace === true });
+    await test.save();
+    const { status } = await syncLiveStatus(test);
+    res.json({ ...result, testStatus: status });
 });
 
 // POST /api/lecturer/live-tests/:id/sections/:key/submit   (hand the section in)
@@ -277,4 +292,4 @@ const submitSection = handle("submitSection", async (req, res) => {
     res.json({ message: "Handed in", submittedAt: section.submittedAt });
 });
 
-module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection };
+module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection, autoPickSection };

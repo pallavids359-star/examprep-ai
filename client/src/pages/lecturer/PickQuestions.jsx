@@ -3,9 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import QuestionBody from "../../components/QuestionBody";
-import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
-import { fmtDateTime, preview } from "../../components/liveHelpers";
+import { fmtUntil, preview } from "../../components/liveHelpers";
+import { Ring } from "../../components/premium";
 
 // The lecturer picks questions for one section of a live test:
 // class -> chapters -> concepts -> questions grouped by concept, with answers and solutions.
@@ -45,6 +45,9 @@ export default function PickQuestions() {
   const [results, setResults] = useState(null);
   const [loadingResults, setLoadingResults] = useState(false);
   const [showSolutions, setShowSolutions] = useState(true);
+  const [showConcepts, setShowConcepts] = useState(false);
+  const [moreFilters, setMoreFilters] = useState(false);
+  const [testStatus, setTestStatus] = useState(null);
   const listTop = useRef(null);
 
   const load = useCallback(() => {
@@ -53,6 +56,7 @@ export default function PickQuestions() {
       .then((res) => {
         setInfo(res.data);
         setPicked(res.data.questions);
+        setTestStatus(res.data.test.status);
       })
       .catch((err) => setError(getErrorMessage(err)));
   }, [id, key]);
@@ -137,7 +141,9 @@ export default function PickQuestions() {
     setPicked(next);
     setSaving(true);
     try {
-      await api.put(`/lecturer/live-tests/${id}/sections/${key}`, { questionIds: next.map((q) => q._id) });
+      const res = await api.put(`/lecturer/live-tests/${id}/sections/${key}`, { questionIds: next.map((q) => q._id) });
+      if (res.data.testStatus === "published" && testStatus !== "published") toast("Every subject is ready. The test opens by itself at its start time.");
+      setTestStatus(res.data.testStatus);
     } catch (err) {
       setPicked(before);
       toast(getErrorMessage(err), "error");
@@ -160,19 +166,19 @@ export default function PickQuestions() {
     save(next);
   };
 
-  const handIn = async () => {
-    const ok = await askConfirm(`You picked all ${sec.mcqCount + sec.numericalCount} questions. After handing in, only the head lecturer can re-open the section.`, {
-      title: `Hand in ${sec.name}?`,
-      confirmText: "Hand in",
-      danger: false,
-    });
-    if (!ok) return;
+  // Let GenPrep pick the remaining questions (from the ticked chapters, if any)
+  const autoFill = async () => {
+    setSaving(true);
     try {
-      await api.post(`/lecturer/live-tests/${id}/sections/${key}/submit`);
-      toast("Handed in to the head lecturer");
+      const res = await api.post(`/lecturer/live-tests/${id}/sections/${key}/autopick`, { chapterIds, classLevel });
+      if (res.data.shortMcq || res.data.shortNumerical) {
+        toast(`Added ${res.data.added}. These chapters ran out: still ${res.data.shortMcq} MCQ and ${res.data.shortNumerical} numerical needed. Tick more chapters and try again.`, "error");
+      } else toast(`Added ${res.data.added} questions`);
       load();
     } catch (err) {
       toast(getErrorMessage(err), "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -216,47 +222,50 @@ export default function PickQuestions() {
   return (
     <LecturerLayout>
       {/* Section header with progress */}
-      <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="gp-topbar sticky top-0 z-20">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <div className="min-w-0">
-            <Link to="/lecturer" className="text-xs font-medium text-indigo-700 hover:underline">
+            <Link to="/lecturer" className="text-xs font-semibold text-amber-200 hover:underline">
               ← Your sections
             </Link>
-            <p className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-amber-100/60">
               {info.exam?.code} · {info.test.title}
             </p>
-            <h1 className="text-xl font-bold text-slate-900">{sec.name}: pick the questions</h1>
+            <h1 className="text-xl font-extrabold text-white">{sec.name}: pick the questions</h1>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <div className="min-w-[220px]">
-              <p className="text-sm text-slate-700">
+            <Ring value={total ? (pickedCount / total) * 100 : 0} size={52} stroke={6} dark tone={complete ? "green" : "gold"} />
+            <div className="min-w-[200px]">
+              <p className="text-sm text-amber-50">
                 <b>
                   {pickedCount} of {total}
                 </b>{" "}
                 picked · {mcqPicked}/{sec.mcqCount} MCQ{sec.numericalCount ? ` · ${numPicked}/${sec.numericalCount} numerical` : ""}
-                {saving && <span className="ml-2 text-xs text-slate-400">Saving...</span>}
+                {saving && <span className="ml-2 text-xs text-amber-200/60">Saving...</span>}
               </p>
-              <div className="mt-1 h-2 rounded-full bg-slate-100">
-                <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${total ? Math.round((pickedCount / total) * 100) : 0}%` }} />
-              </div>
             </div>
-            {sec.submittedAt ? (
-              <span className="rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">Handed in {fmtDateTime(sec.submittedAt)}</span>
+            {complete ? (
+              <span className="rounded-xl bg-green-500/15 px-3 py-2 text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
+                Done ✓ {testStatus === "published" ? `Opens ${fmtUntil(info.test.startsAt)}` : "Waiting for the other subjects"}
+              </span>
             ) : (
-              <button
-                type="button"
-                disabled={!complete || !editable || saving}
-                onClick={handIn}
-                className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                Hand in to head lecturer
-              </button>
+              editable && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={autoFill}
+                  className="gp-gold-btn px-4 py-2.5 text-sm disabled:opacity-50"
+                  title={chapterIds.length ? "Picks from the ticked chapters" : "Picks from the whole syllabus"}
+                >
+                  Auto-fill the rest{chapterIds.length ? " from ticked chapters" : ""}
+                </button>
+              )
             )}
           </div>
         </div>
         {!editable && (
           <p className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-800">
-            {info.test.status !== "draft" ? "This test is published, so the questions can't change now." : "You handed this section in. Ask the head lecturer to re-open it to make changes."}
+            The test has opened, so its questions can't change now.
           </p>
         )}
       </div>
@@ -264,8 +273,8 @@ export default function PickQuestions() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-start gap-6 px-4 py-6">
         {/* Filters */}
         <aside className="w-full space-y-4 lg:w-72 lg:shrink-0" aria-label="Filters">
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">1. Class</h2>
+          <section className="gp-card p-4">
+            <h2 className="text-sm font-semibold text-slate-900">1. Choose class</h2>
             <div className="mt-2 flex gap-2">
               {[
                 ["11", "11"],
@@ -279,8 +288,8 @@ export default function PickQuestions() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">2. Chapters</h2>
+          <section className="gp-card p-4">
+            <h2 className="text-sm font-semibold text-slate-900">2. Tick chapters</h2>
             {classes.length === 0 && <p className="mt-2 text-sm text-slate-500">No chapters for this class.</p>}
             {classes.map((cl) => {
               const list = visibleChapters.filter((c) => c.classLevel === cl);
@@ -289,7 +298,7 @@ export default function PickQuestions() {
                 <div key={cl} className="mt-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Class {cl}</p>
-                    <button type="button" className="text-xs font-semibold text-indigo-700 hover:underline" onClick={() => setClassChapters(cl, !allOn)}>
+                    <button type="button" className="text-xs font-semibold text-amber-800 hover:underline" onClick={() => setClassChapters(cl, !allOn)}>
                       {allOn ? "Clear" : "Select all"}
                     </button>
                   </div>
@@ -306,11 +315,21 @@ export default function PickQuestions() {
             })}
           </section>
 
-          {chapterIds.length > 0 && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-slate-900">
-                3. Concepts <span className="font-normal text-slate-500">(optional)</span>
-              </h2>
+          {chapterIds.length > 0 && !showConcepts && (
+            <button type="button" onClick={() => setShowConcepts(true)} className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-3 text-sm font-medium text-indigo-700 hover:border-indigo-400">
+              + Narrow down to concepts{topicIds.length ? ` (${topicIds.length} ticked)` : ""}
+            </button>
+          )}
+          {chapterIds.length > 0 && showConcepts && (
+            <section className="gp-card p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Concepts <span className="font-normal text-slate-500">(optional)</span>
+                </h2>
+                <button type="button" onClick={() => setShowConcepts(false)} className="text-xs font-semibold text-amber-800 hover:underline">
+                  Hide
+                </button>
+              </div>
               <p className="mt-0.5 text-xs text-slate-500">Nothing ticked = every concept of the chosen chapters.</p>
               <div className="mt-2 max-h-80 space-y-3 overflow-y-auto pr-1">
                 {chapterIds.map((cid) => {
@@ -341,8 +360,18 @@ export default function PickQuestions() {
             </section>
           )}
 
+          {!moreFilters ? (
+            <button type="button" onClick={() => setMoreFilters(true)} className="w-full rounded-2xl border border-dashed border-slate-300 bg-white p-3 text-sm font-medium text-indigo-700 hover:border-indigo-400">
+              + More filters (type, level, diagrams)
+            </button>
+          ) : (
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">4. Show only</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">Show only</h2>
+              <button type="button" onClick={() => setMoreFilters(false)} className="text-xs font-semibold text-amber-800 hover:underline">
+                Hide
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {TYPES.map(([v, l]) => (
                 <button key={v} type="button" className={pill(type === v)} onClick={filtered(() => setType(v))}>
@@ -366,25 +395,26 @@ export default function PickQuestions() {
               Hide questions used in other live tests
             </label>
           </section>
+          )}
         </aside>
 
         {/* Questions grouped by concept */}
         <main className="min-w-0 flex-[999_1_480px] space-y-4" ref={listTop}>
           {chapterIds.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
-              Choose the class and one or more chapters to see their questions.
+            <div className="gp-card p-10 text-center text-slate-500">
+              Tick one or more chapters to see their questions. Or press <b>Auto-fill the rest</b> and GenPrep picks for you.
             </div>
           ) : !results ? (
             <p className="text-sm text-slate-500">Loading questions...</p>
           ) : results.total === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">No questions match these filters.</div>
+            <div className="gp-card p-10 text-center text-slate-500">No questions match these filters.</div>
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-slate-600">
                   {results.total} questions{loadingResults ? " · loading..." : ""}
                 </p>
-                <button type="button" onClick={() => setShowSolutions((v) => !v)} className="text-sm font-semibold text-indigo-700 hover:underline">
+                <button type="button" onClick={() => setShowSolutions((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
                   {showSolutions ? "Collapse all solutions" : "Open all solutions"}
                 </button>
               </div>
@@ -403,7 +433,7 @@ export default function PickQuestions() {
                     {g.questions.map((q) => {
                       const isPicked = pickedIds.has(String(q._id));
                       return (
-                        <article key={q._id} className={`rounded-2xl border bg-white p-5 ${isPicked ? "border-2 border-indigo-500" : "border-slate-200"}`}>
+                        <article key={q._id} className={`gp-card p-5 transition ${isPicked ? "ring-2 ring-amber-500" : ""}`}>
                           <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
                             <span className={`rounded-full px-2.5 py-0.5 font-medium ${q.type === "numerical" ? "bg-orange-50 text-orange-800" : "bg-blue-50 text-blue-800"}`}>
                               {q.type === "numerical" ? "Numerical" : q.type === "mcq_multi" ? "MCQ (multi)" : "MCQ"}
@@ -417,7 +447,7 @@ export default function PickQuestions() {
                           {editable && (
                             <div className="mt-4 flex justify-end">
                               {isPicked ? (
-                                <button type="button" onClick={() => remove(q._id)} disabled={saving} className="rounded-lg border border-indigo-500 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 disabled:opacity-50">
+                                <button type="button" onClick={() => remove(q._id)} disabled={saving} className="rounded-xl border border-green-600 bg-green-50 px-4 py-2 text-sm font-semibold text-green-800 disabled:opacity-50">
                                   ✓ Added · Remove
                                 </button>
                               ) : (

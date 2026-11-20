@@ -23,4 +23,5 @@ createRoot(document.getElementById("root")).render(
 );
 import "./fonts.css";
 import "./theme.css";
+import "./premium.css";
 import "./loader";

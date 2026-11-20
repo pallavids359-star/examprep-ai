@@ -11,10 +11,11 @@ const sectionSchema = new mongoose.Schema(
         questionIds: [{ type: ObjectId, ref: "Question" }],
         key: { type: String }, // live tests: "physics", "botany"...
         lecturerId: { type: ObjectId, ref: "User" },
+        picker: { type: String, enum: ["auto", "me", "lecturer"] }, // who picks the questions
         mcqCount: { type: Number, min: 0, max: 200 },
         numericalCount: { type: Number, min: 0, max: 50 },
         dueAt: { type: Date },
-        submittedAt: { type: Date }, // lecturer handed it in
+        submittedAt: { type: Date }, // no longer required: a full section counts as done
     },
     { _id: false }
 );

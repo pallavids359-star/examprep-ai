@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import QuestionBody from "../../components/QuestionBody";
 import { fmtDateTime, fmtDuration, preview } from "../../components/liveHelpers";
+import { Donut, ICONS, Ring, Stat } from "../../components/premium";
 
 // Live test report: every number about the student's attempt, question by question
 const STATUS = {
@@ -129,38 +130,105 @@ export default function LiveReport() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
       {back}
-      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">Live test report</p>
-      <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">{t.title}</h1>
-      <p className="mt-1 text-slate-500">
-        Taken {fmtDateTime(data.startedAt)} – {fmtDateTime(data.submittedAt)}
-        {data.autoSubmitted ? " · submitted automatically when time ran out" : ""}
-      </p>
 
-      {/* Headline numbers */}
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-2xl bg-slate-900 p-5 text-white">
-          <p className="text-xs text-slate-300">Score</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-amber-300">
-            {s.score} <span className="text-base font-normal text-slate-300">/ {s.maxScore}</span>
-          </p>
-          <p className="text-xs text-slate-300">{s.percentage}%</p>
+      {/* Score hero */}
+      <section className="gp-hero mt-4 p-6 md:p-8">
+        <div className="relative flex flex-wrap items-center justify-between gap-8">
+          <div className="min-w-0 max-w-xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">Live test report</p>
+            <h1 className="mt-2 text-2xl font-extrabold text-white md:text-3xl">{t.title}</h1>
+            <p className="gp-muted mt-2 text-sm">
+              Taken {fmtDateTime(data.startedAt)} – {fmtDateTime(data.submittedAt)}
+              {data.autoSubmitted ? " · submitted automatically when time ran out" : ""}
+            </p>
+            <div className="mt-6 flex flex-wrap items-end gap-8">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Score</p>
+                <p className="font-display text-5xl font-extrabold">
+                  <span className="gp-gold-text">{s.score}</span>
+                  <span className="text-2xl text-amber-100/60"> / {s.maxScore}</span>
+                </p>
+              </div>
+              {r && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Rank</p>
+                  <p className="font-display text-5xl font-extrabold text-white">
+                    #{r.rank}
+                    <span className="text-2xl text-amber-100/60"> of {r.totalCandidates}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+            {r && <p className="mt-3 text-sm text-amber-100/80">You did better than {r.percentile}% of everyone who took it.</p>}
+          </div>
+          <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />
         </div>
-        <Tile label="Rank" value={r ? `${r.rank}` : "—"} unit={r ? `of ${r.totalCandidates}` : ""} sub={r ? `Better than ${r.percentile}% of the others` : ""} />
-        <Tile label="Accuracy" value={`${s.accuracy ?? 0}%`} sub={`${s.correct} right of ${answeredCount} answered`} />
-        <Tile label="Time used" value={fmtDuration(s.timeTakenSec)} sub={`About ${fmtDuration(questions.length ? s.timeTakenSec / questions.length : 0)} per question`} />
+      </section>
+
+      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Accuracy" value={`${s.accuracy ?? 0}%`} sub={`${s.correct} right of ${answeredCount} answered`} icon={ICONS.target} />
+        <Stat label="Time used" value={fmtDuration(s.timeTakenSec)} sub={`≈ ${fmtDuration(questions.length ? s.timeTakenSec / questions.length : 0)} per question`} icon={ICONS.clock} />
+        <Stat label="Lost to wrong answers" value={s.negativeMarks || 0} sub={`${s.wrong} wrong answer${s.wrong === 1 ? "" : "s"}`} icon={ICONS.bolt} />
+        <Stat label="Marked for review" value={s.marked} sub={`${s.markedAnswered} of them answered`} icon={ICONS.book} />
       </div>
 
       {/* Every question at a glance */}
-      <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="font-semibold text-slate-900">Every question at a glance</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-          <Count n={s.correct} label="Correct" cls="bg-green-50 text-green-800" />
-          <Count n={s.wrong} label={`Wrong (${s.negativeMarks} marks)`} cls="bg-orange-50 text-orange-800" />
-          <Count n={s.skipped} label="Seen but skipped" cls="bg-slate-100 text-slate-700" />
-          <Count n={s.notVisited} label="Never opened" cls="bg-slate-50 text-slate-600" />
-          <Count n={s.marked} label={`Marked for review (${s.markedAnswered} answered)`} cls="bg-violet-50 text-violet-800" />
+      <section className="gp-card mt-5 flex flex-wrap items-center gap-8 p-6">
+        <Donut
+          size={170}
+          center={questions.length}
+          centerSub="questions"
+          parts={[
+            { label: "Correct", value: s.correct, color: "#1f8a4c" },
+            { label: "Wrong", value: s.wrong, color: "#e07a1f" },
+            { label: "Seen but skipped", value: s.skipped, color: "#a8987a" },
+            { label: "Never opened", value: s.notVisited, color: "#e7dcc3" },
+          ]}
+        />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-slate-900">Every question at a glance</h2>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              ["Correct", s.correct, "#1f8a4c", "correct"],
+              ["Wrong", s.wrong, "#e07a1f", "wrong"],
+              ["Seen but skipped", s.skipped, "#a8987a", "skipped"],
+              ["Never opened", s.notVisited, "#e7dcc3", "not_visited"],
+            ].map(([l, n, c, k]) => (
+              <li key={l}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter(k);
+                    setSection("all");
+                    document.getElementById("qbq")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left hover:border-amber-300"
+                >
+                  <span className="h-3 w-3 rounded-full" style={{ background: c }} />
+                  <span className="flex-1 text-sm text-slate-700">{l}</span>
+                  <span className="font-display text-xl font-extrabold tabular-nums text-slate-900">{n}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
+
+      {/* Subjects */}
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.sections.map((x) => (
+          <div key={x.name} className="gp-card flex items-center gap-4 p-5">
+            <Ring value={x.maxScore ? Math.max(0, (x.score / x.maxScore) * 100) : 0} size={72} />
+            <div className="min-w-0">
+              <p className="font-bold text-slate-900">{x.name}</p>
+              <p className="text-sm text-slate-600">
+                {x.score} / {x.maxScore} · <span className="text-green-700">{x.correct}✓</span> <span className="text-orange-700">{x.wrong}✗</span> · {fmtDuration(x.timeSec)}
+              </p>
+              {x.weakestChapter && <p className="mt-0.5 truncate text-xs text-slate-500">Work on: {x.weakestChapter.name}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* By section */}
       <section className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-5">
@@ -256,9 +324,9 @@ export default function LiveReport() {
       </section>
 
       {/* Question by question */}
-      <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
+      <section id="qbq" className="gp-card mt-5 scroll-mt-6 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-900">Question by question</h2>
+          <h2 className="text-lg font-bold text-slate-900">Question by question</h2>
           <select aria-label="Subject" value={section} onChange={(e) => setSection(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
             <option value="all">All subjects</option>
             {data.sections.map((x) => (

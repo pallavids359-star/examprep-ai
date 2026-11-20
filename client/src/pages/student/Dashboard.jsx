@@ -7,6 +7,7 @@ import { DashboardSkeleton } from "../../components/Skeleton";
 import { QuickActions, WelcomeBanner } from "../../components/DashboardHero";
 import { StatsRow, WeeklyChart } from "../../components/DashboardWidgets";
 import { RecommendedCard } from "../../components/DashboardLists";
+import LiveNowBanner from "../../components/LiveNowBanner";
 
 const STEPS = [
   { title: "Pick a chapter", text: "Open Practice and choose any chapter or topic." },
@@ -36,6 +37,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
       <WelcomeBanner name={user.name} examCode={examCode} today={today} />
+      <LiveNowBanner examId={examId} />
       <QuickActions wrongCount={data?.wrongQuestionsCount || 0} />
 
       {error && <div className="mt-6 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
