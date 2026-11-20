@@ -753,13 +753,14 @@ function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setSh
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
       <PaperSummary picked={picked} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">
-          Read every question. Don't like one? <b>Swap</b> puts a similar question in the same place, <b>Choose</b> lets you pick the replacement, <b>Remove</b> takes it out.
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e7dcc3] bg-white px-4 py-3">
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+          <span className="font-semibold text-slate-900">Under each question:</span>
+          <span><b className="text-slate-900">⇄ Swap</b> similar question</span>
+          <span><b className="text-slate-900">Choose</b> your own</span>
+          <span><b className="text-slate-900">Remove</b> it</span>
         </p>
-        <button type="button" onClick={() => setShowSolutions((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
-          {showSolutions ? "Hide solutions" : "Show solutions"}
-        </button>
+        <Toggle on={showSolutions} onClick={() => setShowSolutions((v) => !v)} label="Answers & solutions" />
       </div>
       {groups.map(([title, list, need, offset]) => (
         <section key={title} className="space-y-4">
@@ -871,7 +872,7 @@ function SendCard({ sec, complete, sentAt, editable, canChange, isAdmin, saving,
   );
 }
 
-// Where the paper's questions come from: chapters with their concepts, levels, diagrams
+// Where the paper's questions come from: level mix, then each chapter with its topics
 function PaperSummary({ picked }) {
   const [open, setOpen] = useState(true);
   const chapters = [];
@@ -883,38 +884,71 @@ function PaperSummary({ picked }) {
     c.topics.set(t, (c.topics.get(t) || 0) + 1);
   }
   chapters.sort((a, b) => b.count - a.count);
-  const lv = (d) => picked.filter((q) => q.difficulty === d).length;
+  const total = picked.length || 1;
+  const levels = [
+    ["Easy", picked.filter((q) => q.difficulty === "easy").length, "#7fb069"],
+    ["Medium", picked.filter((q) => q.difficulty === "medium").length, "#c9a24a"],
+    ["Hard", picked.filter((q) => q.difficulty === "hard").length, "#b5532c"],
+  ];
+  const diagrams = picked.filter((q) => q.diagram).length;
+
   return (
-    <section className="gp-card p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="overflow-hidden rounded-2xl border border-[#e7dcc3] bg-white">
+      {/* Top: numbers + level mix */}
+      <div className="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[#efe6d2] px-6 py-5">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Where the questions come from</h2>
-          <p className="text-sm text-slate-500">
-            {chapters.length} chapter{chapters.length === 1 ? "" : "s"} · {lv("easy")} easy · {lv("medium")} medium · {lv("hard")} hard · {picked.filter((q) => q.diagram).length} with diagrams
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Paper overview</p>
+          <p className="mt-1 text-lg font-bold text-slate-900">
+            {picked.length} questions · {chapters.length} chapter{chapters.length === 1 ? "" : "s"}
           </p>
         </div>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
-          {open ? "Hide" : "Show"}
+        <div className="min-w-[260px] flex-1">
+          <div className="flex h-2.5 overflow-hidden rounded-full bg-[#f1e9d6]">
+            {levels.map(([l, n, c]) => (n ? <div key={l} style={{ width: `${(n / total) * 100}%`, background: c }} /> : null))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+            {levels.map(([l, n, c]) => (
+              <span key={l} className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />
+                {l} <b className="text-slate-900">{n}</b>
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-slate-400" />
+              Diagrams <b className="text-slate-900">{diagrams}</b>
+            </span>
+          </div>
+        </div>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-[#f7f3ea]">
+          {open ? "Hide chapters" : "Show chapters"}
         </button>
       </div>
+
+      {/* Chapters and their topics */}
       {open && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="divide-y divide-[#efe6d2]">
           {chapters.map((c) => (
-            <div key={c.name} className="rounded-xl border border-slate-100 bg-white p-3">
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-slate-900">
-                  {c.name}
-                  {c.classLevel && <span className="ml-1.5 text-xs font-normal text-slate-500">Class {c.classLevel}</span>}
+            <div key={c.name} className="grid gap-4 px-6 py-4 md:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+              <div>
+                <p className="font-semibold text-slate-900">{c.name}</p>
+                <p className="text-xs text-slate-500">
+                  {c.classLevel ? `Class ${c.classLevel} · ` : ""}
+                  {c.count} question{c.count === 1 ? "" : "s"}
                 </p>
-                <span className="shrink-0 rounded-full bg-slate-900 px-2 py-0.5 text-xs font-bold text-amber-200">{c.count}</span>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f1e9d6]">
+                  <div className="h-full rounded-full bg-[#c9a24a]" style={{ width: `${(c.count / total) * 100}%` }} />
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[...c.topics].map(([t, n]) => (
-                  <span key={t} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900 ring-1 ring-amber-200/70">
-                    {t} · {n}
-                  </span>
-                ))}
-              </div>
+              <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                {[...c.topics]
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([t, n]) => (
+                    <li key={t} className="flex items-center justify-between gap-3 border-b border-dashed border-[#efe6d2] pb-1.5 text-sm">
+                      <span className="truncate text-slate-700">{t}</span>
+                      <span className="shrink-0 rounded-md bg-[#f7f3ea] px-1.5 text-xs font-semibold tabular-nums text-slate-700">{n}</span>
+                    </li>
+                  ))}
+              </ul>
             </div>
           ))}
         </div>
