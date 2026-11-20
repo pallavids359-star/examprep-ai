@@ -311,7 +311,7 @@ table tbody tr:hover {
 /* Printing a leaderboard: only the sheet, on white */
 @media print {
   body { background: #fff !important; }
-  .gp-sidebar, .gp-topbar { display: none !important; }
+  .gp-sidebar, .gp-topbar, .gp-tabbar { display: none !important; }
   main { margin-left: 0 !important; padding: 0 !important; }
   body * { visibility: hidden; }
   .gp-print-sheet, .gp-print-sheet * { visibility: visible; }

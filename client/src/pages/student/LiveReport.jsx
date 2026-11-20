@@ -160,6 +160,9 @@ export default function LiveReport() {
               )}
             </div>
             {r && <p className="mt-3 text-sm text-amber-100/80">You did better than {r.percentile}% of everyone who took it.</p>}
+            <Link to={`/live-tests/${t._id}/leaderboard`} className="gp-gold-btn mt-5 inline-block px-5 py-2.5 text-sm">
+              See the leaderboard →
+            </Link>
           </div>
           <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />
         </div>

@@ -203,6 +203,11 @@ export default function LiveTests() {
                   </span>
                 )}
                 {(t.state === "missed" || t.resultsReady) && (
+                  <Link to={`/live-tests/${t._id}/leaderboard`} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-amber-200 hover:bg-black">
+                    Leaderboard
+                  </Link>
+                )}
+                {(t.state === "missed" || t.resultsReady) && (
                   <Link to={`/live-tests/${t._id}/report`} className="rounded-xl border border-amber-400 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-50">
                     {t.state === "missed" ? "See answers" : "Full report →"}
                   </Link>

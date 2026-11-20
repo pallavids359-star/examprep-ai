@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 // Merit list in the style of a printed class leaderboard: title, one summary line,
 // then Rank / Student / Score rows. Ranks run 1, 2, 3... down the list.
 // Click a row to open that student's answers. "Print / Save as PDF" prints just this sheet.
-export default function ClassLeaderboard({ test, rows, brand = "GenPrep" }) {
+export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpen = true }) {
   const navigate = useNavigate();
   const [view, setView] = useState("board");
   const sorted = [...rows].sort((a, b) => b.score - a.score || (a.timeTakenSec || 0) - (b.timeTakenSec || 0));
@@ -35,7 +35,7 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep" }) {
     return (
       <div>
         {switcher}
-        <Board test={test} rows={sorted} onOpen={(r) => navigate(`/admin/attempts/${r.attemptId}`)} />
+        <Board test={test} rows={sorted} onOpen={canOpen ? (r) => navigate(`/admin/attempts/${r.attemptId}`) : null} />
       </div>
     );
   }
@@ -71,13 +71,16 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep" }) {
               {sorted.map((r, i) => (
                 <tr
                   key={r.attemptId}
-                  onClick={() => navigate(`/admin/attempts/${r.attemptId}`)}
-                  title="Open this student's answers"
-                  className="cursor-pointer odd:bg-white even:bg-slate-50/70 hover:bg-amber-50 print:cursor-auto"
+                  onClick={canOpen ? () => navigate(`/admin/attempts/${r.attemptId}`) : undefined}
+                  title={canOpen ? "Open this student's answers" : undefined}
+                  className={`${canOpen ? "cursor-pointer hover:bg-amber-50" : ""} ${r.me ? "!bg-amber-100 font-semibold" : "odd:bg-white even:bg-slate-50/70"} print:cursor-auto`}
                 >
                   <td className="border border-slate-200 px-4 py-2.5 text-center font-bold tabular-nums text-slate-900">{i + 1}</td>
                   {hasRoll && <td className="border border-slate-200 px-4 py-2.5 text-center tabular-nums tracking-wider text-slate-500">{r.student?.rollNo || "—"}</td>}
-                  <td className="border border-slate-200 px-4 py-2.5 uppercase text-slate-800">{r.student?.name || "Deleted account"}</td>
+                  <td className="border border-slate-200 px-4 py-2.5 uppercase text-slate-800">
+                    {r.student?.name || "Deleted account"}
+                    {r.me && <span className="ml-2 rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold normal-case text-amber-200">You</span>}
+                  </td>
                   <td className="border border-slate-200 px-4 py-2.5 text-right font-bold tabular-nums text-slate-900">{r.score}</td>
                 </tr>
               ))}
@@ -192,7 +195,7 @@ function Board({ test, rows, onOpen }) {
               [third, 3, BRONZE, 96, "mt-10"],
             ].map(([r, place, ring, size, mt]) =>
               r ? (
-                <button key={place} type="button" onClick={() => onOpen(r)} className={`group flex flex-col items-center ${mt}`} title="Open answers">
+                <button key={place} type="button" disabled={!onOpen} onClick={() => onOpen?.(r)} className={`group flex flex-col items-center disabled:cursor-default ${mt}`}>
                   <span className={`font-display font-extrabold ${place === 1 ? "text-3xl text-amber-200" : "text-xl text-white/80"}`}>
                     {place}
                     <sup className="text-[0.55em]">{["st", "nd", "rd"][place - 1]}</sup>
@@ -203,7 +206,8 @@ function Board({ test, rows, onOpen }) {
                     {place === 1 && <Laurel flip className="absolute -right-12 bottom-0 h-36 w-12" />}
                     {place === 1 && <span className="absolute -right-4 -top-3 text-3xl drop-shadow">🏆</span>}
                   </span>
-                  <span className={`mt-3 max-w-full truncate font-bold uppercase tracking-wide group-hover:underline ${place === 1 ? "text-lg" : "text-sm"}`}>{r.student?.name || "Deleted account"}</span>
+                  <span className={`mt-3 max-w-full truncate font-bold uppercase tracking-wide ${onOpen ? "group-hover:underline" : ""} ${place === 1 ? "text-lg" : "text-sm"}`}>{r.student?.name || "Deleted account"}</span>
+                  {r.me && <span className="mt-1 rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-extrabold text-slate-900">YOU</span>}
                   <span className={`font-display font-extrabold tabular-nums ${place === 1 ? "text-3xl text-amber-200" : "text-xl text-white/90"}`}>{r.score}</span>
                   <span className="text-[11px] text-white/50">/ {r.maxScore}</span>
                 </button>
@@ -224,15 +228,21 @@ function Board({ test, rows, onOpen }) {
                       <button
                         key={r.attemptId}
                         type="button"
-                        onClick={() => onOpen(r)}
-                        className="flex w-full items-center gap-3 rounded-full bg-gradient-to-r from-white/15 to-white/5 py-1.5 pl-1.5 pr-5 text-left ring-1 ring-white/15 transition hover:from-white/25 hover:ring-amber-200/50"
+                        disabled={!onOpen}
+                        onClick={() => onOpen?.(r)}
+                        className={`flex w-full items-center gap-3 rounded-full py-1.5 pl-1.5 pr-5 text-left transition disabled:cursor-default ${
+                          r.me ? "bg-gradient-to-r from-amber-300/40 to-amber-200/10 ring-2 ring-amber-300" : "bg-gradient-to-r from-white/15 to-white/5 ring-1 ring-white/15 hover:from-white/25"
+                        }`}
                       >
                         <span className="w-12 shrink-0 text-right font-display text-lg font-extrabold">
                           {place}
                           <sup className="text-[0.55em]">{ordinal(place).replace(String(place), "")}</sup>
                         </span>
                         <Avatar name={r.student?.name} size={34} ring="linear-gradient(135deg,#ffffff,#c7c2e8)" />
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide">{r.student?.name || "Deleted account"}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide">
+                          {r.student?.name || "Deleted account"}
+                          {r.me && <span className="ml-2 rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-extrabold normal-case text-slate-900">You</span>}
+                        </span>
                         <span className="font-display font-extrabold tabular-nums text-amber-200">{r.score}</span>
                       </button>
                     );

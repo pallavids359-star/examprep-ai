@@ -322,4 +322,30 @@ const liveReport = handle("liveReport", async (req, res) => {
     });
 });
 
-module.exports = { listLive, startLive, liveReport, resultsOpen };
+// GET /api/live-tests/:id/leaderboard   (every student's rank, once results are out)
+const liveLeaderboard = handle("liveLeaderboard", async (req, res) => {
+    if (!isValidId(req.params.id)) throw userError("Invalid test id");
+    const test = await Test.findOne({ _id: req.params.id, type: "live", status: { $in: ["published", "archived"] } }).select("title examId totalMarks availability live").lean();
+    if (!test) throw userError("Live test not found", 404);
+    if (!resultsOpen(test)) throw userError("The leaderboard opens when the test closes");
+    const exam = await Exam.findById(test.examId).select("code").lean();
+    const attempts = await TestAttempt.find({ testId: test._id, status: { $in: ["submitted", "auto_submitted"] } })
+        .select("userId result.score result.maxScore result.timeTakenSec")
+        .populate("userId", "name")
+        .lean();
+    attempts.sort((a, b) => (b.result?.score ?? 0) - (a.result?.score ?? 0) || (a.result?.timeTakenSec ?? 0) - (b.result?.timeTakenSec ?? 0));
+    res.json({
+        test: { _id: test._id, title: test.title, exam: exam?.code || "", totalMarks: test.totalMarks },
+        rows: attempts.map((a, i) => ({
+            attemptId: String(i), // students never open other students' answers
+            rank: i + 1,
+            me: String(a.userId?._id) === String(req.user._id),
+            student: { name: a.userId?.name || "Student" },
+            score: a.result?.score ?? 0,
+            maxScore: a.result?.maxScore ?? test.totalMarks,
+            timeTakenSec: a.result?.timeTakenSec ?? 0,
+        })),
+    });
+});
+
+module.exports = { listLive, startLive, liveReport, liveLeaderboard, resultsOpen };
