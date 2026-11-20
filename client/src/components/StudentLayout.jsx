@@ -34,22 +34,35 @@ function Logo({ compact }) {
   );
 }
 
+// Exam switcher: one tap between NEET, JEE and KCET (gold = the exam you're preparing for)
 function ExamPicker({ full }) {
   const { exams, examId, setExamId } = useExam();
   if (exams.length === 0) return null;
   return (
-    <select
-      value={examId}
-      onChange={(e) => setExamId(e.target.value)}
+    <div
+      role="radiogroup"
       aria-label="Exam"
-      className={`rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-semibold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${full ? "w-full" : ""}`}
+      className={`grid gap-1 rounded-2xl bg-white/5 p-1 ring-1 ring-amber-200/20 ${full ? "w-full" : ""}`}
+      style={{ gridTemplateColumns: `repeat(${exams.length}, minmax(0, 1fr))` }}
     >
-      {exams.map((e) => (
-        <option key={e._id} value={e._id}>
-          {e.code}
-        </option>
-      ))}
-    </select>
+      {exams.map((e) => {
+        const on = e._id === examId;
+        return (
+          <button
+            key={e._id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => !on && setExamId(e._id)}
+            className={`rounded-xl font-display font-extrabold tracking-wide transition ${full ? "py-2 text-sm" : "px-2.5 py-1 text-xs"} ${
+              on ? "bg-gradient-to-br from-amber-200 to-amber-400 text-slate-900 shadow-[0_6px_16px_-8px_rgba(229,195,114,0.9)]" : "text-amber-100/70 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {e.code}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
