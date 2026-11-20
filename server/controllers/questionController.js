@@ -215,6 +215,7 @@ const updateQuestion = async (req, res) => {
 
         question.version += 1;
         question.updatedBy = req.user._id;
+        if (question.external?.id) question.set("external.editedAt", new Date()); // keep this edit when Supabase syncs again
         await question.save();
 
         res.json({ message: "Question updated", question });

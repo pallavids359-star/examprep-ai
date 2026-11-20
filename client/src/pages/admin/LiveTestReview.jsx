@@ -180,7 +180,7 @@ export default function LiveTestReview() {
           const need = s.mcqCount + s.numericalCount;
           return (
             <section key={s.key} className="gp-card gp-card-hover flex flex-col gap-3 p-5">
-              <div className="flex items-center gap-4">
+              <Link to={`/lecturer/tests/${id}/${s.key}?view=paper`} className="flex items-center gap-4" title={`Open all ${s.name} questions`}>
                 <Ring value={need ? (s.picked / need) * 100 : 0} size={64} tone={s.ready ? "green" : "gold"} label={s.ready ? "✓" : undefined} />
                 <div className="min-w-0">
                   <h2 className="text-lg font-bold text-slate-900">{s.name}</h2>
@@ -194,20 +194,25 @@ export default function LiveTestReview() {
                     </p>
                   )}
                 </div>
-              </div>
+              </Link>
               {s.missing > 0 && <p className="text-xs text-red-700">{s.missing} picked question(s) were deleted from the bank. Pick replacements.</p>}
               <p className="text-xs text-slate-500">
                 {s.mcqCount} MCQ{s.numericalCount ? ` + ${s.numericalCount} numerical` : ""} · {s.questions.filter((q) => q.diagram).length} with diagrams ·{" "}
                 {["easy", "medium", "hard"].map((d) => `${s.questions.filter((q) => q.difficulty === d).length} ${d}`).join(" · ")}
               </p>
               <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
+                {s.picked > 0 && (
+                  <Link to={`/lecturer/tests/${id}/${s.key}?view=paper`} className="w-full rounded-xl bg-slate-900 px-4 py-2 text-center font-semibold text-amber-200 hover:bg-black">
+                    Review all {s.picked} questions →
+                  </Link>
+                )}
                 <button type="button" onClick={() => setOpenKey(openKey === s.key ? null : s.key)} className="font-semibold text-amber-800 hover:underline">
-                  {openKey === s.key ? "Hide list" : test.editable ? "See, swap or remove" : "See list"}
+                  {openKey === s.key ? "Hide quick list" : "Quick list"}
                 </button>
                 {test.editable && (
                   <>
                     <Link to={`/lecturer/tests/${id}/${s.key}`} className="font-semibold text-amber-800 hover:underline">
-                      {s.picker === "me" && !s.full ? "Pick questions" : "Change questions"}
+                      {s.picked ? "Add questions" : "Pick questions"}
                     </Link>
                     {!s.full && (
                       <button type="button" disabled={busy} onClick={() => fill(s)} className="font-semibold text-amber-800 hover:underline disabled:opacity-50">

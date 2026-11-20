@@ -1,6 +1,6 @@
 import MathText from "../../components/MathText";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import SyllabusPicker from "../../components/SyllabusPicker";
@@ -37,6 +37,9 @@ export default function QuestionForm() {
     const { id } = useParams(); // "new" or a question id
     const isNew = id === "new";
     const navigate = useNavigate();
+    // Opened from a live test paper: go back there after saving
+    const [search] = useSearchParams();
+    const back = (search.get("back") || "").startsWith("/") ? search.get("back") : "/admin/questions";
 
     const [place, setPlace] = useState({ examId: localStorage.getItem("examId") || "", subjectId: "", chapterId: "", topicId: "" });
     const [form, setForm] = useState(EMPTY);
@@ -111,7 +114,7 @@ export default function QuestionForm() {
                 setNote("Saved! Write the next question for the same topic.");
                 window.scrollTo(0, 0);
             } else {
-                navigate("/admin/questions");
+                navigate(back);
             }
         } catch (err) {
             setError(getErrorMessage(err));
@@ -131,7 +134,7 @@ export default function QuestionForm() {
     return (
         <AdminLayout
             title={isNew ? "Add question" : "Edit question"}
-            actions={<Link to="/admin/questions" className="text-sm text-slate-600 hover:text-slate-900">← All questions</Link>}
+            actions={<Link to={back} className="text-sm text-slate-600 hover:text-slate-900">{back === "/admin/questions" ? "← All questions" : "← Back to the paper"}</Link>}
         >
             <form onSubmit={(e) => save(e)} className="mt-6 space-y-4">
                 {error && <div className="rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
@@ -217,7 +220,7 @@ export default function QuestionForm() {
                             Save and add another
                         </button>
                     )}
-                    <Link to="/admin/questions" className="text-sm text-slate-600 px-3 py-2.5 hover:text-slate-900">
+                    <Link to={back} className="text-sm text-slate-600 px-3 py-2.5 hover:text-slate-900">
                         Cancel
                     </Link>
                 </div>

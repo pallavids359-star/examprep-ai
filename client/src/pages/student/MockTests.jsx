@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui";
 import api, { getErrorMessage } from "../../api/axios";
 import MockSetup from "../../components/MockSetup";
+import { toast } from "../../components/Toaster";
 
 // The real paper pattern (the server uses the same numbers)
 const PATTERNS = {
@@ -66,6 +67,7 @@ export default function MockTests() {
                 topicIds: filters?.topicIds || [],
                 difficulty: filters?.difficulty || "any",
             });
+            (res.data.notes || []).forEach((n) => toast(n, "error"));
             navigate(`/attempt/${res.data.attemptId}`);
         } catch (err) {
             if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});

@@ -7,6 +7,7 @@ const Subject = require("../models/Subject");
 const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const Question = require("../models/Question");
+const User = require("../models/User");
 const { phase } = require("./liveAdminController");
 const { syncLiveStatus, canEditQuestions, autoPick, findSwap, sectionState } = require("../utils/liveSchedule");
 
@@ -131,10 +132,11 @@ const mySections = handle("mySections", async (req, res) => {
 // GET /api/lecturer/live-tests/:id/sections/:key   (section, its syllabus and the picked questions)
 const getSection = handle("getSection", async (req, res) => {
     const { test, section, editable, lockedBySend } = await loadSection(req);
-    const [exam, subject, chapters] = await Promise.all([
+    const [exam, subject, chapters, lecturer] = await Promise.all([
         Exam.findById(test.examId).select("code name").lean(),
         Subject.findById(section.subjectId).select("name").lean(),
         Chapter.find({ subjectId: section.subjectId }).sort({ classLevel: 1, order: 1, name: 1 }).select("name classLevel order").lean(),
+        section.lecturerId ? User.findById(section.lecturerId).select("name").lean() : null,
     ]);
     const picked = await Question.find({ _id: { $in: section.questionIds } }).select(FULL_FIELDS).lean();
     const [chaptersById, topicsById] = await namesFor(picked);
@@ -151,6 +153,7 @@ const getSection = handle("getSection", async (req, res) => {
             mcqCount: section.mcqCount || 0,
             numericalCount: section.numericalCount || 0,
             picker: section.picker || "lecturer",
+            lecturerName: lecturer?.name || "",
             dueAt: section.dueAt || null,
             submittedAt: section.submittedAt || null,
             returnedAt: section.returnedAt || null,

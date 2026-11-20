@@ -271,12 +271,19 @@ const shuffle = (list) => {
 
 const sample = (match, size) =>
     size > 0
-        ? Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: { _id: 1, subjectId: 1, chapterId: 1, topicId: 1 } }])
+        ? Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: { _id: 1, type: 1, subjectId: 1, chapterId: 1, topicId: 1 } }])
         : Promise.resolve([]);
 
 // Picks one subject's questions: MCQs (with the diagram share mixed in), then numericals at the end.
-const pickSection = async (baseMatch, count, numericalCount) => {
+// Numericals are looked for in the chosen chapters and difficulty first, then any difficulty, then
+// the whole subject (wider), so JEE gets its 5 whenever the bank has them. Only if the subject has
+// none left are the missing places filled with MCQs.
+const pickSection = async (baseMatch, count, numericalCount, wider = []) => {
     const numericals = await sample({ ...baseMatch, type: "numerical" }, numericalCount);
+    for (const w of wider) {
+        if (numericals.length >= numericalCount) break;
+        numericals.push(...(await sample({ ...w, type: "numerical", _id: { $nin: numericals.map((q) => q._id) } }, numericalCount - numericals.length)));
+    }
     const mcqCount = count - numericals.length; // too few numericals: fill with MCQs
     const mcqMatch = { ...baseMatch, type: { $ne: "numerical" } };
 
@@ -345,6 +352,7 @@ const generateMock = async (req, res) => {
 
         const subjects = await Subject.find({ examId: exam._id }).lean();
         const sections = [];
+        const notes = [];
         for (const [name, count] of pattern.sections) {
             const subject = subjects.find((s) => subjectKey(s.name) === name);
             if (!subject) continue;
@@ -355,7 +363,13 @@ const generateMock = async (req, res) => {
                 match.$or = parts;
             }
             if (difficulty !== "any") match.difficulty = difficulty;
-            const picked = await pickSection(match, count, NUMERICAL_PER_SUBJECT[exam.code] || 0);
+            const numNeed = NUMERICAL_PER_SUBJECT[exam.code] || 0;
+            const anyLevel = { ...match };
+            delete anyLevel.difficulty;
+            const wholeSubject = { examId: exam._id, subjectId: subject._id, status: "published" };
+            const picked = await pickSection(match, count, numNeed, [anyLevel, wholeSubject]);
+            const gotNum = picked.filter((q) => q.type === "numerical").length;
+            if (numNeed && gotNum < numNeed) notes.push(`${subject.name}: only ${gotNum} numerical question${gotNum === 1 ? "" : "s"} in the bank, so ${numNeed - gotNum} MCQ${numNeed - gotNum === 1 ? "" : "s"} added instead`);
             if (picked.length) sections.push({ name: subject.name, subjectId: subject._id, picked });
         }
         const all = sections.flatMap((s) => s.picked);
@@ -401,7 +415,7 @@ const generateMock = async (req, res) => {
             answers: all.map((q) => ({ questionId: q._id, subjectId: q.subjectId, chapterId: q.chapterId, topicId: q.topicId })),
         });
 
-        res.status(201).json({ attemptId: attempt._id, resumed: false, title: test.title, totalQuestions: all.length, minutes });
+        res.status(201).json({ attemptId: attempt._id, resumed: false, title: test.title, totalQuestions: all.length, minutes, notes });
     } catch (error) {
         sendError(res, error, "generateMock");
     }

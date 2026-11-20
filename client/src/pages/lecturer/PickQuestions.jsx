@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import QuestionBody from "../../components/QuestionBody";
@@ -27,6 +27,7 @@ const TYPES = [
 
 export default function PickQuestions() {
   const { id, key } = useParams();
+  const [search] = useSearchParams();
   const [info, setInfo] = useState(null); // section, chapters, editable...
   const [picked, setPicked] = useState([]); // full question objects, in paper order
   const [error, setError] = useState("");
@@ -49,7 +50,7 @@ export default function PickQuestions() {
   const [showConcepts, setShowConcepts] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
   const [testStatus, setTestStatus] = useState(null);
-  const [view, setView] = useState("add"); // "add" = browse the bank, "paper" = the questions picked so far
+  const [view, setView] = useState(search.get("view") === "paper" ? "paper" : "add"); // "add" = browse the bank, "paper" = the questions picked so far
   const [history, setHistory] = useState([]); // earlier versions of the paper, for Undo
   const [swapFor, setSwapFor] = useState(null); // the picked question being replaced by hand
   const [busyId, setBusyId] = useState(null);
@@ -324,13 +325,15 @@ export default function PickQuestions() {
       <div className="gp-topbar sticky top-0 z-20">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3">
           <div className="min-w-0">
-            <Link to="/lecturer" className="text-xs font-semibold text-amber-200 hover:underline">
-              ← Your sections
+            <Link to={info.isAdmin ? `/admin/live-tests/${id}` : "/lecturer"} className="text-xs font-semibold text-amber-200 hover:underline">
+              {info.isAdmin ? "← Back to the live test" : "← Your sections"}
             </Link>
             <p className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-amber-100/60">
               {info.exam?.code} · {info.test.title}
             </p>
-            <h1 className="text-xl font-extrabold text-white">{sec.name}: pick the questions</h1>
+            <h1 className="text-xl font-extrabold text-white">
+              {sec.name}: {info.isAdmin && sec.picker === "lecturer" ? `review ${sec.lecturerName ? `${sec.lecturerName}'s` : "the lecturer's"} questions` : "pick the questions"}
+            </h1>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <Ring value={total ? (pickedCount / total) * 100 : 0} size={52} stroke={6} dark tone={complete ? "green" : "gold"} />
@@ -448,6 +451,7 @@ export default function PickQuestions() {
           onSwap={(q) => swap(q)}
           onChoose={startManualSwap}
           onAdd={() => setView("add")}
+          editLink={info.isAdmin ? (q) => `/admin/questions/${q._id}?back=${encodeURIComponent(`/lecturer/tests/${id}/${key}?view=paper`)}` : null}
           sendCard={
             needsSend ? (
               <SendCard
@@ -727,7 +731,7 @@ export default function PickQuestions() {
 }
 
 // Every picked question in full, with answer and solution, and Move / Swap / Remove under each one
-function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setShowSolutions, onMove, onRemove, onSwap, onChoose, onAdd, sendCard }) {
+function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setShowSolutions, onMove, onRemove, onSwap, onChoose, onAdd, sendCard, editLink }) {
   const mcqs = picked.filter((q) => q.type !== "numerical");
   const nums = picked.filter((q) => q.type === "numerical");
   const groups = [
@@ -751,6 +755,7 @@ function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setSh
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
+      <PaperSummary picked={picked} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">
           Read every question. Don't like one? <b>Swap</b> puts a similar question in the same place, <b>Choose</b> lets you pick the replacement, <b>Remove</b> takes it out.
@@ -802,6 +807,11 @@ function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setSh
                     <button type="button" disabled={busy || saving} onClick={() => onChoose(q)} className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:border-amber-400 disabled:opacity-50" title="Choose the replacement yourself">
                       Choose replacement
                     </button>
+                    {editLink && (
+                      <Link to={editLink(q)} className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:border-amber-400" title="Fix a typo, the answer or the solution of this question">
+                        ✎ Edit
+                      </Link>
+                    )}
                     <button type="button" disabled={busy || saving} onClick={() => onRemove(q._id)} className="rounded-lg border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
                       Remove
                     </button>
@@ -860,6 +870,58 @@ function SendCard({ sec, complete, sentAt, editable, canChange, isAdmin, saving,
           )
         )}
       </div>
+    </section>
+  );
+}
+
+// Where the paper's questions come from: chapters with their concepts, levels, diagrams
+function PaperSummary({ picked }) {
+  const [open, setOpen] = useState(true);
+  const chapters = [];
+  for (const q of picked) {
+    let c = chapters.find((x) => x.name === q.chapter);
+    if (!c) chapters.push((c = { name: q.chapter || "No chapter", classLevel: q.classLevel, count: 0, topics: new Map() }));
+    c.count += 1;
+    const t = q.topic || "General";
+    c.topics.set(t, (c.topics.get(t) || 0) + 1);
+  }
+  chapters.sort((a, b) => b.count - a.count);
+  const lv = (d) => picked.filter((q) => q.difficulty === d).length;
+  return (
+    <section className="gp-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Where the questions come from</h2>
+          <p className="text-sm text-slate-500">
+            {chapters.length} chapter{chapters.length === 1 ? "" : "s"} · {lv("easy")} easy · {lv("medium")} medium · {lv("hard")} hard · {picked.filter((q) => q.diagram).length} with diagrams
+          </p>
+        </div>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-amber-800 hover:underline">
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {chapters.map((c) => (
+            <div key={c.name} className="rounded-xl border border-slate-100 bg-white p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold text-slate-900">
+                  {c.name}
+                  {c.classLevel && <span className="ml-1.5 text-xs font-normal text-slate-500">Class {c.classLevel}</span>}
+                </p>
+                <span className="shrink-0 rounded-full bg-slate-900 px-2 py-0.5 text-xs font-bold text-amber-200">{c.count}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[...c.topics].map(([t, n]) => (
+                  <span key={t} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900 ring-1 ring-amber-200/70">
+                    {t} · {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

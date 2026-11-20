@@ -225,7 +225,8 @@ const applyBatch = async (source, rows, ctx) => {
                 $inc: { version: 1 },
             };
             if (have.has(t.key)) {
-                ops.push({ updateOne: { filter: { "external.source": source.name, "external.id": t.key }, update } });
+                // Questions edited in GenPrep keep the edit
+                ops.push({ updateOne: { filter: { "external.source": source.name, "external.id": t.key, "external.editedAt": { $exists: false } }, update } });
                 continue;
             }
             const adoptedId = await ctx.adopt(t.data);

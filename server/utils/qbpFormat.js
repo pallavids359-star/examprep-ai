@@ -78,6 +78,30 @@ const toCorrect = (v) => {
         .filter(Boolean);
 };
 
+// A numerical answer as { value, tolerance }, or null. Understands "9.8", "$ 9.8 $", "2.5 m/s",
+// "1,200", "3/4", "1.5e3", and ranges like "4 to 5" / "4-5" / "[4, 5]" (middle value, half the width).
+const NUM = "[-+]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][-+]?\\d+)?";
+const parseNumAnswer = (raw) => {
+    let s = String(raw || "")
+        .replace(/\$/g, "")
+        .replace(/\\(?:text|mathrm)\{([^}]*)\}/g, "$1")
+        .replace(/\\,|\\;|\\!/g, "")
+        .trim();
+    if (!s) return null;
+    s = s.replace(/(\d),(\d{3})(?!\d)/g, "$1$2"); // 1,200 -> 1200
+    const range = s.match(new RegExp(`^[\\[(]?\\s*(${NUM})\\s*(?:to|-|–|—|~|,)\\s*(${NUM})\\s*[\\])]?$`, "i"));
+    if (range) {
+        const a = Number(range[1]);
+        const b = Number(range[2]);
+        if (Number.isFinite(a) && Number.isFinite(b) && b > a) return { value: (a + b) / 2, tolerance: (b - a) / 2 };
+    }
+    const frac = s.match(new RegExp(`^(${NUM})\\s*/\\s*(${NUM})$`));
+    if (frac && Number(frac[2]) !== 0) return { value: Number(frac[1]) / Number(frac[2]), tolerance: 0 };
+    const lead = s.match(new RegExp(`^(${NUM})\\s*(?:[a-zA-Z°%µΩ][\\w°%µΩ/^\\-\\s.²³]*)?$`));
+    if (lead && Number.isFinite(Number(lead[1]))) return { value: Number(lead[1]), tolerance: 0 };
+    return null;
+};
+
 // Returns { ok: true, id, exams, names, data } or { ok: false, id, reason }
 const convertQbpRow = (r, { defaultStatus = "published", pendingStatus = "draft" } = {}) => {
     const id = clean(r.id);
@@ -109,12 +133,12 @@ const convertQbpRow = (r, { defaultStatus = "published", pendingStatus = "draft"
     let question = clean(r.question).replace(QBP_TAG, "").trim();
 
     if (type === "numerical" || type === "integer") {
-        const answer = (clean(r.num_answer) || clean(r.correct_option)).replace(/[$\s]/g, "");
+        const parsed = parseNumAnswer(clean(r.num_answer) || clean(r.correct_option));
         if (!question) return fail("Question text is empty");
-        if (!answer || Number.isNaN(Number(answer))) return fail("Numerical answer is not a number, so it can't be marked automatically");
+        if (!parsed) return fail("Numerical answer is not a number, so it can't be marked automatically");
         return {
             ok: true, id, exams, names,
-            data: { ...data, type: "numerical", text: question, options: [], correctOptionIds: [], numericalAnswer: { value: Number(answer), tolerance: 0 } },
+            data: { ...data, type: "numerical", text: question, options: [], correctOptionIds: [], numericalAnswer: parsed },
         };
     }
 
@@ -158,4 +182,5 @@ const convertQbpRow = (r, { defaultStatus = "published", pendingStatus = "draft"
     };
 };
 
-module.exports = { isQbpRow, convertQbpRow, normText, toExams, toCorrect };
+module.exports = {
+    parseNumAnswer, isQbpRow, convertQbpRow, normText, toExams, toCorrect };
