@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
+import LecturerOptions from "../../components/LecturerOptions";
 import { toast } from "../../components/Toaster";
-import { fmtDateTime, fmtDuration, toLocalInput } from "../../components/liveHelpers";
+import { fmtDateTime, fmtDuration, lecturersFor, toLocalInput } from "../../components/liveHelpers";
 import { Hero, ICONS, Step } from "../../components/premium";
 
 // Head lecturer: create a live test (or edit one before it opens) in one short form.
@@ -432,7 +433,7 @@ export default function LiveTestForm() {
                     {r.include && (
                       <div className="flex gap-1.5" role="group" aria-label={`Who picks ${r.name} questions`}>
                         {PICKERS.map(([v, l, hint]) => (
-                          <button key={v} type="button" title={hint} aria-pressed={r.picker === v} className="gp-tile px-3 py-1.5 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setRow(r.key, { picker: v })}>
+                          <button key={v} type="button" title={hint} aria-pressed={r.picker === v} className="gp-tile px-3 py-1.5 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setRow(r.key, { picker: v, ...(v === "lecturer" && !r.lecturerId ? { lecturerId: lecturersFor(lecturers, r.key).match[0]?._id || "" } : {}) })}>
                             {l}
                           </button>
                         ))}
@@ -441,12 +442,7 @@ export default function LiveTestForm() {
                   </div>
                   {r.include && r.picker === "lecturer" && (
                     <select aria-label={`Lecturer for ${r.name}`} className={`${input} mt-3 max-w-xs`} value={r.lecturerId} onChange={(e) => setRow(r.key, { lecturerId: e.target.value })}>
-                      <option value="">Choose a lecturer...</option>
-                      {lecturers.map((l) => (
-                        <option key={l._id} value={l._id}>
-                          {l.name}
-                        </option>
-                      ))}
+                      <LecturerOptions list={lecturers} sectionKey={r.key} />
                     </select>
                   )}
                   {r.include && r.picker === "lecturer" && lecturers.length === 0 && (

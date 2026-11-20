@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
+import LecturerOptions from "../../components/LecturerOptions";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
 import { PHASE, fmtDateTime, fmtUntil, preview, toLocalInput } from "../../components/liveHelpers";
@@ -239,12 +240,7 @@ export default function LiveTestReview() {
                   <label className="block text-xs font-semibold text-slate-800">
                     Who should pick the {s.name} questions?
                     <select value={newLecturer} onChange={(e) => setNewLecturer(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal">
-                      <option value="">Choose a lecturer...</option>
-                      {lecturers.map((l) => (
-                        <option key={l._id} value={l._id}>
-                          {l.name} · {l.email}
-                        </option>
-                      ))}
+                      <LecturerOptions list={lecturers} sectionKey={s.key} showEmail />
                     </select>
                   </label>
                   {s.picked > 0 && (

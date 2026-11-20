@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema(
             enum: ["student", "lecturer", "admin"],
             default: "student",
         },
+        // Lecturers only: the subject they teach (Botany and Zoology count as Biology)
+        subject: {
+            type: String,
+            enum: ["physics", "chemistry", "mathematics", "biology"],
+        },
         isEmailVerified: {
             type: Boolean,
             default: false,

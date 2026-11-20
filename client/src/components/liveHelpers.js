@@ -45,3 +45,18 @@ export const toLocalInput = (d) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}T${pad(x.getHours())}:${pad(x.getMinutes())}`;
 };
+
+// Lecturer subjects (Botany and Zoology sections go to Biology lecturers)
+export const LECTURER_SUBJECTS = [
+  ["physics", "Physics", "P"],
+  ["chemistry", "Chemistry", "C"],
+  ["mathematics", "Maths", "M"],
+  ["biology", "Biology", "B"],
+];
+export const subjectOfSection = (key) => (key === "botany" || key === "zoology" ? "biology" : key);
+export const subjectName = (k) => LECTURER_SUBJECTS.find(([v]) => v === k)?.[1] || "No subject";
+// Lecturers who teach this section's subject, then everyone else
+export const lecturersFor = (list, sectionKey) => {
+  const sub = subjectOfSection(sectionKey);
+  return { match: list.filter((l) => l.subject === sub), other: list.filter((l) => l.subject !== sub) };
+};

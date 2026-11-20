@@ -76,7 +76,7 @@ const phase = (test, now = new Date()) => {
 const listLecturers = handle("listLecturers", async (req, res) => {
     const users = await User.find({ role: { $in: ["lecturer", "admin"] } })
         .sort({ role: -1, name: 1 })
-        .select("name email role status lastLoginAt createdAt")
+        .select("name email role status subject lastLoginAt createdAt")
         .lean();
     const counts = await Test.aggregate([
         { $match: { type: "live", status: { $ne: "archived" } } },
@@ -87,7 +87,14 @@ const listLecturers = handle("listLecturers", async (req, res) => {
     res.json({ lecturers: users.map((u) => ({ ...u, sections: byId.get(String(u._id)) || 0 })) });
 });
 
-// POST /api/admin/lecturers   { name, email, password }
+const SUBJECTS = ["physics", "chemistry", "mathematics", "biology"];
+const readSubject = (v) => {
+    const k = String(v || "").toLowerCase();
+    if (!SUBJECTS.includes(k)) throw userError("Choose the lecturer's subject: Physics, Chemistry, Maths or Biology");
+    return k;
+};
+
+// POST /api/admin/lecturers   { name, email, password, subject }
 const createLecturer = handle("createLecturer", async (req, res) => {
     const name = String(req.body.name || "").trim();
     const email = String(req.body.email || "").trim().toLowerCase();
@@ -95,6 +102,7 @@ const createLecturer = handle("createLecturer", async (req, res) => {
     if (name.length < 2) throw userError("Enter the lecturer's name");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw userError("Enter a valid email address");
     if (password.length < 8) throw userError("The password needs at least 8 characters");
+    const subject = readSubject(req.body.subject);
 
     const existing = await User.findOne({ email }).select("role").lean();
     if (existing) {
@@ -109,9 +117,10 @@ const createLecturer = handle("createLecturer", async (req, res) => {
         email,
         passwordHash: await bcrypt.hash(password, 10),
         role: "lecturer",
+        subject,
         isEmailVerified: true,
     });
-    res.status(201).json({ lecturer: { _id: user._id, name: user.name, email: user.email, role: user.role, status: user.status, sections: 0 } });
+    res.status(201).json({ lecturer: { _id: user._id, name: user.name, email: user.email, role: user.role, subject: user.subject, status: user.status, sections: 0 } });
 });
 
 // PUT /api/admin/lecturers/:id   { name?, email?, status?: "active"|"suspended", password?: "new password" }
@@ -124,6 +133,7 @@ const updateLecturer = handle("updateLecturer", async (req, res) => {
         if (name.length > 80) throw userError("The name is too long");
         update.name = name;
     }
+    if (req.body.subject !== undefined) update.subject = readSubject(req.body.subject);
     if (req.body.email !== undefined) {
         const email = String(req.body.email).trim().toLowerCase();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw userError("Enter a valid email address");
@@ -140,7 +150,7 @@ const updateLecturer = handle("updateLecturer", async (req, res) => {
         update.passwordHash = await bcrypt.hash(String(req.body.password), 10);
     }
     if (!Object.keys(update).length) throw userError("Nothing to change");
-    const user = await User.findOneAndUpdate({ _id: req.params.id, role: "lecturer" }, update, { returnDocument: "after" }).select("name email role status");
+    const user = await User.findOneAndUpdate({ _id: req.params.id, role: "lecturer" }, update, { returnDocument: "after" }).select("name email role status subject");
     if (!user) throw userError("Lecturer not found", 404);
     res.json({ lecturer: user });
 });

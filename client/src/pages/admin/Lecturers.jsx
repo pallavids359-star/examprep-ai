@@ -3,8 +3,8 @@ import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
-import { fmtDateTime } from "../../components/liveHelpers";
-import { Hero, ICONS, Stat } from "../../components/premium";
+import { LECTURER_SUBJECTS, fmtDateTime, subjectName } from "../../components/liveHelpers";
+import { Hero } from "../../components/premium";
 
 const input = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none";
 const initials = (n = "") =>
@@ -19,10 +19,11 @@ const initials = (n = "") =>
 export default function Lecturers() {
   const [list, setList] = useState(null);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [tab, setTab] = useState("physics");
+  const [form, setForm] = useState({ name: "", email: "", password: "", subject: "physics" });
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [edit, setEdit] = useState({ name: "", email: "", password: "" });
+  const [edit, setEdit] = useState({ name: "", email: "", password: "", subject: "" });
 
   const load = () =>
     api
@@ -39,7 +40,8 @@ export default function Lecturers() {
     try {
       await api.post("/admin/lecturers", form);
       toast(`Account created for ${form.name}. Share the email and password with them.`);
-      setForm({ name: "", email: "", password: "" });
+      setTab(form.subject);
+      setForm({ name: "", email: "", password: "", subject: form.subject });
       load();
     } catch (err) {
       toast(getErrorMessage(err), "error");
@@ -50,7 +52,7 @@ export default function Lecturers() {
 
   const startEdit = (l) => {
     setEditId(l._id);
-    setEdit({ name: l.name, email: l.email, password: "" });
+    setEdit({ name: l.name, email: l.email, password: "", subject: l.subject || "" });
   };
 
   const saveEdit = async (e, l) => {
@@ -59,6 +61,7 @@ export default function Lecturers() {
     if (edit.name.trim() !== l.name) body.name = edit.name.trim();
     if (edit.email.trim().toLowerCase() !== l.email) body.email = edit.email.trim();
     if (edit.password) body.password = edit.password;
+    if (edit.subject && edit.subject !== l.subject) body.subject = edit.subject;
     if (!Object.keys(body).length) return setEditId(null);
     setBusy(true);
     try {
@@ -89,6 +92,9 @@ export default function Lecturers() {
   };
 
   const lecturers = (list || []).filter((l) => l.role === "lecturer");
+  const noSubject = lecturers.filter((l) => !l.subject);
+  const shown = tab === "none" ? noSubject : lecturers.filter((l) => l.subject === tab);
+  const tabs = [...LECTURER_SUBJECTS.map(([k, l]) => [k, l, lecturers.filter((x) => x.subject === k).length]), ...(noSubject.length ? [["none", "No subject yet", noSubject.length]] : [])];
 
   return (
     <AdminLayout>
@@ -98,14 +104,54 @@ export default function Lecturers() {
         subtitle="Lecturers log in at the normal login page and only see the subjects you give them in live tests. Typed a wrong name or email? Press Edit."
       />
 
-      <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <Stat label="Lecturers" value={lecturers.length} sub="accounts" icon={ICONS.users} accent />
-        <Stat label="Active" value={lecturers.filter((l) => l.status === "active").length} sub="can log in" icon={ICONS.check} />
-        <Stat label="Subjects given" value={lecturers.reduce((a, l) => a + (l.sections || 0), 0)} sub="across live tests" icon={ICONS.book} />
+      {/* Subject tabs */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4" role="tablist">
+        {tabs.map(([k, l, n]) => {
+          const on = tab === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => {
+                setTab(k);
+                if (k !== "none") setForm((f) => ({ ...f, subject: k }));
+                setEditId(null);
+              }}
+              className={`flex items-center gap-3 rounded-2xl p-4 text-left transition ${on ? "bg-slate-900 text-white shadow-lg ring-2 ring-amber-300" : "gp-card gp-card-hover"}`}
+            >
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl font-display text-lg font-extrabold ${on ? "bg-amber-300 text-slate-900" : k === "none" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>
+                {k === "none" ? "!" : l[0]}
+              </span>
+              <span className="min-w-0">
+                <span className={`block font-bold ${on ? "text-white" : "text-slate-900"}`}>{l}</span>
+                <span className={`text-xs ${on ? "text-amber-100/80" : "text-slate-500"}`}>
+                  {n} lecturer{n === 1 ? "" : "s"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
+      {noSubject.length > 0 && tab !== "none" && (
+        <p className="mt-3 rounded-xl bg-orange-50 px-4 py-2.5 text-sm text-orange-900">
+          {noSubject.length} lecturer{noSubject.length === 1 ? " has" : "s have"} no subject yet.{" "}
+          <button type="button" onClick={() => setTab("none")} className="font-semibold underline">
+            Set it
+          </button>{" "}
+          so they show up under the right subject.
+        </p>
+      )}
 
       <form onSubmit={create} className="gp-card mt-5 grid gap-3 p-5 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-        <p className="text-sm font-bold text-slate-900 sm:col-span-4">Add a lecturer</p>
+        {tab === "none" && (
+          <label className="text-sm font-medium text-slate-700 sm:col-span-4">
+            Subject
+            <SubjectPick value={form.subject} onChange={(v) => setForm({ ...form, subject: v })} />
+          </label>
+        )}
+        <p className="text-sm font-bold text-slate-900 sm:col-span-4">Add a {tab === "none" ? "" : subjectName(form.subject)} lecturer</p>
         <label className="text-sm font-medium text-slate-700">
           Name
           <input className={`${input} mt-1`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required minLength={2} placeholder="e.g. Priya (Biology)" />
@@ -128,7 +174,12 @@ export default function Lecturers() {
 
       {list && (
         <div className="mt-6 grid gap-3">
-          {list.map((l) => {
+          {shown.length === 0 && (
+            <div className="gp-card px-6 py-10 text-center text-sm text-slate-500">
+              No {tab === "none" ? "lecturers without a subject" : `${subjectName(tab)} lecturers`} yet.{tab !== "none" && " Add one above."}
+            </div>
+          )}
+          {shown.map((l) => {
             const isEditing = editId === l._id;
             return (
               <div key={l._id} className="gp-card p-4">
@@ -140,7 +191,9 @@ export default function Lecturers() {
                         {l.name}
                         {l.role === "admin" && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Head lecturer</span>}
                       </p>
-                      <p className="truncate text-sm text-slate-500">{l.email}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {l.email} · <span className="font-semibold text-amber-800">{subjectName(l.subject)}</span>
+                      </p>
                     </div>
                     <div className="text-sm text-slate-600">
                       <span className="font-semibold text-slate-900">{l.sections}</span> subject{l.sections === 1 ? "" : "s"}
@@ -179,6 +232,10 @@ export default function Lecturers() {
                       New password <span className="font-normal text-slate-400">(leave empty to keep)</span>
                       <input type="text" className={`${input} mt-1`} value={edit.password} onChange={(e) => setEdit({ ...edit, password: e.target.value })} minLength={8} placeholder="At least 8 characters" />
                     </label>
+                    <label className="text-sm font-medium text-slate-700 sm:col-span-3">
+                      Subject
+                      <SubjectPick value={edit.subject} onChange={(v) => setEdit({ ...edit, subject: v })} />
+                    </label>
                     <div className="flex justify-end gap-2 sm:col-span-3">
                       <button type="button" onClick={() => setEditId(null)} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
                         Cancel
@@ -195,5 +252,17 @@ export default function Lecturers() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+function SubjectPick({ value, onChange }) {
+  return (
+    <div className="mt-1 grid grid-cols-4 gap-2">
+      {LECTURER_SUBJECTS.map(([k, l]) => (
+        <button key={k} type="button" aria-pressed={value === k} onClick={() => onChange(k)} className="gp-tile py-2 text-sm font-semibold text-slate-800">
+          {l}
+        </button>
+      ))}
+    </div>
   );
 }
