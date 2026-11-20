@@ -519,7 +519,7 @@ const deleteLiveTest = handle("deleteLiveTest", async (req, res) => {
 // GET /api/admin/live-tests/:id/results   (leaderboard)
 const liveResults = handle("liveResults", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
-    const test = await Test.findOne({ _id: req.params.id, type: "live" }).select("title totalMarks totalQuestions availability status").lean();
+    const test = await Test.findOne({ _id: req.params.id, type: "live" }).select("title examId totalMarks totalQuestions availability status").lean();
     if (!test) throw userError("Live test not found", 404);
     const attempts = await TestAttempt.find({ testId: test._id })
         .select("userId status startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec")
@@ -549,7 +549,7 @@ const liveResults = handle("liveResults", async (req, res) => {
     });
     const scores = done.map((a) => a.result.score);
     res.json({
-        test: { _id: test._id, title: test.title, totalMarks: test.totalMarks, totalQuestions: test.totalQuestions, startsAt: test.availability.startsAt, endsAt: test.availability.endsAt, phase: phase(test) },
+        test: { _id: test._id, title: test.title, exam: (await Exam.findById(test.examId).select("code").lean())?.code || "", totalMarks: test.totalMarks, totalQuestions: test.totalQuestions, startsAt: test.availability.startsAt, endsAt: test.availability.endsAt, phase: phase(test) },
         stats: {
             finished: done.length,
             inProgress: attempts.filter((a) => a.status === "in_progress").length,

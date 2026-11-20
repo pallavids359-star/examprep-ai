@@ -307,3 +307,16 @@ table tbody tr:hover {
   color: var(--ink);
   background: var(--card);
 }
+
+/* Printing a leaderboard: only the sheet, on white */
+@media print {
+  body { background: #fff !important; }
+  .gp-sidebar, .gp-topbar { display: none !important; }
+  main { margin-left: 0 !important; padding: 0 !important; }
+  body * { visibility: hidden; }
+  .gp-print-sheet, .gp-print-sheet * { visibility: visible; }
+  .gp-print-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  .gp-print-sheet thead { display: table-header-group; }
+  .gp-print-sheet tr { break-inside: avoid; }
+  .gp-print-sheet thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
