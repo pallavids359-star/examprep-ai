@@ -8,7 +8,7 @@ import { toast } from "../../components/Toaster";
 import { PHASE, fmtDateTime, fmtUntil, preview, toLocalInput } from "../../components/liveHelpers";
 import { Countdown, Ring } from "../../components/premium";
 
-const PICKER_LABEL = { auto: "Auto-picked", me: "You pick", lecturer: "Lecturer picks" };
+const PICKER_LABEL = { auto: "Auto-picked", me: "Set by you (admin)", lecturer: "Lecturer picks" };
 
 // Head lecturer: one page to see where the test stands. No publish button:
 // the test goes live by itself once every subject has its questions.
@@ -201,6 +201,11 @@ export default function LiveTestReview() {
                 {["easy", "medium", "hard"].map((d) => `${s.questions.filter((q) => q.difficulty === d).length} ${d}`).join(" · ")}
               </p>
               <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
+                {s.picked === 0 && s.picker !== "lecturer" && test.editable && (
+                  <Link to={`/lecturer/tests/${id}/${s.key}`} className="w-full rounded-xl bg-gradient-to-r from-amber-200 to-amber-400 px-4 py-2 text-center font-bold text-slate-900 hover:brightness-105">
+                    Pick {s.name} questions →
+                  </Link>
+                )}
                 {s.picked > 0 && (
                   <Link to={`/lecturer/tests/${id}/${s.key}?view=paper`} className="w-full rounded-xl bg-slate-900 px-4 py-2 text-center font-semibold text-amber-200 hover:bg-black">
                     Review all {s.picked} questions →

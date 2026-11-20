@@ -19,7 +19,7 @@ const OPEN_FOR = [
 ];
 const PICKERS = [
   ["auto", "Auto", "GenPrep picks the questions for you"],
-  ["me", "Me", "You pick the questions yourself"],
+  ["me", "Admin (me)", "You, the admin, pick the questions yourself"],
   ["lecturer", "Lecturer", "A lecturer picks them"],
 ];
 const pad = (n) => String(n).padStart(2, "0");
@@ -416,7 +416,38 @@ export default function LiveTestForm() {
         {/* 2. Questions */}
         {pattern && (
           <section className="gp-card space-y-4 p-6">
-            <Step n={3} title="Who picks the questions?" hint="Auto fills a subject instantly" right={<span className="gp-chip">{totalQs} questions</span>} />
+            <Step n={3} title="Who sets the questions?" hint="For the whole test, or subject by subject below" right={<span className="gp-chip">{totalQs} questions</span>} />
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["me", "I'll set it myself", "As admin, you pick every subject's questions", "A"],
+                ["lecturer", "Give to lecturers", "Each subject's lecturer picks and sends it", "L"],
+                ["auto", "Auto-pick everything", "GenPrep fills all subjects now; change any later", "⚡"],
+              ].map(([v, l, hint, icon]) => {
+                const all = included.length > 0 && included.every((r) => r.picker === v);
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={all}
+                    onClick={() =>
+                      setRows((rs) =>
+                        rs.map((r) =>
+                          r.include ? { ...r, picker: v, lecturerId: v === "lecturer" ? r.lecturerId || lecturersFor(lecturers, r.key).match[0]?._id || "" : r.lecturerId } : r
+                        )
+                      )
+                    }
+                    className="gp-tile flex items-start gap-3 p-4 text-left"
+                  >
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl font-display text-sm font-extrabold ${all ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-800"}`}>{icon}</span>
+                    <span className="min-w-0">
+                      <span className="block font-bold text-slate-900">{l}</span>
+                      <span className="block text-xs text-slate-500">{hint}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Or choose per subject</p>
             {pattern.canSplitBiology && (
               <label className="flex items-center gap-3 text-sm text-slate-800">
                 <input type="checkbox" className="h-4 w-4 accent-amber-600" checked={split} onChange={(e) => setSplit(e.target.checked)} />
