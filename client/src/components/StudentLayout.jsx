@@ -25,7 +25,7 @@ function Icon({ path }) {
 
 function Logo({ compact }) {
   return (
-    <Link to="/dashboard" className="flex items-center gap-2 font-display font-extrabold text-white">
+    <Link to="/dashboard" className="flex items-center gap-2 font-display font-extrabold text-slate-900">
       <img src="/genprep-icon.png" alt="" className="h-9 w-9 rounded-lg" />
       <span className={compact ? "hidden sm:inline" : ""}>
         GenPrep
@@ -42,7 +42,7 @@ function ExamPicker({ full }) {
     <div
       role="radiogroup"
       aria-label="Exam"
-      className={`grid gap-1 rounded-2xl bg-white/5 p-1 ring-1 ring-amber-200/20 ${full ? "w-full" : ""}`}
+      className={`grid gap-1 rounded-2xl bg-[#efe6d2]/60 p-1 ring-1 ring-[#e7dcc3] ${full ? "w-full" : ""}`}
       style={{ gridTemplateColumns: `repeat(${exams.length}, minmax(0, 1fr))` }}
     >
       {exams.map((e) => {
@@ -55,7 +55,7 @@ function ExamPicker({ full }) {
             aria-checked={on}
             onClick={() => !on && setExamId(e._id)}
             className={`rounded-xl font-display font-extrabold tracking-wide transition ${full ? "py-2 text-sm" : "px-2.5 py-1 text-xs"} ${
-              on ? "bg-gradient-to-br from-amber-200 to-amber-400 text-slate-900 shadow-[0_6px_16px_-8px_rgba(229,195,114,0.9)]" : "text-amber-100/70 hover:bg-white/10 hover:text-white"
+              on ? "bg-[#17140f] text-[#e5c372] shadow-sm" : "text-[#6b604c] hover:bg-white hover:text-[#17140f]"
             }`}
           >
             {e.code}
@@ -105,8 +105,8 @@ function Shell() {
           <Link to="/profile" title="My profile" className="flex min-w-0 flex-1 items-center gap-3">
             <span className="gp-avatar grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs">{initials(user.name)}</span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-white">{user.name}</span>
-              <span className="block text-xs text-amber-200/70">View profile</span>
+              <span className="block truncate text-sm font-semibold text-slate-900">{user.name}</span>
+              <span className="block text-xs text-slate-500">View profile</span>
             </span>
           </Link>
           <button onClick={logout} className="gp-ghost-btn px-2.5 py-1.5 text-xs font-semibold">

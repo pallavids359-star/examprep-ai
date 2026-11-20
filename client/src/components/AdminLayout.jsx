@@ -63,8 +63,8 @@ function Sidebar({ onNavigate }) {
             {(user?.name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join("")}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-white">{user?.name}</span>
-            <span className="block text-xs text-amber-200/70">Head lecturer</span>
+            <span className="block truncate text-sm font-semibold text-slate-900">{user?.name}</span>
+            <span className="block text-xs text-slate-500">Head lecturer</span>
           </span>
           <button onClick={logout} className="gp-ghost-btn px-2.5 py-1.5 text-xs font-semibold">
             Log out
@@ -89,8 +89,8 @@ export default function AdminLayout({ title, actions, children }) {
         <button onClick={() => setOpen(true)} aria-label="Open menu" className="gp-ghost-btn p-2">
           <Icon d="M4 6h16M4 12h16M4 18h16" />
         </button>
-        <span className="font-display font-extrabold text-white">GenPrep</span>
-        <span className="rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-900">Admin</span>
+        <span className="font-display font-extrabold text-slate-900">GenPrep</span>
+        <span className="rounded-full bg-[#e5c372] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-900">Admin</span>
       </header>
 
       {open && (

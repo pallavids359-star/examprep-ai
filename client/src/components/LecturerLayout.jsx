@@ -39,8 +39,8 @@ function Sidebar({ onNavigate }) {
       <div className="gp-user flex items-center gap-3 p-3">
         <span className="gp-avatar grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs">{initials(user?.name)}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-white">{user?.name}</span>
-          <span className="block text-xs text-amber-200/70">{isAdmin ? "Head lecturer" : "Lecturer"}</span>
+          <span className="block truncate text-sm font-semibold text-slate-900">{user?.name}</span>
+          <span className="block text-xs text-slate-500">{isAdmin ? "Head lecturer" : "Lecturer"}</span>
         </span>
         <button onClick={logout} className="gp-ghost-btn px-2.5 py-1.5 text-xs font-semibold">
           Log out
@@ -62,8 +62,8 @@ export default function LecturerLayout({ children }) {
         <button onClick={() => setOpen(true)} aria-label="Open menu" className="gp-ghost-btn p-2">
           <Icon d="M4 6h16M4 12h16M4 18h16" />
         </button>
-        <span className="font-display font-extrabold text-white">GenPrep</span>
-        <span className="rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-900">Lecturer</span>
+        <span className="font-display font-extrabold text-slate-900">GenPrep</span>
+        <span className="rounded-full bg-[#e5c372] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-900">Lecturer</span>
       </header>
       {open && (
         <div className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden" onClick={() => setOpen(false)}>

@@ -29,22 +29,20 @@ body {
   background: transparent !important;
 }
 
-/* ---------- Sidebar (admin, lecturer and student) ---------- */
+/* ---------- Sidebar (admin, lecturer and student): ivory, like the brand card ---------- */
 .gp-sidebar {
-  background:
-    radial-gradient(420px 220px at 0% 0%, rgba(229, 195, 114, 0.16), transparent 70%),
-    linear-gradient(180deg, var(--ink-2), var(--ink) 60%);
-  color: #e9e2d2;
-  border-right: 1px solid rgba(229, 195, 114, 0.12);
+  background: #fbf8f1;
+  color: var(--ink);
+  border-right: 1px solid var(--line);
 }
 .gp-sidebar .gp-brand {
-  color: #fffaf0;
+  color: var(--ink);
   font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 .gp-sidebar .gp-role {
-  background: linear-gradient(135deg, #e5c372, #b8862b);
+  background: var(--gold-soft);
   color: var(--ink);
   font-size: 10px;
   font-weight: 800;
@@ -54,7 +52,7 @@ body {
   padding: 3px 8px;
 }
 .gp-sidebar .gp-label {
-  color: #8e826b;
+  color: #9a8d74;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -64,63 +62,68 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 9px 12px;
   font-size: 14px;
   font-weight: 500;
-  color: #cfc5b0 !important;
+  color: #5d5446 !important;
   background: transparent !important;
   box-shadow: none !important;
   position: relative;
 }
 .gp-nav-link:hover {
-  color: #fffaf0 !important;
-  background: rgba(255, 250, 240, 0.06) !important;
+  color: var(--ink) !important;
+  background: #f1e9d6 !important;
 }
 .gp-nav-link.active,
 .gp-nav-link[aria-current="page"] {
   color: var(--ink) !important;
-  background: linear-gradient(135deg, #f0d48d, #d2a446) !important;
+  background: #efe2c2 !important;
   font-weight: 700;
-  box-shadow: 0 8px 20px -10px rgba(229, 195, 114, 0.7) !important;
+}
+.gp-nav-link.active::before,
+.gp-nav-link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--gold);
 }
 .gp-sidebar select {
-  background: rgba(255, 250, 240, 0.06) !important;
-  border: 1px solid rgba(229, 195, 114, 0.25) !important;
-  color: #fffaf0 !important;
+  background: #fff !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink) !important;
   font-weight: 700;
 }
-.gp-sidebar select option {
-  color: var(--ink);
-  background: var(--card);
-}
 .gp-user {
-  border: 1px solid rgba(229, 195, 114, 0.14);
-  background: rgba(255, 250, 240, 0.04);
+  border: 1px solid var(--line);
+  background: #fff;
   border-radius: 14px;
 }
 .gp-avatar {
-  background: linear-gradient(135deg, #f0d48d, #b8862b);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--gold-soft);
   font-weight: 800;
-  box-shadow: 0 0 0 2px rgba(23, 20, 15, 0.9), 0 0 0 3px rgba(229, 195, 114, 0.6);
 }
 .gp-ghost-btn {
-  border: 1px solid rgba(229, 195, 114, 0.25);
-  color: #e9e2d2;
+  border: 1px solid var(--line);
+  color: #5d5446;
   border-radius: 10px;
 }
 .gp-ghost-btn:hover {
-  background: rgba(255, 250, 240, 0.08);
-  color: #fffaf0;
+  background: #f1e9d6;
+  color: var(--ink);
 }
 
 /* Phone top bar and bottom tabs */
 .gp-topbar {
-  background: rgba(23, 20, 15, 0.96);
-  color: #fffaf0;
+  background: rgba(251, 248, 241, 0.96);
+  color: var(--ink);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(229, 195, 114, 0.15);
+  border-bottom: 1px solid var(--line);
 }
 .gp-tabbar {
   background: rgba(255, 253, 248, 0.96);
@@ -173,15 +176,14 @@ body {
   color: transparent;
 }
 .gp-gold-btn {
-  background: linear-gradient(135deg, #f3d995, #d2a446) !important;
+  background: #c9a24a !important;
   color: var(--ink) !important;
   font-weight: 700;
-  border-radius: 14px;
-  box-shadow: 0 10px 24px -12px rgba(229, 195, 114, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 6px 16px -10px rgba(184, 134, 43, 0.9);
 }
 .gp-gold-btn:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
+  background: #d4ae55 !important;
 }
 
 /* ---------- Buttons ---------- */
@@ -298,9 +300,9 @@ table tbody tr:hover {
 }
 
 .gp-topbar select {
-  background: rgba(255, 250, 240, 0.08) !important;
-  border: 1px solid rgba(229, 195, 114, 0.3) !important;
-  color: #fffaf0 !important;
+  background: #fff !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink) !important;
   font-weight: 700;
 }
 .gp-topbar select option {

@@ -167,7 +167,7 @@ function Board({ test, rows, onOpen }) {
       className="relative overflow-hidden rounded-3xl px-5 pb-8 pt-8 text-white shadow-[0_30px_60px_-30px_rgba(15,23,42,0.8)] md:px-10"
       style={{
         background:
-          "radial-gradient(circle at 50% 28%, rgba(233,185,73,0.35), transparent 45%), repeating-conic-gradient(from 0deg at 50% 30%, rgba(255,255,255,0.045) 0deg 6deg, transparent 6deg 12deg), linear-gradient(180deg,#1b1640 0%,#0f0b24 100%)",
+          "radial-gradient(circle at 50% 26%, rgba(229,195,114,0.30), transparent 45%), repeating-conic-gradient(from 0deg at 50% 30%, rgba(229,195,114,0.05) 0deg 6deg, transparent 6deg 12deg), linear-gradient(180deg,#221d15 0%,#17140f 100%)",
       }}
     >
       {/* sparkles */}
@@ -246,7 +246,7 @@ function Board({ test, rows, onOpen }) {
                           {place}
                           <sup className="text-[0.55em]">{ordinal(place).replace(String(place), "")}</sup>
                         </span>
-                        <Avatar name={r.student?.name} size={34} ring="linear-gradient(135deg,#ffffff,#c7c2e8)" />
+                        <Avatar name={r.student?.name} size={34} ring="linear-gradient(135deg,#f7f3ea,#e5c372)" />
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide">
                           {r.student?.name || "Deleted account"}
                           {r.me && <span className="ml-2 rounded-full bg-amber-300 px-1.5 py-0.5 text-[10px] font-extrabold normal-case text-slate-900">You</span>}
