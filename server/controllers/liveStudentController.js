@@ -1,6 +1,7 @@
 // Student side of live tests: the list, starting one, and the detailed report.
 const mongoose = require("mongoose");
 const Test = require("../models/Test");
+const Exam = require("../models/Exam");
 const TestAttempt = require("../models/TestAttempt");
 const Question = require("../models/Question");
 const Subject = require("../models/Subject");
@@ -82,7 +83,16 @@ const listLive = handle("listLive", async (req, res) => {
             rank,
         });
     }
-    res.json({ serverNow: now, tests: items });
+    // Live tests of the other exams (so a student on the wrong exam can switch)
+    const otherTests = await Test.find({ examId: { $ne: req.query.examId }, type: "live", status: "published", "availability.endsAt": { $gt: now } })
+        .select("examId availability.startsAt")
+        .lean();
+    const otherExams = otherTests.length ? await Exam.find({ _id: { $in: otherTests.map((t) => t.examId) } }).select("code").lean() : [];
+    const others = otherExams.map((e) => {
+        const mine = otherTests.filter((t) => String(t.examId) === String(e._id));
+        return { examId: e._id, code: e.code, open: mine.filter((t) => new Date(t.availability.startsAt) <= now).length, upcoming: mine.filter((t) => new Date(t.availability.startsAt) > now).length };
+    });
+    res.json({ serverNow: now, tests: items, others });
 });
 
 // POST /api/live-tests/:id/start

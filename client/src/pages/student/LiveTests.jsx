@@ -13,7 +13,8 @@ const goFullScreen = () => {
 
 // Live tests set by the lecturers: open now, coming up and finished
 export default function LiveTests() {
-  const { examId, exam } = useExam();
+  const { examId, exam, setExamId } = useExam();
+  const [others, setOthers] = useState([]);
   const navigate = useNavigate();
   const [tests, setTests] = useState(null);
   const [error, setError] = useState("");
@@ -26,7 +27,10 @@ export default function LiveTests() {
     setTests(null);
     api
       .get("/live-tests", { params: { examId } })
-      .then((res) => setTests(res.data.tests))
+      .then((res) => {
+        setTests(res.data.tests);
+        setOthers(res.data.others || []);
+      })
       .catch((err) => setError(getErrorMessage(err)));
   }, [examId]);
 
@@ -73,6 +77,25 @@ export default function LiveTests() {
           <div className="h-24 animate-pulse rounded-2xl bg-slate-200/60" />
         </div>
       )}
+      {others.length > 0 && (
+        <div className="mt-6 space-y-3">
+          {others.map((o) => (
+            <div key={o.examId} className="gp-card flex flex-wrap items-center justify-between gap-3 border-amber-300 p-4">
+              <p className="flex items-center gap-2 text-sm text-slate-700">
+                {o.open > 0 && <span className="gp-live-dot" />}
+                <span>
+                  <b className="text-slate-900">{o.code}</b> has {o.open > 0 ? `${o.open} live test${o.open > 1 ? "s" : ""} open now` : `${o.upcoming} live test${o.upcoming > 1 ? "s" : ""} coming up`}
+                  {o.open > 0 && o.upcoming > 0 ? ` and ${o.upcoming} coming up` : ""}. You're looking at {exam?.code}.
+                </span>
+              </p>
+              <button type="button" onClick={() => setExamId(o.examId)} className="gp-gold-btn px-4 py-2 text-sm">
+                Switch to {o.code} →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {tests && tests.length === 0 && (
         <div className="gp-card mt-6 p-10 text-center">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-amber-50 text-amber-700">
