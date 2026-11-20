@@ -173,6 +173,11 @@ export default function LiveTests() {
                 <Link to={`/admin/live-tests/${t._id}`} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-amber-200 hover:bg-black">
                   {t.phase === "draft" ? "Finish setting up" : "Open"}
                 </Link>
+                {["draft", "scheduled", "open"].includes(t.phase) && (
+                  <Link to={`/admin/live-tests/${t._id}/edit`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300" title={t.phase === "open" ? "Rename or keep it open longer" : "Change the date, time, length or subjects"}>
+                    ✎ Edit {t.phase === "open" ? "closing time" : "date & time"}
+                  </Link>
+                )}
                 {t.status !== "draft" && (
                   <Link to={`/admin/live-tests/${t._id}/results`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300">
                     Results

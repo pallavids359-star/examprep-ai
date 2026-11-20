@@ -87,6 +87,7 @@ export default function LiveTestForm() {
   const [editCounts, setEditCounts] = useState(false);
   const [showResults, setShowResults] = useState("after_close");
   const [loadedSections, setLoadedSections] = useState(null);
+  const [openTest, setOpenTest] = useState(null); // test already open: only its name and closing time can change
 
   useEffect(() => {
     Promise.all([api.get("/exams"), api.get("/admin/lecturers")])
@@ -102,7 +103,8 @@ export default function LiveTestForm() {
       .then((res) => {
         const t = res.data.test;
         if (!t.editable) {
-          navigate(`/admin/live-tests/${id}`, { replace: true });
+          if (t.phase === "open") setOpenTest(t);
+          else navigate(`/admin/live-tests/${id}`, { replace: true });
           return;
         }
         const s = new Date(t.startsAt);
@@ -218,6 +220,8 @@ export default function LiveTestForm() {
       setSaving(false);
     }
   };
+
+  if (openTest) return <OpenTestEdit test={openTest} />;
 
   return (
     <AdminLayout>
@@ -567,5 +571,80 @@ function TimePoint({ label, d, right = false }) {
       <p className="font-display text-lg font-extrabold leading-tight text-slate-900">{d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</p>
       <p className="text-xs text-slate-500">{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</p>
     </div>
+  );
+}
+
+// The test is already open (students may be writing it): rename it or keep it open longer
+function OpenTestEdit({ test }) {
+  const navigate = useNavigate();
+  const [title, setTitle] = useState(test.title);
+  const [end, setEnd] = useState(toLocalInput(test.endsAt));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const oldEnd = new Date(test.endsAt);
+  const newEnd = end ? new Date(end) : null;
+  const addHours = (h) => setEnd(toLocalInput(new Date(Math.max(oldEnd.getTime(), (newEnd || oldEnd).getTime()) + h * 3600e3)));
+
+  const save = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!newEnd || newEnd < oldEnd) return setError("While the test is open, the closing time can only move later");
+    setSaving(true);
+    try {
+      await api.put(`/admin/live-tests/${test._id}`, { title, endsAt: newEnd.toISOString() });
+      toast("Saved");
+      navigate(`/admin/live-tests/${test._id}`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AdminLayout>
+      <Link to={`/admin/live-tests/${test._id}`} className="text-sm font-semibold text-amber-800 hover:underline">
+        ← Back
+      </Link>
+      <div className="mt-3">
+        <Hero eyebrow="Edit live test" title={test.title} subtitle="This test is open now, so students may be writing it. You can rename it or keep it open for longer. The start time, length and questions are fixed." />
+      </div>
+      <form onSubmit={save} className="gp-card mt-6 max-w-2xl space-y-6 p-6">
+        <label className="block">
+          <span className={LABEL}>Test name</span>
+          <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} required minLength={3} maxLength={140} />
+        </label>
+        <div>
+          <span className={LABEL}>Closes</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="datetime-local" aria-label="Closing time" className={`${input} max-w-xs`} value={end} min={toLocalInput(test.endsAt)} onChange={(e) => setEnd(e.target.value)} />
+            {[
+              [1, "+1 hour"],
+              [3, "+3 hours"],
+              [24, "+1 day"],
+            ].map(([h, l]) => (
+              <button key={h} type="button" onClick={() => addHours(h)} className="gp-tile px-3 py-2 text-sm font-semibold text-slate-800">
+                {l}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Now closes {fmtDateTime(oldEnd)}
+            {newEnd && newEnd.getTime() !== oldEnd.getTime() ? (
+              <>
+                {" "}
+                → <b className="text-slate-900">{fmtDateTime(newEnd)}</b>
+              </>
+            ) : null}
+          </p>
+        </div>
+        {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving} className="gp-gold-btn px-6 py-3 text-sm disabled:opacity-50">
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </AdminLayout>
   );
 }
