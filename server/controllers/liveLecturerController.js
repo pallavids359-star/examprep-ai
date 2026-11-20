@@ -45,7 +45,7 @@ const loadSection = async (req) => {
     return { test, section, isAdmin, editable, lockedBySend };
 };
 const mustBeChangeable = ({ editable, lockedBySend }) => {
-    if (!editable) throw userError("The test has already opened, so its questions can't change");
+    if (!editable) throw userError("Students have already started this test, so its questions can't change");
     if (lockedBySend) throw userError("You already sent this to the head lecturer. Press \"Take back to edit\" first.");
 };
 
@@ -335,7 +335,7 @@ const swapQuestion = handle("swapQuestion", async (req, res) => {
 // The section must be full. Once every section is ready the test goes live by itself.
 const submitSection = handle("submitSection", async (req, res) => {
     const { test, section, editable } = await loadSection(req);
-    if (!editable) throw userError("The test has already opened");
+    if (!editable) throw userError("Students have already started this test");
     const state = await sectionState(test);
     const mine = state.sections.find((x) => x.key === section.key);
     if (mine.missing) throw userError(`${mine.missing} of your questions were deleted from the bank. Swap or remove them first.`);
@@ -354,7 +354,7 @@ const submitSection = handle("submitSection", async (req, res) => {
 // POST /api/lecturer/live-tests/:id/sections/:key/unsubmit   ("Take back to edit", before the test opens)
 const unsubmitSection = handle("unsubmitSection", async (req, res) => {
     const { test, section, editable } = await loadSection(req);
-    if (!editable) throw userError("The test has already opened, so it can't change now");
+    if (!editable) throw userError("Students have already started this test, so it can't change now");
     section.submittedAt = undefined;
     await test.save();
     const { status } = await syncLiveStatus(test, { pullBack: true });

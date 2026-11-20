@@ -40,10 +40,12 @@ const sectionState = async (test) => {
     return { sections, full: sections.every((s) => s.full), ready: sections.every((s) => s.ready), totalQuestions: ids.length, totalMarks };
 };
 
-const hasStarted = async (test, now = new Date()) =>
-    now >= new Date(test.availability.startsAt) || Boolean(await TestAttempt.exists({ testId: test._id }));
+// "Started" = a student has begun writing it. Until then the head lecturer can change the
+// date, time and questions as often as needed, even after the window has opened.
+// eslint-disable-next-line no-unused-vars
+const hasStarted = async (test, now = new Date()) => Boolean(await TestAttempt.exists({ testId: test._id }));
 
-// Questions can change until the test opens (and nobody has started)
+// Questions, date and time can change until a student starts the test
 const canEditQuestions = async (test) => test.status === "draft" || (test.status === "published" && !(await hasStarted(test)));
 
 // Publishes once every section is ready; goes back to draft if a section is no longer full

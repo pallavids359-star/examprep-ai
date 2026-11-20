@@ -237,7 +237,7 @@ export default function PickQuestions() {
   const needsSend = sec?.picker === "lecturer";
   const sentAt = sec?.submittedAt;
   const sendToHead = async () => {
-    if (!(await askConfirm(`Send your ${sec.name} paper (${picked.length} questions) to the head lecturer? You can take it back to make changes until the test opens.`, { title: "Send to head lecturer?", confirmText: "Send", danger: false }))) return;
+    if (!(await askConfirm(`Send your ${sec.name} paper (${picked.length} questions) to the head lecturer? You can take it back to make changes until a student starts the test.`, { title: "Send to head lecturer?", confirmText: "Send", danger: false }))) return;
     setSaving(true);
     try {
       const res = info.isAdmin && info.section.picker === "lecturer"
@@ -462,7 +462,7 @@ export default function PickQuestions() {
         </section>
 
         {!editable && !info.canChange && (
-          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">The test has opened, so its questions can't change now.</p>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Students have already started this test, so its questions can't change now.</p>
         )}
         {!editable && info.canChange && needsSend && sentAt && (
           <p className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
@@ -836,7 +836,7 @@ function SendCard({ sec, complete, sentAt, editable, canChange, isAdmin, saving,
               <h2 className="mt-1 text-xl font-extrabold text-white">Sent to the head lecturer ✓</h2>
               <p className="gp-muted mt-1 text-sm">
                 Sent {new Date(sentAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.{" "}
-                {canChange ? "Need a change? Take it back, fix it and send again before the test opens." : "The test has opened, so it is final."}
+                {canChange ? "Need a change? Take it back, fix it and send again before any student starts." : "Students have started the test, so it is final."}
               </p>
             </>
           ) : complete ? (

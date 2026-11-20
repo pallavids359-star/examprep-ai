@@ -164,7 +164,7 @@ const changeSectionLecturer = handle("changeSectionLecturer", async (req, res) =
     if (!test) throw userError("Live test not found", 404);
     const section = test.sections.find((s) => s.key === req.params.key);
     if (!section) throw userError("Section not found", 404);
-    if (!(await canEditQuestions(test))) throw userError("The test has already opened, so the lecturer can't change now");
+    if (!(await canEditQuestions(test))) throw userError("Students have already started this test, so the lecturer can't change now");
     const lecturer = await User.findOne({ _id: req.body.lecturerId, role: "lecturer", status: "active" }).select("name").lean();
     if (!lecturer) throw userError("That lecturer doesn't exist or is suspended");
     const same = String(section.lecturerId) === String(lecturer._id) && section.picker === "lecturer";
@@ -427,9 +427,7 @@ const updateLiveTest = handle("updateLiveTest", async (req, res) => {
         if (req.body.endsAt !== undefined) {
             const endsAt = toDate(req.body.endsAt, "Closing time");
             if (endsAt <= test.availability.startsAt) throw userError("The test must close after it opens");
-            if (test.status === "published" && new Date() >= test.availability.startsAt && endsAt < test.availability.endsAt) {
-                throw userError("Once the test has opened, the closing time can only be moved later");
-            }
+            if (endsAt <= new Date() && endsAt.getTime() !== new Date(test.availability.endsAt).getTime()) throw userError("Choose a closing time in the future");
             test.availability.endsAt = endsAt;
         }
     }
@@ -464,7 +462,6 @@ const unpublishLiveTest = handle("unpublishLiveTest", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
     const test = await Test.findOne({ _id: req.params.id, type: "live", status: "published" });
     if (!test) throw userError("Published live test not found", 404);
-    if (new Date() >= test.availability.startsAt) throw userError("The test has already opened, so it can't go back to draft");
     if (await TestAttempt.exists({ testId: test._id })) throw userError("Students have already started it");
     test.status = "draft";
     await test.save();
@@ -479,7 +476,7 @@ const reopenSection = handle("reopenSection", async (req, res) => {
     if (!test) throw userError("Live test not found", 404);
     const section = test.sections.find((s) => s.key === req.params.key);
     if (!section) throw userError("Section not found", 404);
-    if (!(await canEditQuestions(test))) throw userError("The test has already opened, so it can't change now");
+    if (!(await canEditQuestions(test))) throw userError("Students have already started this test, so it can't change now");
     section.submittedAt = undefined;
     section.returnedAt = new Date();
     section.returnNote = String(req.body?.note || "").trim().slice(0, 500) || undefined;

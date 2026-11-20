@@ -103,7 +103,7 @@ export default function LiveTestForm() {
       .then((res) => {
         const t = res.data.test;
         if (!t.editable) {
-          if (t.phase === "open") setOpenTest(t);
+          if (t.phase !== "archived") setOpenTest(t);
           else navigate(`/admin/live-tests/${id}`, { replace: true });
           return;
         }
@@ -605,7 +605,7 @@ function TimePoint({ label, d, right = false }) {
   );
 }
 
-// The test is already open (students may be writing it): rename it or keep it open longer
+// Students have already started the test: rename it or move its closing time (as often as needed)
 function OpenTestEdit({ test }) {
   const navigate = useNavigate();
   const [title, setTitle] = useState(test.title);
@@ -614,12 +614,13 @@ function OpenTestEdit({ test }) {
   const [error, setError] = useState("");
   const oldEnd = new Date(test.endsAt);
   const newEnd = end ? new Date(end) : null;
-  const addHours = (h) => setEnd(toLocalInput(new Date(Math.max(oldEnd.getTime(), (newEnd || oldEnd).getTime()) + h * 3600e3)));
+  const addHours = (h) => setEnd(toLocalInput(new Date(Math.max(Date.now(), (newEnd || oldEnd).getTime()) + h * 3600e3)));
 
   const save = async (e) => {
     e.preventDefault();
     setError("");
-    if (!newEnd || newEnd < oldEnd) return setError("While the test is open, the closing time can only move later");
+    if (!newEnd) return setError("Choose the closing time");
+    if (newEnd.getTime() !== oldEnd.getTime() && newEnd <= new Date()) return setError("Choose a closing time in the future");
     setSaving(true);
     try {
       await api.put(`/admin/live-tests/${test._id}`, { title, endsAt: newEnd.toISOString() });
@@ -638,7 +639,7 @@ function OpenTestEdit({ test }) {
         ← Back
       </Link>
       <div className="mt-3">
-        <Hero eyebrow="Edit live test" title={test.title} subtitle="This test is open now, so students may be writing it. You can rename it or keep it open for longer. The start time, length and questions are fixed." />
+        <Hero eyebrow="Edit live test" title={test.title} subtitle="Students have already started this test, so its start time, length and questions are fixed. You can rename it and change the closing time as many times as you need." />
       </div>
       <form onSubmit={save} className="gp-card mt-6 max-w-2xl space-y-6 p-6">
         <label className="block">
@@ -648,7 +649,7 @@ function OpenTestEdit({ test }) {
         <div>
           <span className={LABEL}>Closes</span>
           <div className="flex flex-wrap items-center gap-2">
-            <input type="datetime-local" aria-label="Closing time" className={`${input} max-w-xs`} value={end} min={toLocalInput(test.endsAt)} onChange={(e) => setEnd(e.target.value)} />
+            <input type="datetime-local" aria-label="Closing time" className={`${input} max-w-xs`} value={end} onChange={(e) => setEnd(e.target.value)} />
             {[
               [1, "+1 hour"],
               [3, "+3 hours"],

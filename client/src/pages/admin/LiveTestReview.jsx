@@ -157,7 +157,7 @@ export default function LiveTestReview() {
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-2">
-              {(test.editable || test.phase === "open") && (
+              {test.phase !== "archived" && (
                 <Link to={`/admin/live-tests/${id}/edit`} className="rounded-xl border border-amber-200/30 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-white/10">
                   ✎ {test.editable ? "Edit date, time & subjects" : "Edit closing time"}
                 </Link>
