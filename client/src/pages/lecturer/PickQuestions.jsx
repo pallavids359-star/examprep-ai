@@ -1054,60 +1054,8 @@ function SelectWizard({ stage, setStage, classLevel, chooseClass, chapters, chap
       {stage === "topics" && (
         <section className="gp-card p-6 md:p-8">
           <h2 className="text-2xl font-extrabold text-slate-900">Choose the topics</h2>
-          <p className="mt-1 text-sm text-slate-500">Tap topics to narrow it down. Leave a chapter with nothing ticked to use all its topics.</p>
-          <div className="mt-6 space-y-5">
-            {chapterIds.map((cid) => {
-              const ch = chapters.find((c) => c._id === cid);
-              const ts = topicsByChapter[cid];
-              const list = Array.isArray(ts) ? ts : [];
-              const on = list.filter((t) => topicIds.includes(t._id)).length;
-              return (
-                <div key={cid} className="rounded-2xl border border-slate-100 bg-white p-4">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-bold text-slate-900">
-                      {ch?.name}
-                      <span className="ml-2 text-xs font-normal text-slate-400">Class {ch?.classLevel}</span>
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{on ? `${on} of ${list.length}` : "All topics"}</span>
-                      {list.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setTopicIds((p) => (on === list.length ? p.filter((x) => !list.some((t) => t._id === x)) : [...new Set([...p, ...list.map((t) => t._id)])]))}
-                          className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
-                        >
-                          {on === list.length ? "Clear" : "Select all"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {ts === "loading" || !ts ? (
-                    <p className="text-sm text-slate-400">Loading topics...</p>
-                  ) : list.length === 0 ? (
-                    <p className="text-sm text-slate-400">No topics in this chapter.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {list.map((t) => {
-                        const checked = topicIds.includes(t._id);
-                        return (
-                          <button
-                            key={t._id}
-                            type="button"
-                            aria-pressed={checked}
-                            onClick={() => toggleTopic(t._id)}
-                            className={`rounded-full px-3.5 py-1.5 text-sm transition ${checked ? "bg-slate-900 font-semibold text-amber-200 shadow" : "bg-amber-50/60 text-slate-700 ring-1 ring-amber-200/80 hover:bg-amber-100"}`}
-                          >
-                            {checked && "✓ "}
-                            {t.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <p className="mt-1 text-sm text-slate-500">Pick a chapter on the left, then tick its topics. A chapter with nothing ticked uses all its topics.</p>
+          <TopicPicker chapters={chapters} chapterIds={chapterIds} topicsByChapter={topicsByChapter} topicIds={topicIds} setTopicIds={setTopicIds} toggleTopic={toggleTopic} />
           <WizardFooter
             left={<button type="button" onClick={() => setStage("chapters")} className="text-sm font-semibold text-slate-600 hover:underline">← Change chapters</button>}
             note={topicIds.length ? `${topicIds.length} topic${topicIds.length === 1 ? "" : "s"} chosen` : "All topics of the ticked chapters"}
@@ -1163,6 +1111,114 @@ function QuestionsBar({ classLevel, chapterCount, topicCount, setStage, type, se
       <div className="mt-3 flex flex-wrap gap-5 border-t border-amber-100 pt-3">
         <Toggle on={diagram} onClick={toggleDiagram} label="Only with a diagram" />
         <Toggle on={hideUsed} onClick={toggleHideUsed} label="Hide questions used in other live tests" />
+      </div>
+    </div>
+  );
+}
+
+// Topics: chapters as tabs on the left, a tidy checklist of the chosen chapter's topics on the right
+function TopicPicker({ chapters, chapterIds, topicsByChapter, topicIds, setTopicIds, toggleTopic }) {
+  const [active, setActive] = useState(chapterIds[0]);
+  const [q, setQ] = useState("");
+  const cur = chapterIds.includes(active) ? active : chapterIds[0];
+  const ch = chapters.find((c) => c._id === cur);
+  const ts = topicsByChapter[cur];
+  const list = (Array.isArray(ts) ? ts : []).slice().sort((x, y) => x.name.localeCompare(y.name));
+  const shown = q ? list.filter((t) => t.name.toLowerCase().includes(q.toLowerCase())) : list;
+  const countFor = (cid) => {
+    const l = Array.isArray(topicsByChapter[cid]) ? topicsByChapter[cid] : [];
+    return [l.filter((t) => topicIds.includes(t._id)).length, l.length];
+  };
+  const [on, all] = countFor(cur);
+
+  return (
+    <div className="mt-6 grid overflow-hidden rounded-2xl border border-slate-200 bg-white md:grid-cols-[260px_minmax(0,1fr)]">
+      {/* Chapters */}
+      <nav className="border-b border-slate-200 bg-amber-50/40 p-2 md:border-b-0 md:border-r" aria-label="Chapters">
+        {chapterIds.map((cid) => {
+          const c = chapters.find((x) => x._id === cid);
+          const [n, total] = countFor(cid);
+          const here = cid === cur;
+          return (
+            <button
+              key={cid}
+              type="button"
+              onClick={() => {
+                setActive(cid);
+                setQ("");
+              }}
+              className={`mb-1 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${here ? "bg-slate-900 text-white shadow" : "text-slate-700 hover:bg-white"}`}
+            >
+              <span className="min-w-0">
+                <span className={`block truncate font-semibold ${here ? "text-white" : "text-slate-900"}`}>{c?.name}</span>
+                <span className={`text-xs ${here ? "text-amber-200/80" : "text-slate-500"}`}>Class {c?.classLevel}</span>
+              </span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${n ? (here ? "bg-amber-300 text-slate-900" : "bg-slate-900 text-amber-200") : here ? "bg-white/10 text-amber-100" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>
+                {n ? `${n}/${total}` : "All"}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Topics of the chosen chapter */}
+      <div className="min-w-0 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-lg font-bold text-slate-900">{ch?.name}</p>
+            <p className="text-xs text-slate-500">{on ? `${on} of ${all} topics ticked` : `All ${all} topics will be used`}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {all > 0 && (
+              <button
+                type="button"
+                onClick={() => setTopicIds((p) => (on === all ? p.filter((x) => !list.some((t) => t._id === x)) : [...new Set([...p, ...list.map((t) => t._id)])]))}
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-50"
+              >
+                {on === all ? "Clear all" : "Select all"}
+              </button>
+            )}
+            {on > 0 && on < all && (
+              <button type="button" onClick={() => setTopicIds((p) => p.filter((x) => !list.some((t) => t._id === x)))} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        {all > 8 && (
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Search ${all} topics...`}
+            className="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm focus:border-amber-400 focus:bg-white focus:outline-none"
+          />
+        )}
+        {ts === "loading" || !ts ? (
+          <p className="mt-6 text-sm text-slate-400">Loading topics...</p>
+        ) : shown.length === 0 ? (
+          <p className="mt-6 text-sm text-slate-400">{q ? "No topic matches that search." : "No topics in this chapter."}</p>
+        ) : (
+          <ul className="mt-4 grid gap-x-4 sm:grid-cols-2">
+            {shown.map((t) => {
+              const checked = topicIds.includes(t._id);
+              return (
+                <li key={t._id}>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    onClick={() => toggleTopic(t._id)}
+                    className={`flex w-full items-center gap-3 border-b border-slate-100 px-2 py-2.5 text-left text-sm transition ${checked ? "font-semibold text-slate-900" : "text-slate-700 hover:bg-amber-50/50"}`}
+                  >
+                    <Box on={checked} />
+                    <span className="min-w-0 leading-snug">{t.name}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
