@@ -519,10 +519,10 @@ const deleteLiveTest = handle("deleteLiveTest", async (req, res) => {
 // GET /api/admin/live-tests/:id/results   (leaderboard)
 const liveResults = handle("liveResults", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
-    const test = await Test.findOne({ _id: req.params.id, type: "live" }).select("title examId totalMarks totalQuestions availability status").lean();
+    const test = await Test.findOne({ _id: req.params.id, type: "live" }).select("title examId totalMarks totalQuestions availability status sections.name sections.questionIds").lean();
     if (!test) throw userError("Live test not found", 404);
     const attempts = await TestAttempt.find({ testId: test._id })
-        .select("userId status startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec")
+        .select("userId status startedAt submittedAt expiresAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec answers.questionId answers.isCorrect answers.marksAwarded answers.timeSpentSec answers.selectedOptionIds answers.numericalValue")
         .populate("userId", "name email")
         .lean();
     const done = attempts.filter((a) => a.status === "submitted" || a.status === "auto_submitted").sort((a, b) => b.result.score - a.result.score || a.result.timeTakenSec - b.result.timeTakenSec);
@@ -544,18 +544,39 @@ const liveResults = handle("liveResults", async (req, res) => {
             unanswered: a.result.unanswered,
             timeTakenSec: a.result.timeTakenSec,
             submittedAt: a.submittedAt,
+            startedAt: a.startedAt,
             autoSubmitted: a.status === "auto_submitted",
+            subjects: (test.sections || []).map((sec) => {
+                const ids = new Set((sec.questionIds || []).map(String));
+                const list = (a.answers || []).filter((x) => ids.has(String(x.questionId)));
+                const correct = list.filter((x) => x.isCorrect === true).length;
+                const wrong = list.filter((x) => x.isCorrect === false).length;
+                return { name: sec.name, total: list.length, correct, wrong, skipped: list.length - correct - wrong, marks: list.reduce((n, x) => n + (x.marksAwarded || 0), 0), timeSec: list.reduce((n, x) => n + (x.timeSpentSec || 0), 0) };
+            }),
         };
     });
     const scores = done.map((a) => a.result.score);
+    const now = new Date();
+    const open = attempts.filter((a) => a.status === "in_progress");
+    const stuck = open.filter((a) => (a.expiresAt && new Date(a.expiresAt) < now) || now > new Date(test.availability.endsAt));
+    const writing = open.filter((a) => !stuck.includes(a));
+    const who = (a) => ({ _id: a.userId?._id, name: a.userId?.name || "Deleted account", email: a.userId?.email || "", startedAt: a.startedAt });
     res.json({
         test: { _id: test._id, title: test.title, exam: (await Exam.findById(test.examId).select("code").lean())?.code || "", totalMarks: test.totalMarks, totalQuestions: test.totalQuestions, startsAt: test.availability.startsAt, endsAt: test.availability.endsAt, phase: phase(test) },
         stats: {
             finished: done.length,
-            inProgress: attempts.filter((a) => a.status === "in_progress").length,
+            started: attempts.length,
+            submitted: done.filter((a) => a.status === "submitted").length,
+            autoSubmitted: done.filter((a) => a.status === "auto_submitted").length,
+            inProgress: writing.length,
+            notCompleted: stuck.length,
             average: scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null,
             highest: scores.length ? Math.max(...scores) : null,
+            lowest: scores.length ? Math.min(...scores) : null,
+            avgTimeSec: done.length ? Math.round(done.reduce((n, a) => n + (a.result.timeTakenSec || 0), 0) / done.length) : 0,
         },
+        writingNow: writing.map(who),
+        notCompleted: stuck.map(who),
         rows,
     });
 });

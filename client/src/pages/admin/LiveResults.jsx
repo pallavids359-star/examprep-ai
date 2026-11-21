@@ -3,7 +3,7 @@ import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
-import ClassLeaderboard from "../../components/ClassLeaderboard";
+import AdminTestResult from "../../components/AdminTestResult";
 
 // Head lecturer: leaderboard of a live test
 export default function LiveResults() {
@@ -58,7 +58,7 @@ export default function LiveResults() {
         )}
       </div>
       <div className="mt-3">
-        <ClassLeaderboard test={data.test} rows={data.rows} />
+        <AdminTestResult board={data} />
       </div>
     </AdminLayout>
   );
