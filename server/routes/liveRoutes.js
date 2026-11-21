@@ -46,6 +46,5 @@ studentRouter.get("/", student.listLive);
 studentRouter.get("/my-results", student.myResults);
 studentRouter.post("/:id/start", student.startLive);
 studentRouter.get("/:id/report", student.liveReport);
-studentRouter.get("/:id/leaderboard", student.liveLeaderboard);
 
 module.exports = { adminRouter, lecturerRouter, studentRouter };

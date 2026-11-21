@@ -164,9 +164,11 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
             </div>
             {r && <p className="mt-3 text-sm text-amber-100/80">{admin ? "Did" : "You did"} better than {r.percentile}% of everyone who took it.</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link to={admin ? `/admin/live-tests/${t._id}/results` : `/live-tests/${t._id}/leaderboard`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
-                See the leaderboard →
-              </Link>
+              {admin && (
+                <Link to={`/admin/live-tests/${t._id}/results`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
+                  See the leaderboard →
+                </Link>
+              )}
               <button type="button" onClick={downloadScorecard} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
