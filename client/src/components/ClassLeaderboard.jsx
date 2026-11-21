@@ -8,6 +8,8 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpe
   const sorted = [...rows].sort((a, b) => b.score - a.score || (a.timeTakenSec || 0) - (b.timeTakenSec || 0));
   const max = test.totalMarks ?? sorted[0]?.maxScore ?? "—";
   const hasRoll = sorted.some((r) => r.student?.rollNo);
+  // One column per subject (Physics, Chemistry, Biology / Mathematics...) in the paper's order
+  const subjects = [...new Set(sorted.flatMap((r) => (r.subjects || []).map((x) => x.name)))];
   const toolbar = (
     <div className="mb-4 flex justify-end print:hidden">
       <button
@@ -41,13 +43,18 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpe
         {sorted.length === 0 ? (
           <p className="py-14 text-center text-sm text-slate-400">No one has finished this test yet.</p>
         ) : (
-          <table className="mt-5 w-full border-collapse text-sm">
+          <table className="mt-5 w-full border-collapse text-[13px]">
             <thead>
-              <tr className="bg-[#0f172a] text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
-                <th className="w-20 px-4 py-2.5 text-center">Rank</th>
-                {hasRoll && <th className="w-36 px-4 py-2.5 text-center">Roll no.</th>}
-                <th className="px-4 py-2.5">Student name</th>
-                <th className="w-28 px-4 py-2.5 text-right">Score</th>
+              <tr className="bg-[#0f172a] text-[11px] font-bold uppercase tracking-wide text-white">
+                <th className="w-16 border border-[#0f172a] px-3 py-2.5 text-center">Rank</th>
+                {hasRoll && <th className="w-28 border border-[#0f172a] px-3 py-2.5 text-center">Roll no</th>}
+                <th className="border border-[#0f172a] px-3 py-2.5 text-center">Student name</th>
+                {subjects.map((n) => (
+                  <th key={n} className="w-24 border border-[#0f172a] px-2 py-2.5 text-center leading-tight">
+                    {n}
+                  </th>
+                ))}
+                <th className="w-20 border border-[#0f172a] px-3 py-2.5 text-center">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -56,15 +63,20 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpe
                   key={r.attemptId}
                   onClick={canOpen ? () => navigate(`/admin/attempts/${r.attemptId}`) : undefined}
                   title={canOpen ? "Open this student's answers" : undefined}
-                  className={`${canOpen ? "cursor-pointer hover:bg-amber-50" : ""} ${r.me ? "!bg-amber-100 font-semibold" : "odd:bg-white even:bg-slate-50/70"} print:cursor-auto`}
+                  className={`${canOpen ? "cursor-pointer hover:bg-amber-50" : ""} ${r.me ? "!bg-amber-100 font-semibold" : "odd:bg-white even:bg-[#f5f7fa]"} print:cursor-auto`}
                 >
-                  <td className="border border-slate-200 px-4 py-2.5 text-center font-bold tabular-nums text-slate-900">{i + 1}</td>
-                  {hasRoll && <td className="border border-slate-200 px-4 py-2.5 text-center tabular-nums tracking-wider text-slate-500">{r.student?.rollNo || "—"}</td>}
-                  <td className="border border-slate-200 px-4 py-2.5 uppercase text-slate-800">
+                  <td className="border border-slate-200 px-3 py-2 text-center font-bold tabular-nums text-slate-700">#{i + 1}</td>
+                  {hasRoll && <td className="border border-slate-200 px-3 py-2 text-center font-semibold tabular-nums text-slate-600">{r.student?.rollNo || "—"}</td>}
+                  <td className="border border-slate-200 px-3 py-2 font-semibold uppercase text-slate-700">
                     {r.student?.name || "Deleted account"}
                     {r.me && <span className="ml-2 rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold normal-case text-amber-200">You</span>}
                   </td>
-                  <td className="border border-slate-200 px-4 py-2.5 text-right font-bold tabular-nums text-slate-900">{r.score}</td>
+                  {subjects.map((n) => (
+                    <td key={n} className="border border-slate-200 px-2 py-2 text-center tabular-nums text-slate-700">
+                      {r.subjects?.find((x) => x.name === n)?.marks ?? "—"}
+                    </td>
+                  ))}
+                  <td className="border border-slate-200 px-3 py-2 text-center font-bold tabular-nums text-slate-900">{r.score}</td>
                 </tr>
               ))}
             </tbody>
