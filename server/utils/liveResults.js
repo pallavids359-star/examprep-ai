@@ -11,10 +11,10 @@ const resultsOut = (test, now = new Date()) => test.live?.showResults === "after
 const liveResultsOf = async (userId, { hideUntilOut = false } = {}) => {
     const attempts = await TestAttempt.find({ userId, mode: "live", status: { $in: FINISHED } })
         .sort({ submittedAt: -1 })
-        .select("testId examId status startedAt submittedAt result")
+        .select("testId examId status startedAt submittedAt result answers.questionId answers.isCorrect answers.marksAwarded answers.timeSpentSec")
         .lean();
     const [tests, exams] = await Promise.all([
-        Test.find({ _id: { $in: attempts.map((a) => a.testId) } }).select("title examId availability live totalMarks totalQuestions").lean(),
+        Test.find({ _id: { $in: attempts.map((a) => a.testId) } }).select("title examId availability live totalMarks totalQuestions sections.name sections.questionIds").lean(),
         Exam.find().select("code name").sort({ code: 1 }).lean(),
     ]);
     const testById = new Map(tests.map((t) => [String(t._id), t]));
@@ -27,6 +27,24 @@ const liveResultsOf = async (userId, { hideUntilOut = false } = {}) => {
         const ready = !hideUntilOut || resultsOut(t);
         const r = a.result || {};
         const rank = ready ? await computeRank(a) : null;
+        // Subject by subject (Physics, Chemistry, Biology / Botany, Zoology, Maths)
+        const subjects = ready
+            ? (t.sections || []).map((sec) => {
+                  const ids = new Set((sec.questionIds || []).map(String));
+                  const list = (a.answers || []).filter((x) => ids.has(String(x.questionId)));
+                  const correct = list.filter((x) => x.isCorrect === true).length;
+                  const wrong = list.filter((x) => x.isCorrect === false).length;
+                  return {
+                      name: sec.name,
+                      total: list.length,
+                      correct,
+                      wrong,
+                      skipped: list.length - correct - wrong,
+                      marks: list.reduce((n, x) => n + (x.marksAwarded || 0), 0),
+                      timeSec: list.reduce((n, x) => n + (x.timeSpentSec || 0), 0),
+                  };
+              })
+            : [];
         rows.push({
             attemptId: a._id,
             testId: t._id,
@@ -48,6 +66,7 @@ const liveResultsOf = async (userId, { hideUntilOut = false } = {}) => {
                       skipped: r.unanswered ?? 0,
                       timeTakenSec: r.timeTakenSec ?? 0,
                       rank: rank?.rank ?? null,
+                      subjects,
                       totalCandidates: rank?.totalCandidates ?? null,
                   }
                 : {}),
