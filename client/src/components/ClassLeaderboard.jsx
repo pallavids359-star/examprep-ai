@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 // Click a row to open that student's answers. "Print / Save as PDF" prints just this sheet.
 export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpen = true }) {
   const navigate = useNavigate();
+  const sorted = [...rows].sort((a, b) => b.score - a.score || (a.timeTakenSec || 0) - (b.timeTakenSec || 0));
+  const max = test.totalMarks ?? sorted[0]?.maxScore ?? "—";
+  const hasRoll = sorted.some((r) => r.student?.rollNo);
   const toolbar = (
     <div className="mb-4 flex justify-end print:hidden">
       <button
