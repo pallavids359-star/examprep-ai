@@ -3,6 +3,8 @@ import BackLink from "../../components/BackLink";
 import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import QuestionBody from "../../components/QuestionBody";
+import Scorecard, { downloadScorecard, scorecardRows } from "../../components/Scorecard";
+import { useAuth } from "../../context/AuthContext";
 import { fmtDateTime, fmtDuration, preview } from "../../components/liveHelpers";
 import { Donut, ICONS, Ring, Stat } from "../../components/premium";
 
@@ -30,6 +32,7 @@ const answerText = (q, mine) => {
 
 export default function LiveReport() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
@@ -157,9 +160,17 @@ export default function LiveReport() {
               )}
             </div>
             {r && <p className="mt-3 text-sm text-amber-100/80">You did better than {r.percentile}% of everyone who took it.</p>}
-            <Link to={`/live-tests/${t._id}/leaderboard`} className="gp-gold-btn mt-5 inline-block px-5 py-2.5 text-sm">
-              See the leaderboard →
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link to={`/live-tests/${t._id}/leaderboard`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
+                See the leaderboard →
+              </Link>
+              <button type="button" onClick={downloadScorecard} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+                </svg>
+                Download scorecard
+              </button>
+            </div>
           </div>
           <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />
         </div>
@@ -441,6 +452,20 @@ export default function LiveReport() {
           {shown.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No questions in this view.</p>}
         </div>
       </section>
+
+      <Scorecard
+        title={t.title}
+        exam={t.exam}
+        date={data.submittedAt || data.startedAt}
+        name={user?.name}
+        idLabel={user?.rollNo ? "Roll number" : "Email"}
+        idValue={user?.rollNo || user?.email}
+        rank={r?.rank}
+        totalCandidates={r?.totalCandidates}
+        score={s.score ?? 0}
+        maxScore={s.maxScore ?? 0}
+        rows={scorecardRows(questions)}
+      />
     </div>
   );
 }

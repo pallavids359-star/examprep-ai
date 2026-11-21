@@ -317,8 +317,19 @@ table tbody tr:hover {
   main { margin-left: 0 !important; padding: 0 !important; }
   body * { visibility: hidden; }
   .gp-print-sheet, .gp-print-sheet * { visibility: visible; }
-  .gp-print-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  .gp-print-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 14mm; }
   .gp-print-sheet thead { display: table-header-group; }
   .gp-print-sheet tr { break-inside: avoid; }
   .gp-print-sheet thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Printing a scorecard: only the scorecard */
+@media print {
+  body.gp-printing-card * { visibility: hidden; }
+  body.gp-printing-card .gp-print-card,
+  body.gp-printing-card .gp-print-card * { visibility: visible; }
+  body.gp-printing-card .gp-print-card { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  .gp-print-card, .gp-print-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:not(.gp-printing-card) .gp-print-card { display: none !important; }
+}
+@page { size: A4; margin: 0; }

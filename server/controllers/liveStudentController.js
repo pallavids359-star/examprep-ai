@@ -176,6 +176,7 @@ const liveReport = handle("liveReport", async (req, res) => {
     const head = {
         _id: test._id,
         title: test.title,
+        exam: (await Exam.findById(test.examId).select("code").lean())?.code || "",
         startsAt: test.availability.startsAt,
         endsAt: test.availability.endsAt,
         durationMinutes: test.durationMinutes,

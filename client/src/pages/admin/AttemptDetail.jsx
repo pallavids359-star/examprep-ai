@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import QuestionBody from "../../components/QuestionBody";
+import Scorecard, { downloadScorecard, scorecardRows } from "../../components/Scorecard";
 import { fmtDateTime, fmtDuration } from "../../components/liveHelpers";
 
 const STATUS = {
@@ -63,6 +64,12 @@ export default function AttemptDetail() {
             {data.status === "auto_submitted" ? " · time ran out" : data.status === "in_progress" ? " · still writing" : ""}
           </p>
         </div>
+        <button type="button" onClick={downloadScorecard} className="order-last inline-flex items-center gap-2 rounded-lg bg-[#17140f] px-3.5 py-2 text-sm font-semibold text-[#e5c372] hover:bg-black print:hidden">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+          </svg>
+          Download scorecard
+        </button>
         <dl className="flex gap-8">
           {s.score !== null && <Fig label="Score" value={`${s.score}`} sub={`/ ${s.maxScore}`} />}
           {data.rank && <Fig label="Rank" value={`${data.rank.rank}`} sub={`of ${data.rank.total}`} />}
@@ -176,6 +183,19 @@ export default function AttemptDetail() {
           );
         })}
       </div>
+      <Scorecard
+        title={data.title}
+        exam={data.exam}
+        date={data.submittedAt || data.startedAt}
+        name={data.student?.name}
+        idLabel={data.student?.rollNo ? "Roll number" : "Email"}
+        idValue={data.student?.rollNo || data.student?.email}
+        rank={data.rank?.rank}
+        totalCandidates={data.rank?.total}
+        score={s.score ?? 0}
+        maxScore={s.maxScore ?? 0}
+        rows={scorecardRows(data.questions)}
+      />
     </AdminLayout>
   );
 }
