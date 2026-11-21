@@ -31,11 +31,19 @@ export default function ClassLeaderboard({ test, rows, brand = "GenPrep", canOpe
           </button>
         ))}
       </div>
-      {view === "list" && (
-        <button type="button" onClick={() => window.print()} className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-black">
-          Print / Save as PDF
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => {
+          setView("list");
+          setTimeout(() => window.print(), 150);
+        }}
+        className="inline-flex items-center gap-2 rounded-lg bg-[#17140f] px-3.5 py-2 text-sm font-semibold text-[#e5c372] hover:bg-black"
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+        </svg>
+        Download PDF
+      </button>
     </div>
   );
 

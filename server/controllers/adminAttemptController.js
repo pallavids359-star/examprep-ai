@@ -8,6 +8,7 @@ const Question = require("../models/Question");
 const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const Subject = require("../models/Subject");
+const { liveResultsOf } = require("../utils/liveResults");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -183,4 +184,10 @@ const getAttemptDetail = handle("getAttemptDetail", async (req, res) => {
     });
 });
 
-module.exports = { listStudentAttempts, getAttemptDetail };
+// GET /api/admin/students/:id/live-results   (the student's live tests, by exam)
+const studentLiveResults = handle("studentLiveResults", async (req, res) => {
+    if (!isValidId(req.params.id)) throw userError("Invalid student id");
+    res.json(await liveResultsOf(req.params.id));
+});
+
+module.exports = { listStudentAttempts, getAttemptDetail, studentLiveResults };

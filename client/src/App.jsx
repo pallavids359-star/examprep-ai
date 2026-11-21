@@ -43,6 +43,7 @@ const PickQuestions = lazy(() => import("./pages/lecturer/PickQuestions"));
 const LiveTests = lazy(() => import("./pages/student/LiveTests"));
 const LiveReport = lazy(() => import("./pages/student/LiveReport"));
 const LiveLeaderboard = lazy(() => import("./pages/student/LiveLeaderboard"));
+const MyResults = lazy(() => import("./pages/student/MyResults"));
 
 const protect = (page) => <ProtectedRoute>{page}</ProtectedRoute>;
 const adminOnly = (page) => <AdminRoute>{page}</AdminRoute>;
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/live-tests" element={<LiveTests />} />
         <Route path="/live-tests/:id/report" element={<LiveReport />} />
         <Route path="/live-tests/:id/leaderboard" element={<LiveLeaderboard />} />
+        <Route path="/results" element={<MyResults />} />
         <Route path="/revise" element={<Revise />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />

@@ -42,6 +42,7 @@ lecturerRouter.post("/live-tests/:id/sections/:key/unsubmit", lecturer.unsubmitS
 const studentRouter = express.Router();
 studentRouter.use(protect);
 studentRouter.get("/", student.listLive);
+studentRouter.get("/my-results", student.myResults);
 studentRouter.post("/:id/start", student.startLive);
 studentRouter.get("/:id/report", student.liveReport);
 studentRouter.get("/:id/leaderboard", student.liveLeaderboard);

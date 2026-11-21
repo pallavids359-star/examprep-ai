@@ -7,6 +7,7 @@ import ClassLeaderboard from "../../components/ClassLeaderboard";
 export default function Results() {
   const [tests, setTests] = useState(null);
   const [testId, setTestId] = useState("");
+  const [exam, setExam] = useState("");
   const [board, setBoard] = useState(null);
   const [error, setError] = useState("");
 
@@ -16,7 +17,9 @@ export default function Results() {
       .then((res) => {
         const list = res.data.tests.filter((t) => t.status !== "draft").sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt));
         setTests(list);
-        setTestId((cur) => cur || (list.find((t) => t.finished > 0) || list[0])?._id || "");
+        const start = list.find((t) => t.finished > 0) || list[0];
+        setExam((cur) => cur || start?.exam || "NEET");
+        setTestId((cur) => cur || start?._id || "");
       })
       .catch((err) => setError(getErrorMessage(err)));
   }, []);
@@ -41,9 +44,34 @@ export default function Results() {
 
       {tests && tests.length > 0 && (
         <>
+          {/* Choose the exam */}
+          <div className="mb-5 grid grid-cols-3 gap-3 print:hidden">
+            {[...new Set(["NEET", "JEE", "KCET", ...tests.map((t) => t.exam)])].map((code) => {
+              const list = tests.filter((t) => t.exam === code);
+              const on = code === exam;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => {
+                    setExam(code);
+                    setTestId((list.find((t) => t.finished > 0) || list[0])?._id || "");
+                  }}
+                  className={`rounded-2xl p-4 text-left transition ${on ? "bg-[#17140f] text-white shadow-lg" : "bg-white ring-1 ring-[#e7dcc3] hover:ring-[#c9a24a]"}`}
+                >
+                  <p className={`font-display text-2xl font-extrabold ${on ? "text-[#e5c372]" : "text-slate-900"}`}>{code}</p>
+                  <p className={`text-sm ${on ? "text-white/70" : "text-slate-500"}`}>
+                    {list.length} live test{list.length === 1 ? "" : "s"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
           {/* Choose a test */}
           <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 print:hidden">
-            {tests.map((t) => {
+            {tests.filter((t) => t.exam === exam).length === 0 && <p className="py-4 text-sm text-slate-500">No {exam} live tests yet.</p>}
+            {tests.filter((t) => t.exam === exam).map((t) => {
               const on = t._id === testId;
               return (
                 <button
@@ -68,7 +96,11 @@ export default function Results() {
           </div>
 
           <div className="mt-6">
-            {board ? <ClassLeaderboard test={board.test} rows={board.rows} /> : <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
+            {!tests.some((t) => t.exam === exam && t._id === testId) ? null : board ? (
+              <ClassLeaderboard test={board.test} rows={board.rows} />
+            ) : (
+              <p className="py-10 text-center text-sm text-slate-400">Loading...</p>
+            )}
           </div>
         </>
       )}

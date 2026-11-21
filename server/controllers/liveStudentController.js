@@ -8,6 +8,7 @@ const Subject = require("../models/Subject");
 const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const { finalizeAttempt, isExpired, computeRank } = require("../utils/finalizeAttempt");
+const { liveResultsOf } = require("../utils/liveResults");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -348,4 +349,9 @@ const liveLeaderboard = handle("liveLeaderboard", async (req, res) => {
     });
 });
 
-module.exports = { listLive, startLive, liveReport, liveLeaderboard, resultsOpen };
+// GET /api/live-tests/my-results   (all my live tests, by exam)
+const myResults = handle("myResults", async (req, res) => {
+    res.json(await liveResultsOf(req.user._id, { hideUntilOut: true }));
+});
+
+module.exports = { listLive, startLive, liveReport, liveLeaderboard, myResults, resultsOpen };
