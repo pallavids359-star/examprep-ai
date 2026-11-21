@@ -30,9 +30,12 @@ const answerText = (q, mine) => {
   return ids.length ? ids.join(", ") : "–";
 };
 
-export default function LiveReport() {
-  const { id } = useParams();
-  const { user } = useAuth();
+// Also used by the admin to see one student's report: pass studentId (and the page's own back link).
+export default function LiveReport({ testId, studentId, backTo, backLabel } = {}) {
+  const params = useParams();
+  const id = testId || params.id;
+  const admin = Boolean(studentId);
+  const { user: me } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
@@ -42,13 +45,13 @@ export default function LiveReport() {
 
   useEffect(() => {
     api
-      .get(`/live-tests/${id}/report`)
+      .get(admin ? `/admin/live-tests/${id}/report/${studentId}` : `/live-tests/${id}/report`)
       .then((res) => {
         setData(res.data);
         if (res.data.sections?.length) setChartSection(res.data.sections[0].name);
       })
       .catch((err) => setError(getErrorMessage(err)));
-  }, [id]);
+  }, [id, admin, studentId]);
 
   const questions = useMemo(() => data?.questions || [], [data]);
   const shown = useMemo(
@@ -66,7 +69,7 @@ export default function LiveReport() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        <BackLink to="/live-tests">Live tests</BackLink>
+        <BackLink to={backTo || "/live-tests"}>{backLabel || "Live tests"}</BackLink>
       </div>
     );
   }
@@ -74,7 +77,7 @@ export default function LiveReport() {
 
   const t = data.test;
   const back = (
-    <BackLink to="/live-tests">Live tests</BackLink>
+    <BackLink to={backTo || "/live-tests"}>{backLabel || "Live tests"}</BackLink>
   );
 
   if (data.state === "in_progress") {
@@ -135,7 +138,7 @@ export default function LiveReport() {
       <section className="gp-hero mt-4 p-6 md:p-8">
         <div className="relative flex flex-wrap items-center justify-between gap-8">
           <div className="min-w-0 max-w-xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">Live test report</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">{admin && data.student ? `${data.student.name} · live test report` : "Live test report"}</p>
             <h1 className="mt-2 text-2xl font-extrabold text-white md:text-3xl">{t.title}</h1>
             <p className="gp-muted mt-2 text-sm">
               Taken {fmtDateTime(data.startedAt)} – {fmtDateTime(data.submittedAt)}
@@ -159,9 +162,9 @@ export default function LiveReport() {
                 </div>
               )}
             </div>
-            {r && <p className="mt-3 text-sm text-amber-100/80">You did better than {r.percentile}% of everyone who took it.</p>}
+            {r && <p className="mt-3 text-sm text-amber-100/80">{admin ? "Did" : "You did"} better than {r.percentile}% of everyone who took it.</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link to={`/live-tests/${t._id}/leaderboard`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
+              <Link to={admin ? `/admin/live-tests/${t._id}/results` : `/live-tests/${t._id}/leaderboard`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
                 See the leaderboard →
               </Link>
               <button type="button" onClick={downloadScorecard} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10">
@@ -506,9 +509,9 @@ export default function LiveReport() {
         title={t.title}
         exam={t.exam}
         date={data.submittedAt || data.startedAt}
-        name={user?.name}
-        idLabel={user?.rollNo ? "Roll number" : "Email"}
-        idValue={user?.rollNo || user?.email}
+        name={(admin ? data.student : me)?.name}
+        idLabel={(admin ? data.student : me)?.rollNo ? "Roll number" : "Email"}
+        idValue={(admin ? data.student : me)?.rollNo || (admin ? data.student : me)?.email}
         rank={r?.rank}
         totalCandidates={r?.totalCandidates}
         score={s.score ?? 0}

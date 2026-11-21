@@ -1,6 +1,7 @@
 // Student side of live tests: the list, starting one, and the detailed report.
 const mongoose = require("mongoose");
 const Test = require("../models/Test");
+const User = require("../models/User");
 const Exam = require("../models/Exam");
 const TestAttempt = require("../models/TestAttempt");
 const Question = require("../models/Question");
@@ -186,7 +187,10 @@ const liveReport = handle("liveReport", async (req, res) => {
         closed,
     };
 
-    let attempt = await TestAttempt.findOne({ userId: req.user._id, testId: test._id });
+    // Admin looking at one student's report (same page the student sees)
+    const asAdmin = Boolean(req.reportUserId);
+    const viewerId = req.reportUserId || req.user._id;
+    let attempt = await TestAttempt.findOne({ userId: viewerId, testId: test._id });
     if (attempt && attempt.status === "in_progress") {
         if (!isExpired(attempt)) return res.json({ test: head, state: "in_progress", attemptId: attempt._id });
         await finalizeAttempt(attempt, null, true);
@@ -220,7 +224,7 @@ const liveReport = handle("liveReport", async (req, res) => {
 
     // Never started
     if (!attempt) {
-        if (!closed) throw userError("You have not taken this test yet", 404);
+        if (!closed || asAdmin) throw userError(asAdmin ? "This student has not taken this test" : "You have not taken this test yet", 404);
         const ids = test.sections.flatMap((s) => s.questionIds);
         const qs = await loadQuestions(ids);
         return res.json({
@@ -235,7 +239,7 @@ const liveReport = handle("liveReport", async (req, res) => {
         });
     }
 
-    if (!resultsOpen(test, now)) {
+    if (!asAdmin && !resultsOpen(test, now)) {
         return res.json({ test: head, state: "waiting", submittedAt: attempt.submittedAt, resultsAt: test.availability.endsAt });
     }
 
@@ -300,6 +304,7 @@ const liveReport = handle("liveReport", async (req, res) => {
     res.json({
         test: head,
         state: "ready",
+        ...(asAdmin ? { student: await User.findById(viewerId).select("name email").lean() } : {}),
         attemptId: attempt._id,
         startedAt: attempt.startedAt,
         submittedAt: attempt.submittedAt,
@@ -355,4 +360,11 @@ const myResults = handle("myResults", async (req, res) => {
     res.json(await liveResultsOf(req.user._id, { hideUntilOut: true }));
 });
 
-module.exports = { listLive, startLive, liveReport, liveLeaderboard, myResults, resultsOpen };
+// GET /api/admin/live-tests/:id/report/:userId   (admin: a student's report, results open or not)
+const studentReportForAdmin = (req, res) => {
+    if (!isValidId(req.params.userId)) return res.status(400).json({ message: "Invalid student id" });
+    req.reportUserId = req.params.userId;
+    return liveReport(req, res);
+};
+
+module.exports = { studentReportForAdmin, listLive, startLive, liveReport, liveLeaderboard, myResults, resultsOpen };

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import QuestionBody from "../../components/QuestionBody";
+import LiveReport from "../student/LiveReport";
 import Scorecard, { downloadScorecard, scorecardRows } from "../../components/Scorecard";
 import { fmtDateTime, fmtDuration } from "../../components/liveHelpers";
 
@@ -37,6 +38,17 @@ export default function AttemptDetail() {
     return (
       <AdminLayout title="Answers">
         {error ? <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : <p className="text-sm text-slate-500">Loading...</p>}
+      </AdminLayout>
+    );
+  }
+
+  // Live tests: show exactly the report the student sees
+  if (data.mode === "live" && data.testId && data.student) {
+    return (
+      <AdminLayout>
+        <div className="-mx-4 -mt-6 md:-mx-8 md:-mt-8">
+          <LiveReport testId={String(data.testId)} studentId={String(data.student._id)} backTo={`/admin/students/${data.student._id}`} backLabel={data.student.name} />
+        </div>
       </AdminLayout>
     );
   }

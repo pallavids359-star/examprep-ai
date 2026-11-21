@@ -14,6 +14,7 @@ adminRouter.get("/lecturers", head.listLecturers);
 adminRouter.post("/lecturers", head.createLecturer);
 adminRouter.put("/lecturers/:id", head.updateLecturer);
 adminRouter.get("/live-tests/pattern", head.getPattern);
+adminRouter.get("/live-tests/:id/report/:userId", student.studentReportForAdmin);
 adminRouter.get("/live-tests", head.listLiveTests);
 adminRouter.post("/live-tests", head.createLiveTest);
 adminRouter.get("/live-tests/:id", head.getLiveTest);
