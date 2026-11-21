@@ -52,86 +52,6 @@ function Trend({ tests }) {
   );
 }
 
-// Marks of one test, split by subject and by chapter
-function TestDetail({ test, reviewLink = true }) {
-  const facts = [
-    ["Correct", test.correct, "text-emerald-700"],
-    ["Wrong", test.incorrect, "text-red-700"],
-    ["Skipped", test.unanswered, "text-slate-600"],
-    ["Accuracy", `${round1(test.accuracy)}%`, "text-slate-900"],
-    ["Time", minutes(test.timeTakenSec), "text-slate-900"],
-  ];
-  return (
-    <div className="border-t border-slate-200 bg-slate-50/60 px-4 pb-5 pt-4 md:px-6">
-      <dl className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {facts.map(([k, v, c]) => (
-          <div key={k} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center">
-            <dt className="text-[11px] font-medium text-slate-500">{k}</dt>
-            <dd className={cx("font-bold tabular-nums", c)}>{v}</dd>
-          </div>
-        ))}
-      </dl>
-
-      {test.subjects.length > 0 && (
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[460px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <th className="py-2 pr-3 font-medium">Subject</th>
-                <th className="py-2 pr-3 text-right font-medium">Marks</th>
-                <th className="py-2 pr-3 text-right font-medium">Correct</th>
-                <th className="py-2 pr-3 text-right font-medium">Wrong</th>
-                <th className="py-2 pr-3 text-right font-medium">Skipped</th>
-                <th className="py-2 text-right font-medium">Accuracy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {test.subjects.map((s) => (
-                <tr key={s.name} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2.5 pr-3 font-medium text-slate-800">{s.name}</td>
-                  <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-slate-900">{s.score}</td>
-                  <td className="py-2.5 pr-3 text-right tabular-nums text-emerald-700">{s.correct}</td>
-                  <td className="py-2.5 pr-3 text-right tabular-nums text-red-700">{s.incorrect}</td>
-                  <td className="py-2.5 pr-3 text-right tabular-nums text-slate-500">{s.unanswered}</td>
-                  <td className="py-2.5 text-right"><Pct value={s.accuracy} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {test.chapters.length > 0 && (
-        <>
-          <h4 className="mt-5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Chapters</h4>
-          <ul className="mt-2 grid gap-x-8 gap-y-3 md:grid-cols-2">
-            {test.chapters.map((c) => (
-              <li key={c.subject + c.name}>
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate text-slate-800" title={c.name}>
-                    {c.name}
-                    <span className="ml-1.5 text-xs text-slate-400">{c.subject}</span>
-                  </span>
-                  <span className="shrink-0 text-xs tabular-nums text-slate-500">
-                    {c.correct}/{c.attempted} <b className={toneText(c.accuracy)}>{round1(c.accuracy)}%</b>
-                  </span>
-                </div>
-                <Bar value={c.accuracy} className="mt-1.5" />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {reviewLink && (
-        <Link to={`/result/${test.attemptId}`} className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:underline">
-        Review every question <Icon d={ICONS.arrow} className="h-4 w-4" />
-      </Link>
-      )}
-    </div>
-  );
-}
-
 // The analytics view. Used by the student's own Analytics page and, for any student,
 // by the admin's student page (historyUrl = /admin/students/:id/history).
 export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", reviewLink = true, showHeader = true }) {
@@ -225,6 +145,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
   }, [tests]);
 
   const kind = tab === "mock" ? "mock tests" : "practice tests";
+  const openTest = (tests || []).find((t) => t.attemptId === open) || null;
   const changeTab = (v) => {
     setTab(v);
     setOpen(null);
@@ -279,9 +200,14 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
         </div>
       )}
 
-      {summary && (
+      {openTest && <SessionResult t={openTest} kind={tab} onBack={() => setOpen(null)} reviewLink={reviewLink} />}
+
+      {tests && tests.length > 0 && !openTest && <SessionList tests={tests} kind={tab} onOpen={setOpen} />}
+
+      {summary && !openTest && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <h2 className="mt-10 text-sm font-semibold uppercase tracking-wider text-slate-500">Overall</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Tests taken" value={tests.length} sub={`${minutes(summary.time)} spent`} />
             <StatTile label="Average score" value={`${round1(summary.avg)}%`} sub={`Best ${round1(summary.best)}%`} />
             <StatTile label="Accuracy" value={`${round1(summary.accuracy)}%`} sub="correct of attempted" accent={toneText(summary.accuracy)} />
@@ -332,47 +258,6 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
             </Card>
           </div>
 
-          <Card className="mt-4 overflow-hidden">
-            <div className="px-5 pt-5">
-              <CardTitle hint="Tap a test to see marks by subject and chapter">
-                {tab === "mock" ? "Mock test history" : "Practice history"}
-                {subject !== "all" ? ` · ${subject}` : ""}
-              </CardTitle>
-            </div>
-            <div className="mt-3 hidden grid-cols-[1fr_110px_90px_24px] gap-3 border-y border-slate-200 bg-slate-50/70 px-5 py-2 text-xs font-medium text-slate-500 sm:grid">
-              <span>Test</span>
-              <span className="text-right">Marks</span>
-              <span className="text-right">Score</span>
-              <span />
-            </div>
-            <ul className="divide-y divide-slate-200 border-t border-slate-200 sm:border-t-0">
-              {tests.map((t) => {
-                const isOpen = open === t.attemptId;
-                return (
-                  <li key={t.attemptId}>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(isOpen ? null : t.attemptId)}
-                      aria-expanded={isOpen}
-                      className={cx("grid w-full grid-cols-[1fr_auto_auto_20px] items-center gap-3 px-5 py-3.5 text-left transition sm:grid-cols-[1fr_110px_90px_24px]", isOpen ? "bg-indigo-50/60" : "hover:bg-slate-50")}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900">{t.title}</span>
-                        <span className="block text-xs text-slate-500">
-                          {t.mode !== "practice" && t.mode !== "mock" ? `${t.kind} · ` : ""}
-                          {when(t.date)}
-                        </span>
-                      </span>
-                      <span className="text-right text-sm font-semibold tabular-nums text-slate-900">{t.score}/{t.maxScore}</span>
-                      <span className="text-right"><Pct value={t.percentage} /></span>
-                      <Icon d={ICONS.chevron} className={cx("h-5 w-5 text-slate-400 transition", isOpen && "rotate-180")} />
-                    </button>
-                    {isOpen && <TestDetail test={t} reviewLink={reviewLink} />}
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
         </>
       )}
     </div>
@@ -382,4 +267,171 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
 export default function Analytics() {
   const { examId, exam } = useExam();
   return <AnalyticsView examId={examId} exam={exam} />;
+}
+
+// ---------- Sessions: a numbered list, then one session's full result ----------
+const fullDay = (d) => new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+const timeOf = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+
+function SessionList({ tests, kind, onOpen }) {
+  const label = kind === "mock" ? "mock test" : "practice session";
+  return (
+    <section className="mt-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+        {tests.length} {label}
+        {tests.length === 1 ? "" : "s"}
+      </h2>
+      <ul className="mt-3 divide-y divide-[#efe6d2] overflow-hidden rounded-2xl bg-white ring-1 ring-[#e7dcc3]">
+        {tests.map((t, i) => (
+          <li key={t.attemptId}>
+            <button type="button" onClick={() => onOpen(t.attemptId)} className="group flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#fbf8f1]">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#f7f3ea] font-display text-lg font-extrabold text-[#b8862b]">{tests.length - i}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-slate-900">{t.title}</span>
+                <span className="block text-sm text-slate-500">
+                  {fullDay(t.date)} · {timeOf(t.date)}
+                </span>
+              </span>
+              <span className="hidden gap-4 text-center text-xs text-slate-500 sm:flex">
+                <span>
+                  <b className="block text-base text-green-700">{t.correct}</b>correct
+                </span>
+                <span>
+                  <b className="block text-base text-orange-700">{t.incorrect}</b>wrong
+                </span>
+                <span>
+                  <b className="block text-base text-slate-500">{t.unanswered}</b>skipped
+                </span>
+              </span>
+              <span className="w-24 text-right font-display text-lg font-extrabold tabular-nums text-slate-900">
+                {t.score}
+                <span className="text-xs font-medium text-slate-400"> / {t.maxScore}</span>
+              </span>
+              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-900" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SessionResult({ t, kind, onBack, reviewLink }) {
+  const attempted = t.correct + t.incorrect;
+  const total = attempted + t.unanswered;
+  const pctOf = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  return (
+    <section className="mt-6">
+      <button type="button" onClick={onBack} className="group inline-flex items-center gap-2.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[#e7dcc3] transition group-hover:bg-[#17140f] group-hover:text-[#e5c372]">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </span>
+        All {kind === "mock" ? "mock tests" : "practice sessions"}
+      </button>
+
+      <div className="mt-4 overflow-hidden rounded-3xl bg-[#17140f] text-white">
+        <div className="flex flex-wrap items-center justify-between gap-6 p-6 md:p-8">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e5c372]/80">
+              {kind === "mock" ? "Mock test" : "Practice"} · {fullDay(t.date)}
+            </p>
+            <h2 className="mt-1 text-2xl font-extrabold md:text-3xl">{t.title}</h2>
+            <p className="mt-2 text-sm text-white/60">{minutes(t.timeTakenSec)} taken · {total} questions</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-wider text-white/50">Score</p>
+            <p className="font-display text-4xl font-extrabold tabular-nums text-[#e5c372]">
+              {t.score}
+              <span className="text-lg text-white/40"> / {t.maxScore}</span>
+            </p>
+            <p className="text-sm text-white/60">{round1(t.percentage)}%</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-t border-white/10 sm:grid-cols-5">
+          {[
+            ["Attempted", attempted, "text-white"],
+            ["Correct", t.correct, "text-green-400"],
+            ["Wrong", t.incorrect, "text-orange-400"],
+            ["Skipped", t.unanswered, "text-white/80"],
+            ["Accuracy", `${round1(t.accuracy)}%`, "text-[#e5c372]"],
+          ].map(([l, v, c], i) => (
+            <div key={l} className={`px-6 py-4 ${i ? "sm:border-l sm:border-white/10" : ""}`}>
+              <p className="text-xs text-white/50">{l}</p>
+              <p className={`mt-0.5 font-display text-2xl font-extrabold tabular-nums ${c}`}>{v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {t.subjects.length > 0 && (
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {t.subjects.map((s) => {
+            const n = s.correct + s.incorrect + s.unanswered;
+            return (
+              <div key={s.name} className="rounded-2xl bg-white p-5 ring-1 ring-[#e7dcc3]">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-lg font-bold text-slate-900">{s.name}</p>
+                  <p className="font-display text-xl font-extrabold tabular-nums text-slate-900">
+                    {s.score}
+                    <span className="text-xs font-medium text-slate-400"> marks</span>
+                  </p>
+                </div>
+                <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-[#f1e9d6]">
+                  <div className="bg-green-600" style={{ width: `${pctOf(s.correct, n)}%` }} />
+                  <div className="bg-orange-500" style={{ width: `${pctOf(s.incorrect, n)}%` }} />
+                </div>
+                <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
+                  {[
+                    ["Correct", s.correct, "text-green-700"],
+                    ["Wrong", s.incorrect, "text-orange-700"],
+                    ["Skipped", s.unanswered, "text-slate-500"],
+                    ["Accuracy", `${round1(s.accuracy)}%`, "text-slate-900"],
+                  ].map(([l, v, c]) => (
+                    <div key={l}>
+                      <dd className={`font-display text-xl font-extrabold tabular-nums ${c}`}>{v}</dd>
+                      <dt className="text-[11px] text-slate-500">{l}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {t.chapters.length > 0 && (
+        <div className="mt-5 rounded-2xl bg-white p-5 ring-1 ring-[#e7dcc3]">
+          <h3 className="font-bold text-slate-900">Chapters</h3>
+          <ul className="mt-3 grid gap-x-8 gap-y-3 md:grid-cols-2">
+            {t.chapters.map((c) => (
+              <li key={c.subject + c.name}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate text-slate-800" title={c.name}>
+                    {c.name}
+                    <span className="ml-1.5 text-xs text-slate-400">{c.subject}</span>
+                  </span>
+                  <span className="shrink-0 text-xs tabular-nums text-slate-500">
+                    {c.correct}/{c.attempted} correct · <b className={toneText(c.accuracy)}>{round1(c.accuracy)}%</b>
+                  </span>
+                </div>
+                <Bar value={c.accuracy} className="mt-1.5" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {reviewLink && (
+        <div className="mt-5 flex justify-end">
+          <Link to={`/result/${t.attemptId}`} className="inline-flex items-center gap-2 rounded-xl bg-[#c9a24a] px-5 py-3 text-sm font-bold text-[#17140f] hover:bg-[#d4ae55]">
+            See every question & answer →
+          </Link>
+        </div>
+      )}
+    </section>
+  );
 }
