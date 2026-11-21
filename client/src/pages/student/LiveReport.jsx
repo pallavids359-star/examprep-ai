@@ -335,85 +335,134 @@ export default function LiveReport() {
       </section>
 
       {/* Question by question */}
-      <section id="qbq" className="gp-card mt-5 scroll-mt-6 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-slate-900">Question by question</h2>
-          <select aria-label="Subject" value={section} onChange={(e) => setSection(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
-            <option value="all">All subjects</option>
-            {data.sections.map((x) => (
-              <option key={x.name} value={x.name}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {FILTERS.map(([k, l]) => {
-            const n = k === "all" ? questions.length : k === "marked" ? questions.filter((q) => q.markedForReview).length : questions.filter((q) => q.status === k).length;
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setFilter(k)}
-                className={`rounded-full border px-3 py-1 text-sm font-medium ${filter === k ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-700"}`}
-              >
-                {l} {n}
-              </button>
-            );
-          })}
+      <section id="qbq" className="mt-6 scroll-mt-6 overflow-hidden rounded-2xl bg-white ring-1 ring-[#e7dcc3]">
+        {/* Title and filters */}
+        <div className="border-b border-[#efe6d2] px-5 pb-4 pt-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Question by question</h2>
+              <p className="text-sm text-slate-500">Tap a question to see it with your answer, the right answer and the solution.</p>
+            </div>
+            {data.sections.length > 1 && (
+              <div className="flex rounded-xl bg-[#f7f3ea] p-1 ring-1 ring-[#e7dcc3]" role="radiogroup" aria-label="Subject">
+                {["all", ...data.sections.map((x) => x.name)].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={section === n}
+                    onClick={() => setSection(n)}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${section === n ? "bg-white text-slate-900 shadow-sm ring-1 ring-[#e7dcc3]" : "text-slate-500 hover:text-slate-900"}`}
+                  >
+                    {n === "all" ? "All" : n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {FILTERS.map(([k, l]) => {
+              const n = k === "all" ? questions.length : k === "marked" ? questions.filter((q) => q.markedForReview).length : questions.filter((q) => q.status === k).length;
+              const on = filter === k;
+              const dot = { correct: "bg-green-600", wrong: "bg-orange-500", skipped: "bg-slate-400", not_visited: "bg-slate-300", marked: "bg-violet-500" }[k];
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setFilter(k)}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${on ? "bg-[#17140f] text-white" : "bg-[#fbf8f1] text-slate-600 ring-1 ring-[#efe6d2] hover:ring-[#c9a24a]"}`}
+                >
+                  {dot && <span className={`h-2 w-2 rounded-full ${dot}`} />}
+                  {l}
+                  <span className={`rounded-md px-1.5 text-xs font-semibold tabular-nums ${on ? "bg-white/15 text-[#e5c372]" : "bg-[#f1e9d6] text-slate-700"}`}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="py-2 pr-3">Q</th>
-                <th className="py-2 pr-3">Chapter · concept</th>
-                <th className="py-2 pr-3">Result</th>
-                <th className="py-2 pr-3">You</th>
-                <th className="py-2 pr-3">Correct</th>
-                <th className="py-2 pr-3">Your time</th>
-                <th className="py-2 pr-3">Batch avg</th>
-                <th className="py-2 pr-3">Got it right</th>
-                <th className="py-2">Marks</th>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr className="bg-[#fbf8f1] text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <th className="w-16 px-5 py-3">Q</th>
+                <th className="py-3 pr-3">Chapter · concept</th>
+                <th className="py-3 pr-3">Result</th>
+                <th className="py-3 pr-3">You → Correct</th>
+                <th className="py-3 pr-3">Your time</th>
+                <th className="py-3 pr-3">Batch got it right</th>
+                <th className="py-3 pr-3 text-right">Marks</th>
+                <th className="w-10 py-3 pr-5" />
               </tr>
             </thead>
             <tbody>
               {shown.map((q) => {
                 const st = STATUS[q.status];
                 const isOpen = openNo === q.number;
+                const mine = answerText(q, true);
+                const right = answerText(q, false);
+                const numBg = { correct: "bg-green-600 text-white", wrong: "bg-orange-500 text-white", skipped: "bg-slate-200 text-slate-700", not_visited: "bg-slate-100 text-slate-400" }[q.status];
                 return (
                   <FragmentRow key={q.number}>
                     <tr
                       id={`lq-${q.number}`}
                       onClick={() => setOpenNo(isOpen ? null : q.number)}
-                      className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${isOpen ? "bg-indigo-50/50" : ""}`}
+                      className={`cursor-pointer border-t border-[#f4eee0] transition hover:bg-[#fbf8f1] ${isOpen ? "bg-[#fbf8f1]" : ""}`}
                     >
-                      <td className="py-2.5 pr-3 font-semibold text-slate-700">
-                        <button type="button" aria-expanded={isOpen} className="font-semibold">
+                      <td className="px-5 py-3">
+                        <button type="button" aria-expanded={isOpen} className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-bold tabular-nums ${numBg}`}>
                           {q.number}
                         </button>
                       </td>
-                      <td className="py-2.5 pr-3 text-slate-700">
-                        <span className="text-xs text-slate-500">{q.section} · </span>
-                        {q.chapter}
-                        <span className="text-slate-500"> · {q.topic}</span>
+                      <td className="py-3 pr-3">
+                        <p className="font-medium text-slate-900">{q.chapter}</p>
+                        <p className="text-xs text-slate-500">
+                          {q.section}
+                          {q.topic && q.topic !== q.chapter ? ` · ${q.topic}` : ""}
+                        </p>
                       </td>
-                      <td className={`py-2.5 pr-3 font-semibold ${st.text}`}>
-                        {st.short}
-                        {q.markedForReview && <span className="ml-1 rounded bg-violet-50 px-1 text-xs font-medium text-violet-800">marked</span>}
+                      <td className="py-3 pr-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.chip}`}>{st.label}</span>
+                        {q.markedForReview && <span className="ml-1.5 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800">Marked</span>}
                       </td>
-                      <td className="py-2.5 pr-3 tabular-nums">{answerText(q, true)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{answerText(q, false)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{fmtDuration(q.timeSpentSec)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums text-slate-600">{q.batch ? fmtDuration(q.batch.avgTimeSec) : "—"}</td>
-                      <td className="py-2.5 pr-3 tabular-nums text-slate-600">{q.batch?.correctPct != null ? `${q.batch.correctPct}%` : "—"}</td>
-                      <td className="py-2.5 tabular-nums">{q.marksAwarded > 0 ? `+${q.marksAwarded}` : q.marksAwarded}</td>
+                      <td className="py-3 pr-3">
+                        <span className="inline-flex items-center gap-1.5 tabular-nums">
+                          <span className={`grid h-7 min-w-7 place-items-center rounded-full px-1.5 text-xs font-bold ${q.status === "correct" ? "bg-green-50 text-green-800 ring-1 ring-green-200" : q.status === "wrong" ? "bg-orange-50 text-orange-800 ring-1 ring-orange-200" : "bg-slate-50 text-slate-400 ring-1 ring-slate-200"}`}>
+                            {mine === "–" || mine === "" ? "–" : mine}
+                          </span>
+                          <span className="text-slate-300">→</span>
+                          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-[#17140f] px-1.5 text-xs font-bold text-[#e5c372]">{right}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3 tabular-nums">
+                        <p className="font-medium text-slate-900">{fmtDuration(q.timeSpentSec)}</p>
+                        {q.batch && <p className="text-xs text-slate-400">avg {fmtDuration(q.batch.avgTimeSec)}</p>}
+                      </td>
+                      <td className="py-3 pr-3">
+                        {q.batch?.correctPct != null ? (
+                          <span className="flex items-center gap-2">
+                            <span className="h-1.5 w-16 overflow-hidden rounded-full bg-[#f1e9d6]">
+                              <span className="block h-full rounded-full bg-[#c9a24a]" style={{ width: `${q.batch.correctPct}%` }} />
+                            </span>
+                            <span className="text-xs tabular-nums text-slate-600">{q.batch.correctPct}%</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className={`py-3 pr-3 text-right font-display font-extrabold tabular-nums ${q.marksAwarded > 0 ? "text-green-700" : q.marksAwarded < 0 ? "text-orange-700" : "text-slate-400"}`}>
+                        {q.marksAwarded > 0 ? `+${q.marksAwarded}` : q.marksAwarded}
+                      </td>
+                      <td className="py-3 pr-5 text-slate-400">
+                        <svg viewBox="0 0 24 24" className={`h-4 w-4 transition ${isOpen ? "rotate-90 text-slate-900" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      </td>
                     </tr>
                     {isOpen && (
                       <tr>
-                        <td colSpan={9} className="border-t border-slate-100 bg-slate-50/60 px-2 py-4">
-                          <div className="rounded-xl border border-slate-200 bg-white p-5">
+                        <td colSpan={8} className="border-t border-[#f4eee0] bg-[#fbf8f1] px-5 py-4">
+                          <div className="rounded-xl bg-white p-5 ring-1 ring-[#e7dcc3]">
                             <p className="mb-3 text-sm text-slate-600">
                               <b className="text-slate-900">Q{q.number}</b> · {preview(q.chapter, 60)} · {q.topic} · you {fmtDuration(q.timeSpentSec)}
                               {q.batch ? `, batch average ${fmtDuration(q.batch.avgTimeSec)}, ${q.batch.correctPct}% got it right` : ""}
@@ -433,9 +482,9 @@ export default function LiveReport() {
                                       setOpenNo(target.number);
                                       setTimeout(() => document.getElementById(`lq-${target.number}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
                                     }}
-                                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40"
+                                    className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-[#e7dcc3] hover:bg-[#17140f] hover:text-[#e5c372] disabled:opacity-40"
                                   >
-                                    {d < 0 ? "← Previous" : "Next →"}
+                                    {d < 0 ? "‹ Previous" : "Next ›"}
                                   </button>
                                 );
                               })}
@@ -449,7 +498,7 @@ export default function LiveReport() {
               })}
             </tbody>
           </table>
-          {shown.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No questions in this view.</p>}
+          {shown.length === 0 && <p className="py-10 text-center text-sm text-slate-500">No questions in this view.</p>}
         </div>
       </section>
 
