@@ -113,47 +113,59 @@ export default function AttemptDetail() {
       )}
 
       {/* Filters */}
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          {[
-            ["all", "All", inSection.length],
-            ["wrong", "Wrong", count("wrong")],
-            ["correct", "Correct", count("correct")],
-            ["blank", "Not answered", count("blank")],
-          ].map(([k, l, n]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setFilter(k)}
-              className={`border-b-2 pb-1 font-medium ${filter === k ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-            >
-              {l} <span className="text-slate-400">{n}</span>
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          {sections.length > 1 && (
-            <div className="flex rounded-xl bg-white p-1 ring-1 ring-[#e7dcc3]" role="radiogroup" aria-label="Subject">
-              {["all", ...sections].map((n) => (
+      <div className="sticky top-0 z-10 mt-8 rounded-2xl bg-white/95 p-2 shadow-[0_8px_24px_-16px_rgba(70,48,10,0.45)] ring-1 ring-[#e7dcc3] backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Status */}
+          <div className="flex flex-wrap gap-1">
+            {[
+              ["all", "All", inSection.length, "bg-slate-400"],
+              ["wrong", "Wrong", count("wrong"), "bg-orange-500"],
+              ["correct", "Correct", count("correct"), "bg-green-600"],
+              ["blank", "Not answered", count("blank"), "bg-slate-300"],
+            ].map(([k, l, n, dot]) => {
+              const on = filter === k;
+              return (
                 <button
-                  key={n}
+                  key={k}
                   type="button"
-                  role="radio"
-                  aria-checked={section === n}
-                  onClick={() => setSection(n)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${section === n ? "bg-[#17140f] text-[#e5c372]" : "text-slate-600 hover:text-slate-900"}`}
+                  onClick={() => setFilter(k)}
+                  className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition ${on ? "bg-[#17140f] text-white" : "text-slate-600 hover:bg-[#f7f3ea]"}`}
                 >
-                  {n === "all" ? "All subjects" : n}
+                  {k !== "all" && <span className={`h-2 w-2 rounded-full ${dot}`} />}
+                  {l}
+                  <span className={`rounded-md px-1.5 text-xs font-semibold tabular-nums ${on ? "bg-white/15 text-[#e5c372]" : "bg-[#f1e9d6] text-slate-700"}`}>{n}</span>
                 </button>
-              ))}
-            </div>
-          )}
-          <button type="button" role="switch" aria-checked={showSolutions} onClick={() => setShowSolutions((v) => !v)} className="flex items-center gap-2.5 font-medium text-slate-700">
-            <span className={`relative h-6 w-11 rounded-full transition ${showSolutions ? "bg-[#c9a24a]" : "bg-slate-300"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${showSolutions ? "left-[22px]" : "left-0.5"}`} />
-            </span>
-            Solutions
-          </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Subject */}
+            {sections.length > 1 && (
+              <div className="flex rounded-xl bg-[#f7f3ea] p-1 ring-1 ring-[#e7dcc3]" role="radiogroup" aria-label="Subject">
+                {["all", ...sections].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={section === n}
+                    onClick={() => setSection(n)}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${section === n ? "bg-white text-slate-900 shadow-sm ring-1 ring-[#e7dcc3]" : "text-slate-500 hover:text-slate-900"}`}
+                  >
+                    {n === "all" ? "All" : n}
+                  </button>
+                ))}
+              </div>
+            )}
+            <span className="hidden h-6 w-px bg-[#e7dcc3] sm:block" />
+            {/* Solutions */}
+            <button type="button" role="switch" aria-checked={showSolutions} onClick={() => setShowSolutions((v) => !v)} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-[#f7f3ea]">
+              <span className={`relative h-5 w-9 rounded-full transition ${showSolutions ? "bg-[#c9a24a]" : "bg-slate-300"}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${showSolutions ? "left-[18px]" : "left-0.5"}`} />
+              </span>
+              Solutions
+            </button>
+          </div>
         </div>
       </div>
 
