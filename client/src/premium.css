@@ -333,3 +333,14 @@ table tbody tr:hover {
   body:not(.gp-printing-card) .gp-print-card { display: none !important; }
 }
 @page { size: A4; margin: 0; }
+
+/* Result sheet: plain report look (Arial, navy header, grey/white rows), unaffected by the app theme */
+.gp-sheet, .gp-sheet * { font-family: Arial, Helvetica, sans-serif !important; letter-spacing: normal !important; }
+.gp-sheet h1 { letter-spacing: 0.02em !important; }
+.gp-sheet { background: #fff !important; }
+.gp-sheet thead th { background: #0f172a !important; color: #fff !important; font-weight: 700 !important; text-transform: uppercase; }
+.gp-sheet tbody tr.gp-row-a { background: #f3f5f8 !important; }
+.gp-sheet tbody tr.gp-row-b { background: #ffffff !important; }
+.gp-sheet tbody td { color: #475569; font-weight: 700; }
+.gp-sheet tbody td.gp-total { color: #0f172a; }
+.gp-sheet, .gp-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
