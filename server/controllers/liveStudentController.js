@@ -27,7 +27,8 @@ const FINISHED = ["submitted", "auto_submitted"];
 const isFinished = (a) => a && FINISHED.includes(a.status);
 
 // Can this student see their result yet?
-const resultsOpen = (test, now = new Date()) => test.live?.showResults === "after_submit" || now > new Date(test.availability.endsAt);
+// Students see their own result as soon as they finish (every live test)
+const resultsOpen = () => true;
 
 const shuffle = (list) => {
     const a = [...list];
@@ -87,7 +88,7 @@ const listLive = handle("listLive", async (req, res) => {
             sections: t.sections.map((s) => ({ name: s.name, questions: (s.mcqCount || 0) + (s.numericalCount || 0) })),
             startsAt,
             endsAt,
-            showResults: t.live?.showResults || "after_close",
+            showResults: "after_submit",
             state,
             attemptId: a?._id || null,
             resultsReady: open,
@@ -194,7 +195,7 @@ const liveReport = handle("liveReport", async (req, res) => {
         durationMinutes: test.durationMinutes,
         totalMarks: test.totalMarks,
         markingScheme: test.markingScheme,
-        showResults: test.live?.showResults || "after_close",
+        showResults: "after_submit",
         closed,
     };
 

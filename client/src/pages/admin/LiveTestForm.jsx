@@ -87,7 +87,7 @@ export default function LiveTestForm() {
   const [split, setSplit] = useState(false);
   const [rows, setRows] = useState([]); // { key, name, include, picker, lecturerId, mcqCount, numericalCount }
   const [editCounts, setEditCounts] = useState(false);
-  const [showResults, setShowResults] = useState("after_close");
+  const [showResults, setShowResults] = useState("after_submit"); // students see their result as soon as they finish
   const [college, setCollege] = useState(""); // "" = every student
   const [audSections, setAudSections] = useState([]); // none = all sections
   const [loadedSections, setLoadedSections] = useState(null);
@@ -126,7 +126,7 @@ export default function LiveTestForm() {
         setCustomEnd(toLocalInput(t.endsAt));
         setDuration(t.durationMinutes);
         setSplit(Boolean(t.live?.splitBiology));
-        setShowResults(t.live?.showResults || "after_close");
+
         setCollege(t.live?.college || "");
         setAudSections(t.live?.sections || []);
         setLoadedSections(t.sections);
@@ -212,7 +212,7 @@ export default function LiveTestForm() {
       endsAt: endsAt.toISOString(),
       durationMinutes: Number(duration),
       splitBiology: split,
-      showResults,
+      showResults: "after_submit",
       shuffle: true,
       college,
       audienceSections: college ? audSections : [],
@@ -351,13 +351,13 @@ export default function LiveTestForm() {
         {/* 2. Questions */}
         {pattern && (
           <section className="gp-card space-y-4 p-6">
-            <Step n={3} title="Who sets the questions?" hint="For the whole test, or subject by subject below" right={<span className="gp-chip">{totalQs} questions</span>} />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <Step n={3} title="Who sets the questions?" right={<span className="gp-chip">{totalQs} questions</span>} />
+            <div className="grid grid-cols-3 gap-3">
               {[
-                ["me", "I'll set it myself", "As admin, you pick every subject's questions", "A"],
-                ["lecturer", "Give to lecturers", "Each subject's lecturer picks and sends it", "L"],
-                ["auto", "Auto-pick everything", "GenPrep fills all subjects now; change any later", "⚡"],
-              ].map(([v, l, hint, icon]) => {
+                ["me", "Myself"],
+                ["lecturer", "Lecturer"],
+                ["auto", "Auto"],
+              ].map(([v, l]) => {
                 const all = included.length > 0 && included.every((r) => r.picker === v);
                 return (
                   <button
@@ -371,18 +371,13 @@ export default function LiveTestForm() {
                         )
                       )
                     }
-                    className="gp-tile flex items-start gap-3 p-4 text-left"
+                    className={`rounded-2xl border px-4 py-4 text-center text-base font-bold transition ${all ? "border-[#17140f] bg-[#17140f] text-[#e5c372] shadow-lg shadow-black/10" : "border-[#e7dcc3] bg-white text-slate-800 hover:border-[#c9a24a]"}`}
                   >
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl font-display text-sm font-extrabold ${all ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-800"}`}>{icon}</span>
-                    <span className="min-w-0">
-                      <span className="block font-bold text-slate-900">{l}</span>
-                      <span className="block text-xs text-slate-500">{hint}</span>
-                    </span>
+                    {l}
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Or choose per subject</p>
             {pattern.canSplitBiology && (
               <label className="flex items-center gap-3 text-sm text-slate-800">
                 <input type="checkbox" className="h-4 w-4 accent-amber-600" checked={split} onChange={(e) => setSplit(e.target.checked)} />
@@ -400,14 +395,8 @@ export default function LiveTestForm() {
                         · {r.mcqCount} MCQ{Number(r.numericalCount) ? ` + ${r.numericalCount} numerical` : ""}
                       </span>
                     </label>
-                    {r.include && (
-                      <div className="flex gap-1.5" role="group" aria-label={`Who picks ${r.name} questions`}>
-                        {PICKERS.map(([v, l, hint]) => (
-                          <button key={v} type="button" title={hint} aria-pressed={r.picker === v} className="gp-tile px-3 py-1.5 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setRow(r.key, { picker: v, ...(v === "lecturer" && !r.lecturerId ? { lecturerId: lecturersFor(lecturers, r.key).match[0]?._id || "" } : {}) })}>
-                            {l}
-                          </button>
-                        ))}
-                      </div>
+                    {r.include && !included.every((x) => x.picker === r.picker) && (
+                      <span className="text-xs font-semibold text-slate-500">{r.picker === "me" ? "Myself" : r.picker === "lecturer" ? "Lecturer" : "Auto"}</span>
                     )}
                   </div>
                   {r.include && r.picker === "lecturer" && (
@@ -421,7 +410,7 @@ export default function LiveTestForm() {
                       <Link to="/admin/lecturers" className="font-semibold underline">
                         Add one
                       </Link>{" "}
-                      or choose Auto / Me.
+                      or choose Myself / Auto.
                     </p>
                   )}
                   {r.include && editCounts && (
@@ -440,7 +429,6 @@ export default function LiveTestForm() {
               ))}
             </div>
             <p className="text-sm text-slate-500">
-              <b>Auto</b> picks a mix from the whole syllabus right away, including diagram questions; you can change them later.{" "}
               <button type="button" className="font-semibold text-amber-800 hover:underline" onClick={() => setEditCounts((v) => !v)}>
                 {editCounts ? "Hide question counts" : "Change number of questions"}
               </button>
@@ -448,22 +436,9 @@ export default function LiveTestForm() {
           </section>
         )}
 
-        {/* 3. Results */}
-        <section className="gp-card space-y-4 p-6">
-          <Step n={4} title="When do students see their result?" />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" aria-pressed={showResults === "after_close"} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setShowResults("after_close")}>
-              After the test closes (with rank)
-            </button>
-            <button type="button" aria-pressed={showResults === "after_submit"} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50" onClick={() => setShowResults("after_submit")}>
-              Right after they submit
-            </button>
-          </div>
-        </section>
-
         {/* 5. Who */}
         <section className="gp-card space-y-4 p-6">
-          <Step n={5} title="Who can write it?" hint="Students only see tests meant for their college and section" />
+          <Step n={4} title="Who can write it?" hint="Students only see tests meant for their college and section" />
           <div className="flex flex-wrap gap-2">
             {[["", "All students"], ...[...new Set(["MB PU", ...(pattern?.colleges || []), ...(college ? [college] : [])])].map((c) => [c, c])].map(([v, l]) => (
               <button
@@ -524,7 +499,6 @@ export default function LiveTestForm() {
                   ["Closes", endsAt && startsAt && endsAt > startsAt ? fmtDateTime(endsAt) : "—"],
                   ["Length", duration ? fmtDuration(Number(duration) * 60) : "—"],
                   ["Questions", totalQs || "—"],
-                  ["Results", showResults === "after_close" ? "After it closes" : "Right after submit"],
                   ["Students", college ? `${college} · ${audSections.length ? `Sec ${audSections.join(", ")}` : "All sections"}` : "All students"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3 border-b border-white/10 pb-2">

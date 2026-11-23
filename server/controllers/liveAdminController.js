@@ -272,7 +272,7 @@ const buildDetails = async (body, exam, existing, me) => {
         sections,
         live: {
             splitBiology,
-            showResults: body.showResults === "after_submit" ? "after_submit" : "after_close",
+            showResults: "after_submit",
             shuffle: body.shuffle !== false,
             college: String(body.college || "").trim().slice(0, 120),
             sections: String(body.college || "").trim() ? [...new Set((body.audienceSections || []).map((x) => String(x).toUpperCase()))].filter((x) => ["A", "B", "C", "D"].includes(x)) : [],
