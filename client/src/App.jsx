@@ -44,6 +44,9 @@ const LecturerAssignments = lazy(() => import("./pages/lecturer/Assignments"));
 const AssignmentForm = lazy(() => import("./pages/lecturer/AssignmentForm"));
 const AssignmentReview = lazy(() => import("./pages/lecturer/AssignmentReview"));
 const StudentAssignments = lazy(() => import("./pages/student/Assignments"));
+const GuidePage = lazy(() => import("./components/GuidePage"));
+const AdminLayoutL = lazy(() => import("./components/AdminLayout"));
+const LecturerLayoutL = lazy(() => import("./components/LecturerLayout"));
 const LiveTests = lazy(() => import("./pages/student/LiveTests"));
 const LiveReport = lazy(() => import("./pages/student/LiveReport"));
 const MyResults = lazy(() => import("./pages/student/MyResults"));
@@ -80,6 +83,7 @@ export default function App() {
         <Route path="/live-tests/:id/leaderboard" element={<Navigate to="/results" replace />} />
         <Route path="/results" element={<MyResults />} />
         <Route path="/assignments" element={<StudentAssignments />} />
+        <Route path="/guide" element={<GuidePage role="student" />} />
         <Route path="/revise" element={<Revise />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />
@@ -102,6 +106,7 @@ export default function App() {
       <Route path="/admin/attempts/:id" element={adminOnly(<AttemptDetail />)} />
       <Route path="/admin/results" element={adminOnly(<Results />)} />
       <Route path="/admin/lecturers" element={adminOnly(<Lecturers />)} />
+      <Route path="/admin/guide" element={adminOnly(<AdminLayoutL><GuidePage role="admin" /></AdminLayoutL>)} />
       <Route path="/admin/live-tests" element={adminOnly(<LiveTestsAdmin />)} />
       <Route path="/admin/live-tests/new" element={adminOnly(<LiveTestForm />)} />
       <Route path="/admin/live-tests/:id" element={adminOnly(<LiveTestReview />)} />
@@ -112,6 +117,7 @@ export default function App() {
       <Route path="/lecturer" element={lecturerOnly(<LecturerHome />)} />
       <Route path="/lecturer/tests/:id/:key" element={lecturerOnly(<PickQuestions />)} />
       <Route path="/lecturer/assignments" element={lecturerOnly(<LecturerAssignments />)} />
+      <Route path="/lecturer/guide" element={lecturerOnly(<LecturerLayoutL><GuidePage role="lecturer" /></LecturerLayoutL>)} />
       <Route path="/lecturer/assignments/new" element={lecturerOnly(<AssignmentForm />)} />
       <Route path="/lecturer/assignments/:id" element={lecturerOnly(<AssignmentReview />)} />
 

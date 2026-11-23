@@ -11,6 +11,7 @@ const LINKS = [
   { to: "/lecturer/assignments", label: "Assignments", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4" },
   { to: "/admin/results", label: "Results", icon: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3" },
   { to: "/admin/lecturers", label: "Lecturers", icon: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" },
+  { to: "/admin/guide", label: "User guide", icon: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4.5M12 17.5h.01" },
   { to: "/admin/students", label: "Students", icon: "M16 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1M9 10a3 3 0 100-6 3 3 0 000 6zM22 19v-1a4 4 0 00-3-3.9M16 4.1a3 3 0 010 5.8" },
 ];
 
@@ -27,6 +28,7 @@ const GROUPS = [
   ["Content", ["/admin/questions", "/admin/syllabus"]],
   ["Tests", ["/admin/tests", "/admin/live-tests", "/lecturer/assignments", "/admin/results"]],
   ["People", ["/admin/students", "/admin/lecturers"]],
+  ["Help", ["/admin/guide"]],
 ];
 
 function Sidebar({ onNavigate }) {

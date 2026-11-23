@@ -40,6 +40,11 @@ function Sidebar({ onNavigate }) {
           <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4" />
           Assignments
         </NavLink>
+        <p className="gp-label px-3 pb-1.5 pt-4">Help</p>
+        <NavLink to={isAdmin ? "/admin/guide" : "/lecturer/guide"} className={link} onClick={onNavigate}>
+          <Icon d="M12 21a9 9 0 100-18 9 9 0 000 18zM9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4.5M12 17.5h.01" />
+          User guide
+        </NavLink>
         {isAdmin && (
           <NavLink to="/admin" className={link} onClick={onNavigate}>
             <Icon d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />
