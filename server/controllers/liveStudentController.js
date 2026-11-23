@@ -8,6 +8,7 @@ const Question = require("../models/Question");
 const Subject = require("../models/Subject");
 const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
+const { buildReport, loadQuestions, questionBody } = require("../utils/attemptReport");
 const { finalizeAttempt, isExpired, computeRank } = require("../utils/finalizeAttempt");
 const { liveResultsOf } = require("../utils/liveResults");
 
@@ -162,22 +163,7 @@ const startLive = handle("startLive", async (req, res) => {
 });
 
 // Per-question numbers across everyone who finished: average time and % right
-const batchStats = async (testId) => {
-    const rows = await TestAttempt.aggregate([
-        { $match: { testId, status: { $in: FINISHED } } },
-        { $unwind: "$answers" },
-        {
-            $group: {
-                _id: "$answers.questionId",
-                takers: { $sum: 1 },
-                avgTime: { $avg: "$answers.timeSpentSec" },
-                answered: { $sum: { $cond: [{ $ne: ["$answers.isCorrect", null] }, 1, 0] } },
-                correct: { $sum: { $cond: [{ $eq: ["$answers.isCorrect", true] }, 1, 0] } },
-            },
-        },
-    ]);
-    return new Map(rows.map((r) => [String(r._id), r]));
-};
+
 
 // GET /api/live-tests/:id/report
 const liveReport = handle("liveReport", async (req, res) => {
@@ -210,30 +196,6 @@ const liveReport = handle("liveReport", async (req, res) => {
 
     const sectionOf = new Map();
     test.sections.forEach((s) => s.questionIds.forEach((id) => sectionOf.set(String(id), s.name)));
-    const loadQuestions = async (ids) => {
-        const qs = await Question.find({ _id: { $in: ids } })
-            .select("type text images options explanation chapterId topicId subjectId +correctOptionIds +numericalAnswer")
-            .lean();
-        const [chapters, topics] = await Promise.all([
-            Chapter.find({ _id: { $in: qs.map((q) => q.chapterId) } }).select("name").lean(),
-            Topic.find({ _id: { $in: qs.map((q) => q.topicId) } }).select("name").lean(),
-        ]);
-        const cName = new Map(chapters.map((c) => [String(c._id), c.name]));
-        const tName = new Map(topics.map((t) => [String(t._id), t.name]));
-        return new Map(qs.map((q) => [String(q._id), { ...q, chapter: cName.get(String(q.chapterId)) || "", topic: tName.get(String(q.topicId)) || "" }]));
-    };
-    const questionBody = (q) => ({
-        type: q.type,
-        text: q.text,
-        images: q.images || [],
-        options: q.options || [],
-        chapter: q.chapter,
-        topic: q.topic,
-        correctOptionIds: q.correctOptionIds || [],
-        correctNumericalValue: q.type === "numerical" ? q.numericalAnswer?.value ?? null : null,
-        explanation: q.explanation || null,
-    });
-
     // Never started
     if (!attempt) {
         if (!closed || asAdmin) throw userError(asAdmin ? "This student has not taken this test" : "You have not taken this test yet", 404);
@@ -256,89 +218,8 @@ const liveReport = handle("liveReport", async (req, res) => {
     }
 
     // Full report
-    const [qs, stats, rank, subjects] = await Promise.all([
-        loadQuestions(attempt.answers.map((a) => a.questionId)),
-        batchStats(test._id),
-        computeRank(attempt),
-        Subject.find({ _id: { $in: test.sections.map((s) => s.subjectId) } }).select("name").lean(),
-    ]);
-    const subjectName = new Map(subjects.map((s) => [String(s._id), s.name]));
-
-    const questions = attempt.answers.map((a, i) => {
-        const q = qs.get(String(a.questionId));
-        const st = stats.get(String(a.questionId));
-        const answered = a.isCorrect !== null && a.isCorrect !== undefined;
-        const visited = a.visited || a.timeSpentSec > 0 || answered;
-        const status = a.isCorrect === true ? "correct" : a.isCorrect === false ? "wrong" : visited ? "skipped" : "not_visited";
-        return {
-            number: i + 1,
-            questionId: a.questionId,
-            section: sectionOf.get(String(a.questionId)) || subjectName.get(String(a.subjectId)) || "",
-            status,
-            markedForReview: a.markedForReview,
-            selectedOptionIds: a.selectedOptionIds,
-            numericalValue: a.numericalValue ?? null,
-            marksAwarded: a.marksAwarded,
-            timeSpentSec: a.timeSpentSec || 0,
-            batch: st ? { avgTimeSec: Math.round(st.avgTime || 0), correctPct: st.takers ? Math.round((st.correct / st.takers) * 1000) / 10 : null, takers: st.takers } : null,
-            ...(q ? questionBody(q) : { text: "(this question was removed)", options: [], images: [] }),
-        };
-    });
-
-    // Per section: marks, counts, time and weakest chapter
-    const sections = test.sections.map((s) => {
-        const list = questions.filter((q) => q.section === s.name);
-        const byChapter = new Map();
-        list.forEach((q) => {
-            if (!q.chapter) return;
-            const c = byChapter.get(q.chapter) || { name: q.chapter, correct: 0, total: 0 };
-            c.total += 1;
-            if (q.status === "correct") c.correct += 1;
-            byChapter.set(q.chapter, c);
-        });
-        const weakest = [...byChapter.values()].filter((c) => c.total >= 2).sort((a, b) => a.correct / a.total - b.correct / b.total)[0] || null;
-        const maxScore = list.length * (test.markingScheme.correct ?? 4);
-        return {
-            name: s.name,
-            questions: list.length,
-            score: list.reduce((a, q) => a + (q.marksAwarded || 0), 0),
-            maxScore,
-            correct: list.filter((q) => q.status === "correct").length,
-            wrong: list.filter((q) => q.status === "wrong").length,
-            skipped: list.filter((q) => q.status === "skipped").length,
-            notVisited: list.filter((q) => q.status === "not_visited").length,
-            timeSec: list.reduce((a, q) => a + q.timeSpentSec, 0),
-            weakestChapter: weakest,
-        };
-    });
-
-    const r = attempt.result || {};
-    res.json({
-        test: head,
-        state: "ready",
-        ...(asAdmin ? { student: await User.findById(viewerId).select("name email").lean() } : {}),
-        attemptId: attempt._id,
-        startedAt: attempt.startedAt,
-        submittedAt: attempt.submittedAt,
-        autoSubmitted: attempt.status === "auto_submitted",
-        summary: {
-            score: r.score,
-            maxScore: r.maxScore,
-            percentage: r.percentage,
-            accuracy: r.accuracy,
-            correct: questions.filter((q) => q.status === "correct").length,
-            wrong: questions.filter((q) => q.status === "wrong").length,
-            skipped: questions.filter((q) => q.status === "skipped").length,
-            notVisited: questions.filter((q) => q.status === "not_visited").length,
-            marked: questions.filter((q) => q.markedForReview).length,
-            markedAnswered: questions.filter((q) => q.markedForReview && (q.status === "correct" || q.status === "wrong")).length,
-            timeTakenSec: r.timeTakenSec || 0,
-            negativeMarks: questions.filter((q) => q.status === "wrong").reduce((a, q) => a + (q.marksAwarded || 0), 0),
-        },
-        rank,
-        sections,
-        questions,
-    });
+    const report = await buildReport(attempt, { test, head });
+    res.json({ ...report, ...(asAdmin ? { student: await User.findById(viewerId).select("name email").lean() } : {}) });
 });
 
 // GET /api/live-tests/my-results   (all my live tests, by exam)

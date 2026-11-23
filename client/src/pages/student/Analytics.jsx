@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import { useExam } from "../../context/ExamContext";
 import { Bone } from "../../components/Skeleton";
@@ -58,6 +58,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
   const [tab, setTab] = useState("practice");
   const [data, setData] = useState({}); // tab -> tests
   const [open, setOpen] = useState(null);
+  const navigate = useNavigate();
   const [subject, setSubject] = useState("all");
   const [error, setError] = useState("");
 
@@ -202,7 +203,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
 
       {openTest && <SessionResult t={openTest} kind={tab} onBack={() => setOpen(null)} reviewLink={reviewLink} />}
 
-      {tests && tests.length > 0 && !openTest && <SessionList tests={tests} kind={tab} onOpen={setOpen} />}
+      {tests && tests.length > 0 && !openTest && <SessionList tests={tests} kind={tab} onOpen={(attemptId) => (reviewLink ? navigate(`/result/${attemptId}`) : setOpen(attemptId))} />}
 
       {summary && !openTest && (
         <>

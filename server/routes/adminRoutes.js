@@ -50,6 +50,7 @@ router.get("/students/:id", admin.getStudent);
 router.get("/students/:id/history", admin.getStudentHistory);
 router.get("/students/:id/attempts", attempts.listStudentAttempts);
 router.get("/students/:id/live-results", attempts.studentLiveResults);
+router.get("/attempts/:id/report", require("../controllers/reportController").adminReport);
 router.get("/attempts/:id", attempts.getAttemptDetail);
 router.put("/students/:id/status", admin.setStudentStatus);
 

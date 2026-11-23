@@ -20,6 +20,7 @@ router.post("/wrong-answers", startWrongAnswerPractice);
 router.post("/bookmarks", startBookmarkPractice);
 router.put("/:id/answers", saveAnswers); // autosave
 router.post("/:id/submit", submitAttempt);
+router.get("/:id/report", require("../controllers/reportController").myReport);
 router.get("/:id", getAttempt);
 
 module.exports = router;

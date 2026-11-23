@@ -30,11 +30,13 @@ const answerText = (q, mine) => {
   return ids.length ? ids.join(", ") : "–";
 };
 
-// Also used by the admin to see one student's report: pass studentId (and the page's own back link).
-export default function LiveReport({ testId, studentId, backTo, backLabel } = {}) {
+// One result page for every kind of test (live, mock, practice, assignment), for students and admins.
+//   live test by test id: testId (+ studentId for the admin)
+//   any attempt:          attemptId (+ asAdmin for the admin)
+export default function LiveReport({ testId, studentId, attemptId, asAdmin = false, backTo, backLabel } = {}) {
   const params = useParams();
   const id = testId || params.id;
-  const admin = Boolean(studentId);
+  const admin = Boolean(studentId) || asAdmin;
   const { user: me } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -45,13 +47,21 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
 
   useEffect(() => {
     api
-      .get(admin ? `/admin/live-tests/${id}/report/${studentId}` : `/live-tests/${id}/report`)
+      .get(
+        attemptId
+          ? admin
+            ? `/admin/attempts/${attemptId}/report`
+            : `/attempts/${attemptId}/report`
+          : admin
+            ? `/admin/live-tests/${id}/report/${studentId}`
+            : `/live-tests/${id}/report`
+      )
       .then((res) => {
         setData(res.data);
         if (res.data.sections?.length) setChartSection(res.data.sections[0].name);
       })
       .catch((err) => setError(getErrorMessage(err)));
-  }, [id, admin, studentId]);
+  }, [id, admin, studentId, attemptId]);
 
   const questions = useMemo(() => data?.questions || [], [data]);
   const shown = useMemo(
@@ -76,9 +86,19 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
   if (!data) return <p className="px-4 py-10 text-center text-sm text-slate-500">Loading your report...</p>;
 
   const t = data.test;
-  const back = (
-    <BackLink to={backTo || "/live-tests"}>{backLabel || "Live tests"}</BackLink>
-  );
+  const kind = data.kind || "live";
+  const isLive = kind === "live";
+  let [defTo, defLabel] = {
+    live: ["/results", "My results"],
+    mock: ["/mock-tests", "Mock tests"],
+    assignment: ["/assignments", "Assignments"],
+  }[kind] || ["/analytics", "Analytics"];
+  if (admin && data.student?._id) {
+    defTo = `/admin/students/${data.student._id}`;
+    defLabel = data.student.name;
+  }
+  const back = <BackLink to={backTo || defTo}>{backLabel || defLabel}</BackLink>;
+  const hasBatch = (data.questions || []).some((q) => q.batch);
 
   if (data.state === "in_progress") {
     return (
@@ -146,7 +166,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
       <section className="gp-hero mt-4 p-6 md:p-8">
         <div className="relative flex flex-wrap items-center justify-between gap-8">
           <div className="min-w-0 max-w-xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">{admin && data.student ? `${data.student.name} · live test report` : "Live test report"}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">{admin && data.student ? `${data.student.name} · ${(data.kindLabel || "Live test").toLowerCase()} report` : `${data.kindLabel || "Live test"} report`}</p>
             <h1 className="mt-2 text-2xl font-extrabold text-white md:text-3xl">{t.title}</h1>
             <p className="gp-muted mt-2 text-sm">
               Taken {fmtDateTime(data.startedAt)} – {fmtDateTime(data.submittedAt)}
@@ -172,7 +192,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
             </div>
             {r && <p className="mt-3 text-sm text-amber-100/80">{admin ? "Did" : "You did"} better than {r.percentile}% of everyone who took it.</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              {admin && (
+              {admin && isLive && (
                 <Link to={`/admin/live-tests/${t._id}/results`} className="gp-gold-btn inline-block px-5 py-2.5 text-sm">
                   See the leaderboard →
                 </Link>
@@ -397,7 +417,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
                 <th className="py-3 pr-3">Result</th>
                 <th className="py-3 pr-3">You → Correct</th>
                 <th className="py-3 pr-3">Your time</th>
-                <th className="py-3 pr-3">Batch got it right</th>
+                {hasBatch && <th className="py-3 pr-3">Batch got it right</th>}
                 <th className="py-3 pr-3 text-right">Marks</th>
                 <th className="w-10 py-3 pr-5" />
               </tr>
@@ -445,7 +465,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
                         <p className="font-medium text-slate-900">{fmtDuration(q.timeSpentSec)}</p>
                         {q.batch && <p className="text-xs text-slate-400">avg {fmtDuration(q.batch.avgTimeSec)}</p>}
                       </td>
-                      <td className="py-3 pr-3">
+                      {hasBatch && <td className="py-3 pr-3">
                         {q.batch?.correctPct != null ? (
                           <span className="flex items-center gap-2">
                             <span className="h-1.5 w-16 overflow-hidden rounded-full bg-[#f1e9d6]">
@@ -456,7 +476,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
-                      </td>
+                      </td>}
                       <td className={`py-3 pr-3 text-right font-display font-extrabold tabular-nums ${q.marksAwarded > 0 ? "text-green-700" : q.marksAwarded < 0 ? "text-orange-700" : "text-slate-400"}`}>
                         {q.marksAwarded > 0 ? `+${q.marksAwarded}` : q.marksAwarded}
                       </td>
@@ -511,7 +531,7 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
 
       <Scorecard
         title={t.title}
-        exam={t.exam}
+        exam={[t.exam, isLive ? "" : data.kindLabel].filter(Boolean).join(" · ")}
         date={data.submittedAt || data.startedAt}
         name={(admin ? data.student : me)?.name}
         idLabel={(admin ? data.student : me)?.rollNo ? "Roll number" : "Email"}
