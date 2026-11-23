@@ -49,38 +49,47 @@ export default function ManageStudents() {
 
     return (
         <AdminLayout title="Students">
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-                <div className="inline-flex flex-wrap rounded-2xl bg-[#f3ecdc] p-1.5" role="tablist" aria-label="College">
-                    {[["", "Overall students"], ...colleges.map((c) => [c, c])].map(([v, l]) => (
-                        <button
-                            key={v || "all"}
-                            role="tab"
-                            aria-selected={college === v}
-                            onClick={() => {
-                                setCollege(v);
-                                setSection("");
-                            }}
-                            className={`rounded-xl px-4 py-2 text-sm font-bold transition ${college === v ? "bg-[#17140f] text-[#e5c372] shadow" : "text-slate-600 hover:text-slate-900"}`}
-                        >
-                            {l}
-                        </button>
-                    ))}
-                </div>
-                {college && (
-                    <div className="inline-flex rounded-2xl bg-white p-1.5 ring-1 ring-[#e7dcc3]" aria-label="Section">
-                        {["", "A", "B", "C", "D"].map((x) => (
-                            <button
-                                key={x || "all"}
-                                onClick={() => setSection(x)}
-                                aria-pressed={section === x}
-                                className={`rounded-xl px-3.5 py-1.5 text-sm font-bold transition ${section === x ? "bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f]" : "text-slate-600 hover:text-slate-900"}`}
-                            >
-                                {x ? `Sec ${x}` : "All sections"}
-                            </button>
+            <div className="mt-6 flex flex-wrap items-end gap-3">
+                <label className="block">
+                    <span className="gp-label">College</span>
+                    <select
+                        value={college}
+                        onChange={(e) => {
+                            setCollege(e.target.value);
+                            setSection("");
+                        }}
+                        className="mt-1.5 block min-w-[13rem] rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30"
+                    >
+                        <option value="">All students</option>
+                        {colleges.map((c) => (
+                            <option key={c} value={c}>
+                                {c}
+                            </option>
                         ))}
-                    </div>
+                    </select>
+                </label>
+                {college.toLowerCase() === "mb pu" && (
+                    <label className="block">
+                        <span className="gp-label">Section</span>
+                        <select
+                            value={section}
+                            onChange={(e) => setSection(e.target.value)}
+                            className="mt-1.5 block min-w-[10rem] rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30"
+                        >
+                            <option value="">All sections</option>
+                            {["A", "B", "C", "D"].map((x) => (
+                                <option key={x} value={x}>
+                                    Section {x}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
                 )}
-                {!loading && <span className="ml-auto text-sm text-slate-500"><b className="text-slate-900">{students.length}</b> student{students.length === 1 ? "" : "s"}</span>}
+                {!loading && (
+                    <span className="ml-auto pb-2.5 text-sm text-slate-500">
+                        <b className="text-slate-900">{students.length}</b> student{students.length === 1 ? "" : "s"}
+                    </span>
+                )}
             </div>
             <form onSubmit={runSearch} className="mt-4 flex gap-2 max-w-md">
                 <input
