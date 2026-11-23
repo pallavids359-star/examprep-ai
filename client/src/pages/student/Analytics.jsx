@@ -205,62 +205,6 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
 
       {tests && tests.length > 0 && !openTest && <SessionList tests={tests} kind={tab} onOpen={(attemptId) => (reviewLink ? navigate(`/result/${attemptId}`) : setOpen(attemptId))} />}
 
-      {summary && !openTest && (
-        <>
-          <h2 className="mt-10 text-sm font-semibold uppercase tracking-wider text-slate-500">Overall</h2>
-          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatTile label="Tests taken" value={tests.length} sub={`${minutes(summary.time)} spent`} />
-            <StatTile label="Average score" value={`${round1(summary.avg)}%`} sub={`Best ${round1(summary.best)}%`} />
-            <StatTile label="Accuracy" value={`${round1(summary.accuracy)}%`} sub="correct of attempted" accent={toneText(summary.accuracy)} />
-            <StatTile label="Questions answered" value={summary.attempted} sub={`${summary.correct} correct`} />
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-5">
-            <Card className="p-5 lg:col-span-3">
-              <CardTitle hint="Score % of your recent tests">Score trend</CardTitle>
-              <Trend tests={tests} />
-            </Card>
-            <Card className="p-5 lg:col-span-2">
-              {subject === "all" && summary.subjects.length > 1 ? (
-                <>
-                  <CardTitle hint="Correct out of attempted">Accuracy by subject</CardTitle>
-                  <div className="mt-4 space-y-4">
-                    {summary.subjects.map((s) => (
-                      <div key={s.name}>
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium text-slate-800">{s.name}</span>
-                          <span className="tabular-nums text-slate-500">{s.correct}/{s.attempted} <b className={toneText(s.accuracy)}>{round1(s.accuracy)}%</b></span>
-                        </div>
-                        <Bar value={s.accuracy} className="mt-1.5" />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <CardTitle hint="Lowest accuracy first">Chapters to work on</CardTitle>
-                  {summary.weakest.length === 0 ? (
-                    <p className="mt-4 text-sm text-slate-500">Answer a few more questions per chapter to see this.</p>
-                  ) : (
-                    <ul className="mt-4 space-y-3">
-                      {summary.weakest.map((c) => (
-                        <li key={c.subject + c.name}>
-                          <div className="flex items-baseline justify-between gap-3 text-sm">
-                            <span className="min-w-0 truncate text-slate-800" title={c.name}>{c.name}</span>
-                            <b className={cx("shrink-0 text-xs tabular-nums", toneText(c.accuracy))}>{round1(c.accuracy)}%</b>
-                          </div>
-                          <Bar value={c.accuracy} className="mt-1.5" />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
-            </Card>
-          </div>
-
-        </>
-      )}
     </div>
   );
 }
