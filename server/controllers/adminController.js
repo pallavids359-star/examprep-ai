@@ -137,7 +137,7 @@ const listStudents = handle("listStudents", async (req, res) => {
     const students = await User.find(filter)
         .sort({ createdAt: -1 })
         .limit(100)
-        .select("name email status createdAt lastLoginAt")
+        .select("name email college section status createdAt lastLoginAt")
         .lean();
 
     const counts = await TestAttempt.aggregate([
@@ -153,7 +153,7 @@ const listStudents = handle("listStudents", async (req, res) => {
 const getStudent = handle("getStudent", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid student id");
     const student = await User.findOne({ _id: req.params.id, role: "student" })
-        .select("name email status createdAt lastLoginAt")
+        .select("name email college section status createdAt lastLoginAt")
         .lean();
     if (!student) throw userError("Student not found", 404);
 

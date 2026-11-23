@@ -4,11 +4,16 @@ import { useAuth } from "../../context/AuthContext";
 import AuthShell from "../../components/AuthShell";
 import { getErrorMessage } from "../../api/axios";
 
+// The college list: MB PU first (the default), then others. Section A-D is asked only for MB PU.
+const DEFAULT_COLLEGE = "MB PU";
+const COLLEGES = [DEFAULT_COLLEGE, "Other"];
+
 export default function Register() {
     const { register, user } = useAuth();
     const navigate = useNavigate();
 
-    const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+    const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", college: DEFAULT_COLLEGE, otherCollege: "", section: "" });
+    const isMB = form.college === DEFAULT_COLLEGE;
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
@@ -21,6 +26,15 @@ export default function Register() {
         setError("");
 
         // Check these here first, so the user gets instant feedback
+        const college = form.college === "Other" ? form.otherCollege.trim() : form.college;
+        if (!college) {
+            setError("Please type your college name");
+            return;
+        }
+        if (isMB && !form.section) {
+            setError("Please choose your section");
+            return;
+        }
         if (form.password.length < 6) {
             setError("Password must be at least 6 characters");
             return;
@@ -32,7 +46,7 @@ export default function Register() {
 
         setSubmitting(true);
         try {
-            await register(form.name, form.email, form.password);
+            await register(form.name, form.email, form.password, { college, section: isMB ? form.section : undefined });
             navigate("/dashboard");
         } catch (err) {
             setError(getErrorMessage(err));
@@ -60,6 +74,52 @@ export default function Register() {
                         </label>
                         <input id="name" name="name" required value={form.name} onChange={handleChange} className={inputClass} />
                     </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="college">
+                            College name
+                        </label>
+                        <select id="college" name="college" value={form.college} onChange={(e) => setForm({ ...form, college: e.target.value, section: "" })} className={inputClass}>
+                            {COLLEGES.map((c) => (
+                                <option key={c} value={c}>
+                                    {c === "Other" ? "Other college (type the name)" : c}
+                                </option>
+                            ))}
+                        </select>
+                        {form.college === "Other" && (
+                            <input
+                                name="otherCollege"
+                                required
+                                placeholder="Your college name"
+                                value={form.otherCollege}
+                                onChange={handleChange}
+                                className={`${inputClass} mt-2`}
+                                maxLength={120}
+                            />
+                        )}
+                    </div>
+
+                    {isMB && (
+                        <div>
+                            <p className="mb-1 text-sm font-medium text-slate-700">Section</p>
+                            <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Section">
+                                {["A", "B", "C", "D"].map((sec) => (
+                                    <button
+                                        key={sec}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={form.section === sec}
+                                        onClick={() => setForm({ ...form, section: sec })}
+                                        className={`rounded-lg py-2 text-sm font-bold transition ${
+                                            form.section === sec ? "bg-[#17140f] text-[#e5c372]" : "border border-slate-300 text-slate-700 hover:border-[#c9a24a]"
+                                        }`}
+                                    >
+                                        {sec}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="email">

@@ -61,6 +61,7 @@ export default function ManageStudents() {
                     <thead>
                         <tr className="text-left text-slate-500 border-b border-slate-200">
                             <th className="px-4 py-3 font-medium">Student</th>
+                            <th className="px-4 py-3 font-medium">College</th>
                             <th className="px-4 py-3 font-medium">Joined</th>
                             <th className="px-4 py-3 font-medium">Last login</th>
                             <th className="px-4 py-3 font-medium">Tests taken</th>
@@ -71,7 +72,7 @@ export default function ManageStudents() {
                     <tbody>
                         {loading && (
                             <tr>
-                                <td colSpan="6" className="px-4 py-6 text-center text-slate-500">Loading...</td>
+                                <td colSpan="7" className="px-4 py-6 text-center text-slate-500">Loading...</td>
                             </tr>
                         )}
                         {!loading &&
@@ -82,6 +83,10 @@ export default function ManageStudents() {
                                             {s.name}
                                         </Link>
                                         <p className="text-xs text-slate-500">{s.email}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        {s.college || "—"}
+                                        {s.section && <span className="ml-1.5 rounded-md bg-[#17140f] px-1.5 py-0.5 text-xs font-bold text-[#e5c372]">{s.section}</span>}
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(s.createdAt)}</td>
                                     <td className="px-4 py-3 text-slate-600">{formatDate(s.lastLoginAt)}</td>
@@ -109,7 +114,7 @@ export default function ManageStudents() {
                             ))}
                         {!loading && students.length === 0 && (
                             <tr>
-                                <td colSpan="6" className="px-4 py-6 text-center text-slate-500">No students found.</td>
+                                <td colSpan="7" className="px-4 py-6 text-center text-slate-500">No students found.</td>
                             </tr>
                         )}
                     </tbody>

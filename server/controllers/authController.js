@@ -15,12 +15,22 @@ const publicUser = (user) => ({
     name: user.name,
     email: user.email,
     role: user.role,
+    college: user.college || "",
+    section: user.section || "",
 });
+
+const DEFAULT_COLLEGE = "MB PU";
 
 // POST /api/auth/register
 const register = async (req, res) => {
     try {
         const { name, email, password, phone } = req.body;
+        const college = String(req.body.college || DEFAULT_COLLEGE).trim().slice(0, 120);
+        const section = String(req.body.section || "").trim().toUpperCase();
+        if (!college) return res.status(400).json({ message: "Please choose your college" });
+        if (college === DEFAULT_COLLEGE && !["A", "B", "C", "D"].includes(section)) {
+            return res.status(400).json({ message: "Please choose your section (A, B, C or D)" });
+        }
 
         if (!name || !email || !password) {
             return res
@@ -40,7 +50,7 @@ const register = async (req, res) => {
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email, phone, passwordHash });
+        const user = await User.create({ name, email, phone, passwordHash, college, ...(college === DEFAULT_COLLEGE ? { section } : {}) });
 
         res.status(201).json({
             message: "Registration successful",

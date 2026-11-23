@@ -33,8 +33,8 @@ export function AuthProvider({ children }) {
         return res.data.user;
     };
 
-    const register = async (name, email, password) => {
-        const res = await api.post("/auth/register", { name, email, password });
+    const register = async (name, email, password, extra = {}) => {
+        const res = await api.post("/auth/register", { name, email, password, ...extra });
         saveSession(res.data);
         return res.data.user;
     };
