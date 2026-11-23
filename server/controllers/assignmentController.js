@@ -19,7 +19,7 @@ const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_f
 const formatsFor = (examCode) => ORDER.filter((f) => FORMATS.includes(f) && (examCode === "JEE" || !JEE_ONLY.includes(f)));
 const { STUDENT_FIELDS } = require("../utils/attemptHelpers");
 const { shape, namesFor, FULL_FIELDS } = require("./liveLecturerController");
-const { normalizeCollege } = require("../utils/college");
+const { normalizeCollege, collegeList, collegeFilter } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const toId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -244,7 +244,7 @@ const options = handle("assignmentOptions", async (req, res) => {
         const mine = subjects.filter((s) => words.some((w) => s.name.toLowerCase().includes(w)));
         if (mine.length) subjects = mine;
     }
-    const colleges = [...new Set([DEFAULT_COLLEGE, ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
+    const colleges = collegeList(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }));
     const exam = exams.find((e) => String(e._id) === String(examId));
     res.json({ exams, examId, subjects, colleges, sections: SECTIONS, formats: formatsFor(exam?.code) });
 });
@@ -444,7 +444,7 @@ const remove = handle("deleteAssignment", async (req, res) => {
 // GET /api/lecturer/assignments/:id/submissions   every student it was sent to, and how they did
 const submissions = handle("assignmentSubmissions", async (req, res) => {
     const a = await loadOwn(req);
-    const studentFilter = { role: "student", college: a.college, ...(a.sections.length ? { section: { $in: a.sections } } : {}) };
+    const studentFilter = { role: "student", college: collegeFilter(a.college), ...(a.sections.length ? { section: { $in: a.sections } } : {}) };
     const [students, attempts] = await Promise.all([
         User.find(studentFilter).select("name email section").sort({ section: 1, name: 1 }).lean(),
         TestAttempt.find({ mode: "assignment", assignmentId: a._id }).select("userId status startedAt submittedAt result").lean(),
@@ -480,7 +480,7 @@ const submissions = handle("assignmentSubmissions", async (req, res) => {
 
 const forStudent = (user) => ({
     status: "published",
-    college: user.college || "__none__",
+    college: user.college ? collegeFilter(user.college) : "__none__",
     $or: [{ sections: { $size: 0 } }, { sections: user.section || "__none__" }],
 });
 

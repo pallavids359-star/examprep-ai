@@ -8,6 +8,7 @@ const User = require("../models/User");
 const TestAttempt = require("../models/TestAttempt");
 const Exam = require("../models/Exam");
 const { getHistory } = require("./historyController");
+const { collegeList, collegeFilter } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const slugify = (text) => text.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -136,7 +137,7 @@ const listStudents = handle("listStudents", async (req, res) => {
     }
     // college=MBPU (or another), section=A..D
     const college = String(req.query.college || "").trim();
-    if (college) filter.college = new RegExp(`^${college.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    if (college) filter.college = collegeFilter(college);
     if (["A", "B", "C", "D"].includes(req.query.section)) filter.section = req.query.section;
     const [students, colleges] = await Promise.all([
         User.find(filter)
@@ -152,7 +153,7 @@ const listStudents = handle("listStudents", async (req, res) => {
         { $group: { _id: "$userId", tests: { $sum: 1 } } },
     ]);
     const testsById = new Map(counts.map((c) => [String(c._id), c.tests]));
-    res.json({ colleges: [...new Set(["MBPU", ...colleges])], students: students.map((s) => ({ ...s, testsTaken: testsById.get(String(s._id)) || 0 })) });
+    res.json({ colleges: collegeList(colleges), students: students.map((s) => ({ ...s, testsTaken: testsById.get(String(s._id)) || 0 })) });
 });
 
 // GET /api/admin/students/:id

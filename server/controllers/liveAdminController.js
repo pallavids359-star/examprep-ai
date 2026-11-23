@@ -10,7 +10,7 @@ const Chapter = require("../models/Chapter");
 const TestAttempt = require("../models/TestAttempt");
 const { sectionsFor, patternFor, canSplitBiology, subjectKey } = require("../utils/livePattern");
 const { syncLiveStatus, canEditQuestions, autoPick, sectionState } = require("../utils/liveSchedule");
-const { normalizeCollege } = require("../utils/college");
+const { normalizeCollege, collegeList } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -192,7 +192,7 @@ const getPattern = handle("getPattern", async (req, res) => {
     if (!exam) throw userError("Exam not found", 404);
     const pattern = patternFor(exam.code);
     if (!pattern) throw userError(`Live tests are not set up for ${exam.code}`);
-    const colleges = [...new Set(["MBPU", ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
+    const colleges = collegeList(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }));
     const subjects = await Subject.find({ examId: exam._id }).select("name").lean();
     const chapterDocs = await Chapter.find({ examId: exam._id }).select("name classLevel order subjectId").sort({ classLevel: 1, order: 1, name: 1 }).lean();
     const chapters = {};
