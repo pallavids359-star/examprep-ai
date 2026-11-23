@@ -35,6 +35,17 @@ function Sidebar({ onNavigate }) {
             All live tests
           </NavLink>
         )}
+        <p className="gp-label px-3 pb-1.5 pt-4">Homework</p>
+        <NavLink to="/lecturer/assignments" className={link} onClick={onNavigate}>
+          <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4" />
+          Assignments
+        </NavLink>
+        {isAdmin && (
+          <NavLink to="/admin" className={link} onClick={onNavigate}>
+            <Icon d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />
+            Back to admin
+          </NavLink>
+        )}
       </nav>
       <div className="gp-user flex items-center gap-3 p-3">
         <span className="gp-avatar grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs">{initials(user?.name)}</span>

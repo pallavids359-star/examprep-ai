@@ -10,6 +10,7 @@
 // Both paths are idempotent: a row is keyed by (database name, row id).
 
 const Question = require("../models/Question");
+const { formatOf } = require("./questionFormat");
 const Topic = require("../models/Topic");
 const SyncState = require("../models/SyncState");
 const { validateQuestion } = require("../controllers/questionController");
@@ -203,6 +204,7 @@ const applyBatch = async (source, rows, ctx) => {
 
         for (const f of found) {
             const data = { ...m.data, topicId: f.topic._id, chapterId: f.topic.chapterId, subjectId: f.topic.subjectId, examId: f.topic.examId };
+            data.format = formatOf(data);
             const error = validateQuestion(data);
             if (error) note(m.id, error);
             else targets.push({ rowId: m.id, key: f.key, data });

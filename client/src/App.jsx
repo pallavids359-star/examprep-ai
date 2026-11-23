@@ -40,6 +40,10 @@ const LiveTestReview = lazy(() => import("./pages/admin/LiveTestReview"));
 const LiveResults = lazy(() => import("./pages/admin/LiveResults"));
 const LecturerHome = lazy(() => import("./pages/lecturer/LecturerHome"));
 const PickQuestions = lazy(() => import("./pages/lecturer/PickQuestions"));
+const LecturerAssignments = lazy(() => import("./pages/lecturer/Assignments"));
+const AssignmentForm = lazy(() => import("./pages/lecturer/AssignmentForm"));
+const AssignmentReview = lazy(() => import("./pages/lecturer/AssignmentReview"));
+const StudentAssignments = lazy(() => import("./pages/student/Assignments"));
 const LiveTests = lazy(() => import("./pages/student/LiveTests"));
 const LiveReport = lazy(() => import("./pages/student/LiveReport"));
 const MyResults = lazy(() => import("./pages/student/MyResults"));
@@ -75,6 +79,7 @@ export default function App() {
         <Route path="/live-tests/:id/report" element={<LiveReport />} />
         <Route path="/live-tests/:id/leaderboard" element={<Navigate to="/results" replace />} />
         <Route path="/results" element={<MyResults />} />
+        <Route path="/assignments" element={<StudentAssignments />} />
         <Route path="/revise" element={<Revise />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />
@@ -106,6 +111,9 @@ export default function App() {
       {/* Lecturers (and head lecturers) pick questions for live tests */}
       <Route path="/lecturer" element={lecturerOnly(<LecturerHome />)} />
       <Route path="/lecturer/tests/:id/:key" element={lecturerOnly(<PickQuestions />)} />
+      <Route path="/lecturer/assignments" element={lecturerOnly(<LecturerAssignments />)} />
+      <Route path="/lecturer/assignments/new" element={lecturerOnly(<AssignmentForm />)} />
+      <Route path="/lecturer/assignments/:id" element={lecturerOnly(<AssignmentReview />)} />
 
       {/* Any unknown URL goes back to the start */}
       <Route path="*" element={<NotFound />} />

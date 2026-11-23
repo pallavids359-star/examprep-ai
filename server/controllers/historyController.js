@@ -4,8 +4,8 @@ const Subject = require("../models/Subject");
 const Chapter = require("../models/Chapter");
 const Test = require("../models/Test");
 
-const PRACTICE_MODES = ["practice", "wrong_answer_practice", "bookmark_practice"];
-const MODE_LABELS = { practice: "Practice", wrong_answer_practice: "Wrong answers", bookmark_practice: "Bookmarks", mock: "Mock test" };
+const PRACTICE_MODES = ["practice", "wrong_answer_practice", "bookmark_practice", "assignment"];
+const MODE_LABELS = { practice: "Practice", wrong_answer_practice: "Wrong answers", bookmark_practice: "Bookmarks", mock: "Mock test", assignment: "Assignment" };
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 
 // GET /api/progress/history?examId=...&mode=practice|mock
@@ -72,7 +72,7 @@ const getHistory = async (req, res) => {
                 const title =
                     a.mode === "mock"
                         ? testTitle.get(String(a.testId)) || "Mock test"
-                        : a.mode === "practice"
+                        : a.mode === "practice" || a.mode === "assignment"
                             ? names.slice(0, 2).join(", ") + (names.length > 2 ? ` +${names.length - 2} more` : "") || "Practice"
                             : MODE_LABELS[a.mode];
                 return {

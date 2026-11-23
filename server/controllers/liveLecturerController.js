@@ -361,4 +361,4 @@ const unsubmitSection = handle("unsubmitSection", async (req, res) => {
     res.json({ message: "Taken back", testStatus: status });
 });
 
-module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection, autoPickSection, swapQuestion, unsubmitSection };
+module.exports = { mySections, getSection, browseQuestions, savePicks, submitSection, autoPickSection, swapQuestion, unsubmitSection, shape, namesFor, FULL_FIELDS };

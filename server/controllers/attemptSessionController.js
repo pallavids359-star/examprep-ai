@@ -64,7 +64,11 @@ const getAttempt = async (req, res) => {
                 .select(Object.keys(STUDENT_FIELDS).join(" "))
                 .lean();
             const byId = new Map(questions.map((q) => [String(q._id), q]));
-            const test = attempt.testId ? await Test.findById(attempt.testId).select("title instructions").lean() : null;
+            const test = attempt.testId
+                ? await Test.findById(attempt.testId).select("title instructions").lean()
+                : attempt.assignmentId
+                  ? await require("../models/Assignment").findById(attempt.assignmentId).select("title instructions").lean()
+                  : null;
 
             return res.json({
                 attemptId: attempt._id,

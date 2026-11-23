@@ -98,6 +98,7 @@ app.use("/api/admin", liveRoutes.adminRouter); // live tests and lecturers
 app.use("/api/admin", adminRoutes);
 app.use("/api/lecturer", liveRoutes.lecturerRouter);
 app.use("/api/live-tests", liveRoutes.studentRouter);
+app.use("/api/assignments", liveRoutes.assignmentRouter);
 app.use("/api/attempts", attemptRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);

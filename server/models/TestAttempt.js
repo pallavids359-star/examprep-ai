@@ -65,10 +65,11 @@ const testAttemptSchema = new mongoose.Schema(
         examId: { type: ObjectId, ref: "Exam", required: true },
         mode: {
             type: String,
-            enum: ["mock", "practice", "wrong_answer_practice", "bookmark_practice", "live"],
+            enum: ["mock", "practice", "wrong_answer_practice", "bookmark_practice", "live", "assignment"],
             required: true,
         },
         testId: { type: ObjectId, ref: "Test" }, // mock tests only (later)
+        assignmentId: { type: ObjectId, ref: "Assignment" }, // assignments
         filters: {
             chapterId: { type: ObjectId, ref: "Chapter" },
             topicIds: [{ type: ObjectId, ref: "Topic" }],
@@ -98,5 +99,7 @@ testAttemptSchema.index({ userId: 1, createdAt: -1 }); // "recent tests"
 testAttemptSchema.index({ testId: 1, status: 1, "result.score": -1 }); // ranking
 // One live-test attempt per student (also stops a double click making two)
 testAttemptSchema.index({ testId: 1, userId: 1 }, { unique: true, partialFilterExpression: { mode: "live" } });
+// One attempt per student per assignment
+testAttemptSchema.index({ assignmentId: 1, userId: 1 }, { unique: true, partialFilterExpression: { mode: "assignment" } });
 
 module.exports = mongoose.model("TestAttempt", testAttemptSchema);

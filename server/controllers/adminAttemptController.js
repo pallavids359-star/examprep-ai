@@ -29,6 +29,7 @@ const MODE_LABEL = {
     practice: "Practice",
     wrong_answer_practice: "Wrong-answer practice",
     bookmark_practice: "Bookmark practice",
+    assignment: "Assignment",
 };
 
 // Rank in a live test: 1 + how many finished attempts scored more (same score = same rank)

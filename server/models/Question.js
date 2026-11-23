@@ -54,6 +54,8 @@ const questionSchema = new mongoose.Schema(
         },
 
         difficulty: { type: String, enum: ["easy", "medium", "hard"], default: "medium" },
+        // single_correct / multi_correct / assertion_reason / match_following / statement_based / numerical
+        format: { type: String, index: true },
 
         // Optional: overrides the exam's marking scheme for this question
         marks: {

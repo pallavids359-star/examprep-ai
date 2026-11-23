@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/practice", label: "Practice", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
   { to: "/mock-tests", label: "Mock tests", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" },
   { to: "/live-tests", label: "Live tests", icon: "M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 100 8 4 4 0 000-8z" },
+  { to: "/assignments", label: "Assignments", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4" },
   { to: "/results", label: "My results", icon: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3" },
   { to: "/analytics", label: "Analytics", icon: "M4 20V10M10 20V4M16 20v-6M2 20h20" },
   { to: "/revise", label: "Revise", icon: "M4 4v6h6M20 20v-6h-6M5.5 15a7.5 7.5 0 0013.5 2M18.5 9A7.5 7.5 0 005 7" },
@@ -74,7 +75,7 @@ function Shell() {
 
   const sideLink = ({ isActive }) => `gp-nav-link ${isActive ? "active" : ""}`;
   const tabClass = ({ isActive }) =>
-    `flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium ${isActive ? "text-indigo-700" : "text-slate-500"}`;
+    `flex-1 min-w-[4.5rem] shrink-0 flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium whitespace-nowrap ${isActive ? "text-indigo-700" : "text-slate-500"}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -138,7 +139,7 @@ function Shell() {
       </main>
 
       {/* Phone: bottom tabs */}
-      <nav className="gp-tabbar lg:hidden fixed bottom-0 inset-x-0 z-20 flex" aria-label="Main">
+      <nav className="gp-tabbar lg:hidden fixed bottom-0 inset-x-0 z-20 flex overflow-x-auto" aria-label="Main">
         {LINKS.map((l) => (
           <NavLink key={l.to} to={l.to} className={tabClass}>
             <Icon path={l.icon} />

@@ -5,6 +5,7 @@ const isAdmin = require("../middleware/isAdmin");
 const isLecturer = require("../middleware/isLecturer");
 const head = require("../controllers/liveAdminController");
 const lecturer = require("../controllers/liveLecturerController");
+const assignments = require("../controllers/assignmentController");
 const student = require("../controllers/liveStudentController");
 
 // /api/admin/... (head lecturer)
@@ -39,6 +40,19 @@ lecturerRouter.post("/live-tests/:id/sections/:key/autopick", lecturer.autoPickS
 lecturerRouter.post("/live-tests/:id/sections/:key/swap", lecturer.swapQuestion);
 lecturerRouter.post("/live-tests/:id/sections/:key/unsubmit", lecturer.unsubmitSection);
 
+// Assignments (lecturers and the head lecturer)
+lecturerRouter.get("/assignments/options", assignments.options);
+lecturerRouter.get("/assignments/chapters", assignments.chapters);
+lecturerRouter.get("/assignments", assignments.listMine);
+lecturerRouter.post("/assignments", assignments.create);
+lecturerRouter.get("/assignments/:id", assignments.getOne);
+lecturerRouter.put("/assignments/:id", assignments.update);
+lecturerRouter.post("/assignments/:id/swap", assignments.swap);
+lecturerRouter.post("/assignments/:id/publish", assignments.publish);
+lecturerRouter.post("/assignments/:id/unpublish", assignments.unpublish);
+lecturerRouter.delete("/assignments/:id", assignments.remove);
+lecturerRouter.get("/assignments/:id/submissions", assignments.submissions);
+
 // /api/live-tests/... (students)
 const studentRouter = express.Router();
 studentRouter.use(protect);
@@ -47,4 +61,10 @@ studentRouter.get("/my-results", student.myResults);
 studentRouter.post("/:id/start", student.startLive);
 studentRouter.get("/:id/report", student.liveReport);
 
-module.exports = { adminRouter, lecturerRouter, studentRouter };
+// /api/assignments/... (students)
+const assignmentRouter = express.Router();
+assignmentRouter.use(protect);
+assignmentRouter.get("/", assignments.myAssignments);
+assignmentRouter.post("/:id/start", assignments.startAssignment);
+
+module.exports = { adminRouter, lecturerRouter, studentRouter, assignmentRouter };

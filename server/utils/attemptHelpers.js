@@ -46,6 +46,10 @@ const buildReview = (attempt, questionsById, extra = {}) => ({
 
 // For mock tests: the test title and the CURRENT rank (it changes as others submit)
 const mockExtras = async (attempt) => {
+    if (attempt.mode === "assignment" && attempt.assignmentId) {
+        const a = await require("../models/Assignment").findById(attempt.assignmentId).select("title").lean();
+        return { testTitle: a ? a.title : "Assignment" };
+    }
     if (!attempt.testId) return {};
     const [test, rankInfo] = await Promise.all([
         Test.findById(attempt.testId).select("title").lean(),
