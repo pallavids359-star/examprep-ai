@@ -8,6 +8,7 @@ const Question = require("../models/Question");
 const Chapter = require("../models/Chapter");
 const Topic = require("../models/Topic");
 const Subject = require("../models/Subject");
+const Assignment = require("../models/Assignment");
 const { liveResultsOf } = require("../utils/liveResults");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
@@ -50,13 +51,15 @@ const listStudentAttempts = handle("listStudentAttempts", async (req, res) => {
     const attempts = await TestAttempt.find({ userId: student._id })
         .sort({ startedAt: -1 })
         .limit(200)
-        .select("mode status testId examId startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec result.rank answers.questionId answers.chapterId answers.subjectId")
+        .select("mode status testId assignmentId examId startedAt submittedAt result.score result.maxScore result.percentage result.accuracy result.correct result.incorrect result.unanswered result.timeTakenSec result.rank answers.questionId answers.chapterId answers.subjectId")
         .lean();
     const [tests, exams] = await Promise.all([
         Test.find({ _id: { $in: attempts.map((a) => a.testId).filter(Boolean) } }).select("title").lean(),
         Exam.find({ _id: { $in: attempts.map((a) => a.examId) } }).select("code").lean(),
     ]);
     const title = new Map(tests.map((t) => [String(t._id), t.title]));
+    const assignmentDocs = await Assignment.find({ _id: { $in: attempts.map((a) => a.assignmentId).filter(Boolean) } }).select("title").lean();
+    assignmentDocs.forEach((x) => title.set(String(x._id), x.title));
     // Practice has no test name: name it after its chapters ("Laws of Motion + 2 more")
     const chapterIds = [...new Set(attempts.filter((a) => !a.testId).flatMap((a) => (a.answers || []).map((x) => String(x.chapterId))).filter((x) => x && x !== "undefined"))];
     const chapterDocs = chapterIds.length ? await Chapter.find({ _id: { $in: chapterIds } }).select("name").lean() : [];
@@ -74,7 +77,7 @@ const listStudentAttempts = handle("listStudentAttempts", async (req, res) => {
             attemptId: a._id,
             mode: a.mode,
             modeLabel: MODE_LABEL[a.mode] || a.mode,
-            title: title.get(String(a.testId)) || practiceTitle(a) || MODE_LABEL[a.mode] || "Test",
+            title: title.get(String(a.testId)) || title.get(String(a.assignmentId)) || practiceTitle(a) || MODE_LABEL[a.mode] || "Test",
             exam: code.get(String(a.examId)) || "",
             status: a.status,
             startedAt: a.startedAt,
@@ -157,6 +160,7 @@ const getAttemptDetail = handle("getAttemptDetail", async (req, res) => {
         student: student ? { _id: student._id, name: student.name, email: student.email } : null,
         title:
             test?.title ||
+            (attempt.assignmentId ? (await Assignment.findById(attempt.assignmentId).select("title").lean())?.title : null) ||
             (() => {
                 const names = [...new Set(questions.map((q) => q.chapter).filter(Boolean))];
                 return names.length ? `${MODE_LABEL[attempt.mode] || "Practice"}: ${names.length === 1 ? names[0] : `${names[0]} + ${names.length - 1} more`}` : MODE_LABEL[attempt.mode] || "Test";
