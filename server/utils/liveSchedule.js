@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const Question = require("../models/Question");
 const Chapter = require("../models/Chapter");
 const Test = require("../models/Test");
+const { sampleMixed } = require("./difficultyMix");
 const TestAttempt = require("../models/TestAttempt");
 
 const IMG = /\{\{IMG::/;
@@ -74,7 +75,15 @@ const sample = (match, size) =>
 //   replace: start from empty instead of keeping what is already picked
 // About 2 in 9 MCQs come with a diagram where the bank has them. Questions already used in
 // other live tests are avoided when possible.
-const autoPick = async (test, section, { chapterIds = [], classLevel = "both", replace = false } = {}) => {
+const autoPick = async (test, section, { chapterIds = [], classLevel, replace = false, useSettings = false } = {}) => {
+    // The head lecturer's auto-pick choices (class, difficulty %, types, per-chapter counts)
+    const auto = useSettings ? test.live?.auto || {} : {};
+    if (!classLevel) classLevel = auto.classLevel || "both";
+    const mix = auto.mix && (auto.mix.easy || auto.mix.medium || auto.mix.hard) ? { easy: auto.mix.easy || 0, medium: auto.mix.medium || 0, hard: auto.mix.hard || 0 } : null;
+    const formats = (auto.formats || []).filter(Boolean);
+    const mcqFormats = formats.filter((f) => f !== "numerical");
+    const perChapter = (auto.perChapter || []).filter((p) => p.sectionKey === section.key && p.count > 0);
+    if (perChapter.length && !chapterIds.length) chapterIds = perChapter.map((p) => p.chapterId);
     const chapterFilter = { subjectId: section.subjectId };
     if (["11", "12"].includes(classLevel)) chapterFilter.classLevel = classLevel;
     if (chapterIds.length) chapterFilter._id = { $in: chapterIds };
@@ -94,13 +103,37 @@ const autoPick = async (test, section, { chapterIds = [], classLevel = "both", r
 
     const base = { examId: test.examId, subjectId: section.subjectId, status: "published", chapterId: { $in: chapters.map((c) => c._id) } };
     const picked = [];
-    const take = async (extra, size, avoidUsed) => {
+    const take = async (extra, size, avoidUsed, alsoExclude = []) => {
         if (size <= 0) return 0;
-        const exclude = [...keep, ...inThisTest, ...picked.map((q) => String(q._id)), ...(avoidUsed ? usedElsewhere : [])];
-        const got = await sample({ ...base, ...extra, _id: { $nin: exclude.map((id) => new mongoose.Types.ObjectId(String(id))) } }, size);
+        const exclude = [...new Set([...keep, ...inThisTest, ...picked.map((q) => String(q._id)), ...(avoidUsed ? usedElsewhere : []), ...alsoExclude.map(String)])];
+        const where = Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== undefined));
+        const got = await sample({ ...base, ...where, _id: { $nin: exclude.map((id) => new mongoose.Types.ObjectId(String(id))) } }, size);
         picked.push(...got);
         return got.length;
     };
+
+    const mcqWhere = { type: { $ne: "numerical" }, ...(mcqFormats.length ? { format: { $in: mcqFormats } } : {}) };
+    // sampleMixed asks for (match, size) and wants the picked questions back
+    const sampleFor = (avoidUsed) => async (m, n) => {
+        const { _id, ...rest } = m;
+        const before = picked.length;
+        await take(rest, n, avoidUsed, _id?.$nin || []);
+        return picked.slice(before);
+    };
+    // Chosen counts per chapter, or a difficulty mix: follow them first (fresh questions, then reused)
+    if ((perChapter.length || mix) && needMcq > 0) {
+        const groups = perChapter.length ? perChapter.map((p) => ({ where: { chapterId: p.chapterId }, count: p.count })) : [{ where: {}, count: needMcq }];
+        for (const g of groups) {
+            let want = Math.min(g.count, needMcq);
+            for (const avoidUsed of [true, false]) {
+                if (want <= 0) break;
+                const where = { ...mcqWhere, ...g.where };
+                const got = mix ? (await sampleMixed(where, want, mix, sampleFor(avoidUsed))).length : await take(where, want, avoidUsed);
+                want -= got;
+                needMcq -= got;
+            }
+        }
+    }
 
     // Diagram MCQs first, then the rest; fresh questions first, then reused ones if the bank runs short
     const diagramTarget = Math.min(needMcq, Math.round(((section.mcqCount || 0) * 2) / 9));
@@ -108,7 +141,7 @@ const autoPick = async (test, section, { chapterIds = [], classLevel = "both", r
         const d = await take({ type: { $ne: "numerical" }, $and: [HAS_DIAGRAM] }, Math.min(diagramTarget, needMcq) - picked.filter((q) => q.diagram).length, avoidUsed);
         picked.slice(-d).forEach((q) => (q.diagram = true));
         needMcq -= d;
-        needMcq -= await take({ type: { $ne: "numerical" } }, needMcq, avoidUsed);
+        needMcq -= await take(mcqWhere, needMcq, avoidUsed);
         needNum -= await take({ type: "numerical" }, needNum, avoidUsed);
         if (needMcq <= 0 && needNum <= 0) break;
     }

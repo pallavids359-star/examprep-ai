@@ -86,7 +86,12 @@ export default function LiveTestForm() {
   const [otherLength, setOtherLength] = useState(false);
   const [split, setSplit] = useState(false);
   const [rows, setRows] = useState([]); // { key, name, include, picker, lecturerId, mcqCount, numericalCount }
-  const [editCounts, setEditCounts] = useState(false);
+  // Auto-pick choices
+  const [autoClass, setAutoClass] = useState("both");
+  const [autoMix, setAutoMix] = useState({ easy: "", medium: "", hard: "" }); // typed %; empty = any difficulty
+  const [autoFormats, setAutoFormats] = useState([]);
+  const [perChapter, setPerChapter] = useState({}); // sectionKey -> { chapterId: count }
+  const [chapterOpen, setChapterOpen] = useState({}); // sectionKey -> open
   const [showResults, setShowResults] = useState("after_submit"); // students see their result as soon as they finish
   const [college, setCollege] = useState(""); // "" = every student
   const [audSections, setAudSections] = useState([]); // none = all sections
@@ -128,6 +133,14 @@ export default function LiveTestForm() {
         setSplit(Boolean(t.live?.splitBiology));
 
         setCollege(t.live?.college || "");
+        const au = t.live?.auto || {};
+        setAutoClass(au.classLevel || "both");
+        setAutoMix(au.mix?.easy || au.mix?.medium || au.mix?.hard ? { easy: String(au.mix.easy || 0), medium: String(au.mix.medium || 0), hard: String(au.mix.hard || 0) } : { easy: "", medium: "", hard: "" });
+        setAutoFormats(au.formats || []);
+        const pc = {};
+        (au.perChapter || []).forEach((x) => ((pc[x.sectionKey] = pc[x.sectionKey] || {})[x.chapterId] = String(x.count)));
+        setPerChapter(pc);
+        setChapterOpen(Object.fromEntries(Object.keys(pc).map((k) => [k, true])));
         setAudSections(t.live?.sections || []);
         setLoadedSections(t.sections);
       })
@@ -194,8 +207,19 @@ export default function LiveTestForm() {
   }, [startsAt, endTouched]);
 
   const setRow = (key, patch) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const anyAuto = rows.some((r) => r.include && r.picker === "auto");
+  const mixTotal = (Number(autoMix.easy) || 0) + (Number(autoMix.medium) || 0) + (Number(autoMix.hard) || 0);
+  const subjectKeyOf = (key) => [...(pattern?.sections || []), ...(pattern?.splitSections || [])].find((d) => d.key === key)?.subjectKey || key;
+  const chaptersOf = (key) => (pattern?.chapters?.[subjectKeyOf(key)] || []).filter((c) => autoClass === "both" || String(c.classLevel) === autoClass);
+  const chapterSum = (key) => Object.values(perChapter[key] || {}).reduce((a, c) => a + (Number(c) || 0), 0);
+  const setChapterCount = (key, chapterId, value) => {
+    const next = { ...(perChapter[key] || {}), [chapterId]: value };
+    setPerChapter((p) => ({ ...p, [key]: next }));
+    const sum = Object.values(next).reduce((a, c) => a + (Number(c) || 0), 0);
+    if (sum > 0) setRow(key, { mcqCount: sum });
+  };
   const included = rows.filter((r) => r.include);
-  const totalQs = included.reduce((a, r) => a + Number(r.mcqCount || 0) + Number(r.numericalCount || 0), 0);
+  const totalQs = included.reduce((a, r) => a + (r.picker === "auto" && chapterSum(r.key) > 0 ? chapterSum(r.key) : Number(r.mcqCount || 0)) + Number(r.numericalCount || 0), 0);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -203,6 +227,7 @@ export default function LiveTestForm() {
     if (!included.length) return setError("Include at least one subject");
     if (included.some((r) => r.picker === "lecturer" && !r.lecturerId)) return setError("Choose a lecturer for each subject marked 'Lecturer'");
     if (!startsAt || !endsAt) return setError("Choose when the test opens and closes");
+    if (anyAuto && mixTotal && mixTotal !== 100) return setError(`Difficulty adds up to ${mixTotal}%. Easy + medium + hard must be 100%.`);
     if (endsAt <= startsAt) return setError("The test must close after it opens");
     setSaving(true);
     const body = {
@@ -214,13 +239,21 @@ export default function LiveTestForm() {
       splitBiology: split,
       showResults: "after_submit",
       shuffle: true,
+      auto: {
+        classLevel: autoClass,
+        mix: mixTotal ? { easy: Number(autoMix.easy) || 0, medium: Number(autoMix.medium) || 0, hard: Number(autoMix.hard) || 0 } : null,
+        formats: autoFormats,
+        perChapter: Object.entries(perChapter).flatMap(([sectionKey, m]) =>
+          included.some((r) => r.key === sectionKey && r.picker === "auto") ? Object.entries(m).filter(([, c]) => Number(c) > 0).map(([chapterId, c]) => ({ sectionKey, chapterId, count: Number(c) })) : []
+        ),
+      },
       college,
       audienceSections: college ? audSections : [],
       sections: included.map((r) => ({
         key: r.key,
         picker: r.picker,
         lecturerId: r.picker === "lecturer" ? r.lecturerId : undefined,
-        mcqCount: Number(r.mcqCount),
+        mcqCount: r.picker === "auto" && chapterSum(r.key) > 0 ? chapterSum(r.key) : Number(r.mcqCount),
         numericalCount: Number(r.numericalCount),
       })),
     };
@@ -384,6 +417,49 @@ export default function LiveTestForm() {
                 Split Biology into Botany and Zoology
               </label>
             )}
+            {anyAuto && (
+              <div className="space-y-4 rounded-2xl border border-[#e7dcc3] bg-[#fffdf8] p-4">
+                <p className="text-sm font-bold text-slate-900">Auto-pick settings</p>
+                <div>
+                  <p className="gp-label">Class</p>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {[["11", "1st PUC"], ["12", "2nd PUC"], ["both", "Both"]].map(([v, l]) => (
+                      <button key={v} type="button" aria-pressed={autoClass === v} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800" onClick={() => setAutoClass(v)}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="gp-label">Difficulty (%)</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                    {[["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]].map(([k, l]) => (
+                      <label key={k} className="flex items-center gap-2 text-sm text-slate-700">
+                        {l}
+                        <input type="number" min={0} max={100} placeholder="%" className="w-20 rounded-lg border border-[#e7dcc3] bg-white px-2 py-1.5 text-center" value={autoMix[k]} onChange={(e) => setAutoMix({ ...autoMix, [k]: e.target.value })} />
+                      </label>
+                    ))}
+                    <span className={`text-sm font-semibold ${!mixTotal ? "text-slate-500" : mixTotal === 100 ? "text-emerald-700" : "text-rose-700"}`}>
+                      {!mixTotal ? "Empty = any difficulty" : mixTotal === 100 ? "Total 100% ✓" : `Total ${mixTotal}% — must be 100%`}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <p className="gp-label">Types of questions</p>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {(pattern?.formats || []).map((f) => {
+                      const on = autoFormats.includes(f);
+                      return (
+                        <button key={f} type="button" aria-pressed={on} className="gp-tile px-3.5 py-2 text-sm font-semibold text-slate-800" onClick={() => setAutoFormats(on ? autoFormats.filter((x) => x !== f) : [...autoFormats, f])}>
+                          {{ single_correct: "Single correct answer", assertion_reason: "Assertion and reason", statement_based: "Statement based", match_following: "Match the following", multi_correct: "Multiple correct (JEE)", numerical: "Numerical (JEE)" }[f] || f}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{autoFormats.length ? `${autoFormats.length} chosen` : "None chosen = every type"}</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-3">
               {rows.map((r) => (
                 <div key={r.key} className={`rounded-2xl border p-4 transition ${r.include ? "border-slate-200 bg-white" : "border-dashed border-slate-200 opacity-60"}`}>
@@ -392,7 +468,7 @@ export default function LiveTestForm() {
                       <input type="checkbox" className="h-4 w-4 accent-amber-600" checked={r.include} onChange={(e) => setRow(r.key, { include: e.target.checked })} />
                       {r.name}
                       <span className="text-sm font-normal text-slate-500">
-                        · {r.mcqCount} MCQ{Number(r.numericalCount) ? ` + ${r.numericalCount} numerical` : ""}
+                        · {r.picker === "auto" && chapterSum(r.key) > 0 ? chapterSum(r.key) : r.mcqCount} MCQ{Number(r.numericalCount) ? ` + ${r.numericalCount} numerical` : ""}
                       </span>
                     </label>
                     {r.include && !included.every((x) => x.picker === r.picker) && (
@@ -413,26 +489,48 @@ export default function LiveTestForm() {
                       or choose Myself / Auto.
                     </p>
                   )}
-                  {r.include && editCounts && (
-                    <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                      <label className="flex items-center gap-2">
-                        MCQ
-                        <input type="number" min={0} max={200} className={`${input} w-24`} value={r.mcqCount} onChange={(e) => setRow(r.key, { mcqCount: e.target.value })} />
-                      </label>
-                      <label className="flex items-center gap-2">
-                        Numerical
-                        <input type="number" min={0} max={50} className={`${input} w-24`} value={r.numericalCount} onChange={(e) => setRow(r.key, { numericalCount: e.target.value })} />
-                      </label>
-                    </div>
-                  )}
+                  {r.include && (() => {
+                    const pcSum = Object.values(perChapter[r.key] || {}).reduce((a, c) => a + (Number(c) || 0), 0);
+                    const byChapter = r.picker === "auto" && pcSum > 0;
+                    return (
+                      <>
+                        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                          <label className="flex items-center gap-2 text-slate-700">
+                            Number of questions
+                            <input type="number" min={0} max={200} className={`${input} w-24`} value={byChapter ? pcSum : r.mcqCount} disabled={byChapter} onChange={(e) => setRow(r.key, { mcqCount: e.target.value })} />
+                          </label>
+                          {(Number(r.numericalCount) > 0 || exam?.code === "JEE") && (
+                            <label className="flex items-center gap-2 text-slate-700">
+                              Numerical
+                              <input type="number" min={0} max={50} className={`${input} w-24`} value={r.numericalCount} onChange={(e) => setRow(r.key, { numericalCount: e.target.value })} />
+                            </label>
+                          )}
+                          {r.picker === "auto" && (
+                            <button type="button" onClick={() => setChapterOpen((o) => ({ ...o, [r.key]: !o[r.key] }))} className="font-semibold text-amber-800 hover:underline">
+                              {chapterOpen[r.key] ? "Hide chapters" : "Questions per chapter"}
+                            </button>
+                          )}
+                        </div>
+                        {r.picker === "auto" && chapterOpen[r.key] && (
+                          <div className="mt-3 rounded-xl border border-[#efe6d2] bg-[#fffdf8] p-3">
+                            <p className="mb-2 text-xs text-slate-500">Type how many questions from each chapter. Leave at 0 to skip it. {byChapter ? `Total: ${pcSum}` : "Leave all empty to use every chapter."}</p>
+                            <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                              {chaptersOf(r.key).map((c) => (
+                                <label key={c._id} className="flex items-center justify-between gap-3 text-sm text-slate-800">
+                                  <span className="min-w-0 truncate">{c.name}</span>
+                                  <input type="number" min={0} max={100} placeholder="0" className="w-16 rounded-lg border border-[#e7dcc3] bg-white px-2 py-1 text-center" value={perChapter[r.key]?.[c._id] ?? ""} onChange={(e) => setChapterCount(r.key, c._id, e.target.value)} />
+                                </label>
+                              ))}
+                              {!chaptersOf(r.key).length && <p className="text-sm text-slate-500">No chapters for this class.</p>}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
-            <p className="text-sm text-slate-500">
-              <button type="button" className="font-semibold text-amber-800 hover:underline" onClick={() => setEditCounts((v) => !v)}>
-                {editCounts ? "Hide question counts" : "Change number of questions"}
-              </button>
-            </p>
           </section>
         )}
 

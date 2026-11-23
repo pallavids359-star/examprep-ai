@@ -6,6 +6,7 @@ const Exam = require("../models/Exam");
 const Subject = require("../models/Subject");
 const User = require("../models/User");
 const Question = require("../models/Question");
+const Chapter = require("../models/Chapter");
 const TestAttempt = require("../models/TestAttempt");
 const { sectionsFor, patternFor, canSplitBiology, subjectKey } = require("../utils/livePattern");
 const { syncLiveStatus, canEditQuestions, autoPick, sectionState } = require("../utils/liveSchedule");
@@ -191,9 +192,16 @@ const getPattern = handle("getPattern", async (req, res) => {
     const pattern = patternFor(exam.code);
     if (!pattern) throw userError(`Live tests are not set up for ${exam.code}`);
     const colleges = [...new Set(["MB PU", ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
+    const subjects = await Subject.find({ examId: exam._id }).select("name").lean();
+    const chapterDocs = await Chapter.find({ examId: exam._id }).select("name classLevel order subjectId").sort({ classLevel: 1, order: 1, name: 1 }).lean();
+    const chapters = {};
+    for (const sub of subjects) chapters[subjectKey(sub.name)] = chapterDocs.filter((c) => String(c.subjectId) === String(sub._id)).map((c) => ({ _id: c._id, name: c.name, classLevel: c.classLevel }));
+    const formats = ["single_correct", "assertion_reason", "statement_based", "match_following", ...(exam.code === "JEE" ? ["multi_correct", "numerical"] : [])];
     res.json({
         exam,
         colleges,
+        chapters,
+        formats,
         minutes: pattern.minutes,
         canSplitBiology: canSplitBiology(exam.code),
         sections: sectionsFor(exam.code, false),
@@ -216,6 +224,22 @@ const buildDetails = async (body, exam, existing, me) => {
 
     const splitBiology = Boolean(body.splitBiology) && canSplitBiology(exam.code);
     const offered = sectionsFor(exam.code, splitBiology);
+
+    // Auto-pick choices
+    const a = body.auto || {};
+    const mixIn = ["easy", "medium", "hard"].map((l) => Math.max(0, Math.min(100, Math.round(Number(a.mix?.[l]) || 0))));
+    const mixSum = mixIn.reduce((x, y) => x + y, 0);
+    if (mixSum && mixSum !== 100) throw userError("Easy + medium + hard must add up to 100%");
+    const auto = {
+        classLevel: ["11", "12"].includes(String(a.classLevel)) ? String(a.classLevel) : "both",
+        mix: mixSum ? { easy: mixIn[0], medium: mixIn[1], hard: mixIn[2] } : undefined,
+        formats: (a.formats || []).filter((f) => ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"].includes(f)),
+        perChapter: (a.perChapter || [])
+            .filter((p) => isValidId(p.chapterId) && Number(p.count) > 0)
+            .map((p) => ({ sectionKey: String(p.sectionKey), chapterId: p.chapterId, count: Math.min(200, Math.round(Number(p.count))) })),
+    };
+    const sameAuto = (x) => JSON.stringify({ c: x?.classLevel || "both", m: x?.mix?.easy ? [x.mix.easy, x.mix.medium, x.mix.hard] : null, f: x?.formats || [], p: (x?.perChapter || []).map((p) => [p.sectionKey, String(p.chapterId), p.count]) });
+    const autoChanged = existing && sameAuto(existing.live?.auto) !== sameAuto(auto);
     const wanted = Array.isArray(body.sections) ? body.sections : [];
     if (!wanted.length) throw userError("Add at least one section");
 
@@ -256,7 +280,8 @@ const buildDetails = async (body, exam, existing, me) => {
             mcqCount,
             numericalCount,
             dueAt: w.dueAt ? toDate(w.dueAt, `${def.name} due time`) : undefined,
-            questionIds: old && String(old.subjectId) === String(subject._id) ? old.questionIds : [],
+            // Auto sections are picked again when the auto choices change
+            questionIds: old && String(old.subjectId) === String(subject._id) && !(picker === "auto" && autoChanged) ? old.questionIds : [],
             submittedAt: same ? old.submittedAt : undefined,
         });
     }
@@ -272,6 +297,7 @@ const buildDetails = async (body, exam, existing, me) => {
         sections,
         live: {
             splitBiology,
+            auto,
             showResults: "after_submit",
             shuffle: body.shuffle !== false,
             college: String(body.college || "").trim().slice(0, 120),
@@ -286,7 +312,7 @@ const fillAutoSections = async (test) => {
     const notes = [];
     for (const s of test.sections) {
         if (s.picker !== "auto") continue;
-        const r = await autoPick(test, s, {});
+        const r = await autoPick(test, s, { useSettings: true });
         if (r.shortMcq || r.shortNumerical) notes.push(`${s.name}: the bank is ${r.shortMcq} MCQ and ${r.shortNumerical} numerical short`);
     }
     await test.save();

@@ -57,6 +57,13 @@ const testSchema = new mongoose.Schema(
             showResults: { type: String, enum: ["after_submit", "after_close"], default: "after_close" },
             shuffle: { type: Boolean, default: true }, // question order within each section, per student
             // Who can take it: no college = every student; otherwise that college, and only these sections (none = all sections)
+            // Auto-pick choices: class, difficulty %, question types, and per-chapter counts per section
+            auto: {
+                classLevel: { type: String, enum: ["11", "12", "both"], default: "both" },
+                mix: { easy: Number, medium: Number, hard: Number }, // empty = any difficulty
+                formats: [{ type: String }],
+                perChapter: [{ sectionKey: String, chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter" }, count: Number }],
+            },
             college: { type: String, default: "" },
             sections: [{ type: String, enum: ["A", "B", "C", "D"] }],
             publishedAt: { type: Date },

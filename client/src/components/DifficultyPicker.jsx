@@ -46,20 +46,22 @@ export default function DifficultyPicker({ value, onChange, mix, onMixChange, to
             <div key={k} className="flex items-center gap-3">
               <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${bar}`} />
               <span className="w-16 text-sm font-semibold text-slate-800">{l}</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={shown[k]}
-                disabled={value === "equal"}
-                onChange={(e) => onMixChange({ ...mix, [k]: Number(e.target.value) })}
-                className="flex-1 accent-[#b8862b] disabled:opacity-60"
-                aria-label={`${l} percent`}
-              />
-              <span className="w-24 text-right text-sm tabular-nums text-slate-700">
-                <b>{shown[k]}%</b>
-                {total > 0 && <span className="text-slate-400"> ≈ {Math.round((total * shown[k]) / 100)}</span>}
+              <span className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={shown[k]}
+                  disabled={value === "equal"}
+                  onChange={(e) => onMixChange({ ...mix, [k]: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                  className="w-20 rounded-lg border border-[#e7dcc3] bg-white px-2 py-1.5 text-center font-semibold text-slate-900 disabled:opacity-60"
+                  aria-label={`${l} percent`}
+                />
+                <span className="text-sm text-slate-500">%</span>
+              </span>
+              <span className="flex-1" />
+              <span className="w-28 text-right text-sm tabular-nums text-slate-700">
+                {total > 0 && <span className="text-slate-500">≈ {Math.round((total * shown[k]) / 100)} questions</span>}
               </span>
             </div>
           ))}
