@@ -120,6 +120,20 @@ const autoPick = async (test, section, { chapterIds = [], classLevel, replace = 
         await take(rest, n, avoidUsed, _id?.$nin || []);
         return picked.slice(before);
     };
+    // How many of each question type (per subject): these come first
+    const fc = auto.formatCounts instanceof Map ? Object.fromEntries(auto.formatCounts) : auto.formatCounts || {};
+    const typed = Object.entries(fc).filter(([f, n]) => n > 0 && f !== "numerical");
+    for (const [format, n] of typed) {
+        let want = Math.min(n, needMcq);
+        for (const avoidUsed of [true, false]) {
+            if (want <= 0) break;
+            const where = { type: { $ne: "numerical" }, format };
+            const got = mix ? (await sampleMixed(where, want, mix, sampleFor(avoidUsed))).length : await take(where, want, avoidUsed);
+            want -= got;
+            needMcq -= got;
+        }
+    }
+
     // Chosen counts per chapter, or a difficulty mix: follow them first (fresh questions, then reused)
     if ((perChapter.length || mix) && needMcq > 0) {
         const groups = perChapter.length ? perChapter.map((p) => ({ where: { chapterId: p.chapterId }, count: p.count })) : [{ where: {}, count: needMcq }];

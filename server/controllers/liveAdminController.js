@@ -234,15 +234,26 @@ const buildDetails = async (body, exam, existing, me) => {
         classLevel: ["11", "12"].includes(String(a.classLevel)) ? String(a.classLevel) : "both",
         mix: mixSum ? { easy: mixIn[0], medium: mixIn[1], hard: mixIn[2] } : undefined,
         formats: (a.formats || []).filter((f) => ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"].includes(f)),
+        formatCounts: Object.fromEntries(
+            Object.entries(a.formatCounts || {})
+                .filter(([f, n]) => (a.formats || []).includes(f) && f !== "numerical" && Number(n) > 0)
+                .map(([f, n]) => [f, Math.min(200, Math.round(Number(n)))])
+        ),
         perChapter: (a.perChapter || [])
             .filter((p) => isValidId(p.chapterId) && Number(p.count) > 0)
             .map((p) => ({ sectionKey: String(p.sectionKey), chapterId: p.chapterId, count: Math.min(200, Math.round(Number(p.count))) })),
     };
-    const sameAuto = (x) => JSON.stringify({ c: x?.classLevel || "both", m: x?.mix?.easy ? [x.mix.easy, x.mix.medium, x.mix.hard] : null, f: x?.formats || [], p: (x?.perChapter || []).map((p) => [p.sectionKey, String(p.chapterId), p.count]) });
+    const sameAuto = (x) => JSON.stringify({ c: x?.classLevel || "both", m: x?.mix?.easy ? [x.mix.easy, x.mix.medium, x.mix.hard] : null, f: x?.formats || [], fc: Object.entries(x?.formatCounts instanceof Map ? Object.fromEntries(x.formatCounts) : x?.formatCounts || {}).sort(), p: (x?.perChapter || []).map((p) => [p.sectionKey, String(p.chapterId), p.count]) });
     const autoChanged = existing && sameAuto(existing.live?.auto) !== sameAuto(auto);
     const wanted = Array.isArray(body.sections) ? body.sections : [];
     if (!wanted.length) throw userError("Add at least one section");
 
+    const typedTotal = Object.values(auto.formatCounts).reduce((x, n) => x + n, 0);
+    for (const w of wanted) {
+        if (w.picker === "auto" && typedTotal > (Number(w.mcqCount) || 0)) {
+            throw userError(`The question types add up to ${typedTotal}, more than the ${Number(w.mcqCount) || 0} questions in ${offered.find((o) => o.key === w.key)?.name || "a subject"}`);
+        }
+    }
     const subjects = await Subject.find({ examId: exam._id }).select("name").lean();
     const lecturerIds = [...new Set(wanted.filter((s) => s.picker === "lecturer" || !s.picker).map((s) => String(s.lecturerId || "")).filter(isValidId))];
     const lecturers = lecturerIds.length

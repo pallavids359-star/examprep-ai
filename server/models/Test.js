@@ -62,6 +62,7 @@ const testSchema = new mongoose.Schema(
                 classLevel: { type: String, enum: ["11", "12", "both"], default: "both" },
                 mix: { easy: Number, medium: Number, hard: Number }, // empty = any difficulty
                 formats: [{ type: String }],
+                formatCounts: { type: Map, of: Number }, // how many of each type, in every subject
                 perChapter: [{ sectionKey: String, chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter" }, count: Number }],
             },
             college: { type: String, default: "" },

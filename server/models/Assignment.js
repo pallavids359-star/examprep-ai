@@ -27,6 +27,7 @@ const assignmentSchema = new mongoose.Schema(
                 hard: Number,
             },
             formats: [String],
+            formatCounts: { type: Map, of: Number }, // how many of each question type (optional)
         },
         questionIds: [{ type: ObjectId, ref: "Question" }],
         status: { type: String, enum: ["draft", "published"], default: "draft" },

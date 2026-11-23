@@ -14,6 +14,7 @@ const TestAttempt = require("../models/TestAttempt");
 const { FORMATS } = require("../utils/questionFormat");
 // Multiple correct and numerical questions are only for JEE
 const JEE_ONLY = ["multi_correct", "numerical"];
+const FORMAT_NAMES = { single_correct: "Single correct", assertion_reason: "Assertion & reason", statement_based: "Statement based", match_following: "Match the following", multi_correct: "Multiple correct", numerical: "Numerical" };
 const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"];
 const formatsFor = (examCode) => ORDER.filter((f) => FORMATS.includes(f) && (examCode === "JEE" || !JEE_ONLY.includes(f)));
 const { STUDENT_FIELDS } = require("../utils/attemptHelpers");
@@ -44,7 +45,7 @@ const ownOrAdmin = (req, a) => isAdmin(req) || String(a.createdBy) === String(re
 
 const sample = async (match, size) => {
     if (size <= 0) return [];
-    return Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: { _id: 1 } }]);
+    return Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: { _id: 1, chapterId: 1 } }]);
 };
 
 // Split n into easy / medium / hard counts
@@ -69,13 +70,45 @@ const splitByLevel = (n, difficulty, used = {}) => {
 };
 
 // Picks the questions for every chapter. Returns { ids, shortages }.
-const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficulty, formats, examCode, exclude = [] }) => {
+const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficulty, formats, formatCounts = {}, examCode, exclude = [] }) => {
     const topics = topicIds.length ? await Topic.find({ _id: { $in: topicIds } }).select("chapterId").lean() : [];
     const chapters = await Chapter.find({ _id: { $in: perChapter.map((p) => p.chapterId) } }).select("name").lean();
     const ids = [];
     const shortages = [];
     const used = {};
-    for (const { chapterId, count } of perChapter) {
+
+    // 1. Question types with a set count come first, from all the chosen chapters
+    const fromChapter = new Map(); // chapterId -> how many already picked there
+    const typed = Object.entries(formatCounts).filter(([, n]) => n > 0);
+    if (typed.length) {
+        const all = { examId: toId(examId), subjectId: toId(subjectId), status: "published", chapterId: { $in: perChapter.map((p) => toId(p.chapterId)) } };
+        if (topics.length) {
+            // chapters with chosen concepts use only those concepts
+            const limited = new Set(topics.map((t) => String(t.chapterId)));
+            all.$or = [{ chapterId: { $in: perChapter.map((p) => p.chapterId).filter((c) => !limited.has(String(c))).map(toId) } }, { topicId: { $in: topics.map((t) => t._id) } }];
+        }
+        for (const [format, n] of typed) {
+            const got = [];
+            const not = () => ({ $nin: [...exclude, ...ids, ...got.map((q) => q._id)].map(toId) });
+            for (const [level, k] of splitByLevel(n, difficulty, used)) {
+                if (level) used[level] = (used[level] || 0) + k;
+                got.push(...(await sample({ ...all, format, ...(level ? { difficulty: level } : {}), _id: not() }, k)));
+            }
+            if (got.length < n) got.push(...(await sample({ ...all, format, _id: not() }, n - got.length)));
+            got.forEach((q) => fromChapter.set(String(q.chapterId), (fromChapter.get(String(q.chapterId)) || 0) + 1));
+            ids.push(...got.map((q) => q._id));
+            if (got.length < n) shortages.push({ chapter: `${FORMAT_NAMES[format] || format} questions`, wanted: n, got: got.length });
+        }
+    }
+
+    // 2. The rest, chapter by chapter (typed questions already count towards their chapter)
+    let extraLeft = 0; // typed questions beyond a chapter's own count come off the other chapters
+    for (const p of perChapter) extraLeft += Math.max(0, (fromChapter.get(String(p.chapterId)) || 0) - p.count);
+    for (const { chapterId, count: fullCount } of perChapter) {
+        let count = Math.max(0, fullCount - (fromChapter.get(String(chapterId)) || 0));
+        const cut = Math.min(count, extraLeft);
+        count -= cut;
+        extraLeft -= cut;
         const base = { examId: toId(examId), subjectId: toId(subjectId), chapterId: toId(chapterId), status: "published" };
         const own = topics.filter((t) => String(t.chapterId) === String(chapterId)).map((t) => t._id);
         if (own.length) base.topicId = { $in: own };
@@ -95,7 +128,7 @@ const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficul
             ids.push(...more.map((q) => q._id));
             got += more.length;
         }
-        if (got < count) shortages.push({ chapter: chapters.find((c) => String(c._id) === String(chapterId))?.name || "Chapter", wanted: count, got });
+        if (got < count && count > 0) shortages.push({ chapter: chapters.find((c) => String(c._id) === String(chapterId))?.name || "Chapter", wanted: count, got });
     }
     return { ids, shortages };
 };
@@ -119,6 +152,11 @@ const readSettings = async (req, body) => {
     const pickMode = body.pickMode === "manual" ? "manual" : "auto";
     const allowed = formatsFor(exam.code);
     const formats = (body.formats || []).filter((f) => allowed.includes(f));
+    const formatCounts = {};
+    for (const f of formats) {
+        const n = Math.max(0, Math.min(200, parseInt(body.formatCounts?.[f]) || 0));
+        if (n) formatCounts[f] = n;
+    }
     const topicIds = (body.topicIds || []).filter(isValidId).map(String);
     if (pickMode === "manual") {
         return { exam, subject, classLevel, chapterIds, perChapter: [], difficulty: { mode: "any" }, formats, topicIds, total: 0, pickMode };
@@ -145,7 +183,9 @@ const readSettings = async (req, body) => {
         LEVELS.forEach((l) => (difficulty[l] = Math.max(0, Math.min(100, Number(body.difficulty?.[l]) || 0))));
         if (difficulty.easy + difficulty.medium + difficulty.hard !== 100) throw userError("Easy + medium + hard must add up to 100%");
     }
-    return { exam, subject, classLevel, chapterIds, perChapter, difficulty, formats, topicIds, total, pickMode };
+    const typedTotal = Object.values(formatCounts).reduce((a, n) => a + n, 0);
+    if (typedTotal > total) throw userError(`The question types add up to ${typedTotal}, more than the ${total} questions in total`);
+    return { exam, subject, classLevel, chapterIds, perChapter, difficulty, formats, formatCounts, topicIds, total, pickMode };
 };
 
 const readAudience = (body) => {
@@ -227,7 +267,7 @@ const listMine = handle("listAssignments", async (req, res) => {
 const create = handle("createAssignment", async (req, res) => {
     const s = await readSettings(req, req.body);
     const who = readAudience(req.body);
-    const { ids, shortages } = s.pickMode === "manual" ? { ids: [], shortages: [] } : await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats, examCode: s.exam.code });
+    const { ids, shortages } = s.pickMode === "manual" ? { ids: [], shortages: [] } : await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats, formatCounts: s.formatCounts, examCode: s.exam.code });
     if (!ids.length && s.pickMode !== "manual") throw userError("No questions match these choices. Try more chapters, any difficulty or more question types.");
     const title =
         String(req.body.title || "").trim().slice(0, 140) ||
@@ -239,7 +279,7 @@ const create = handle("createAssignment", async (req, res) => {
         subjectId: s.subject._id,
         createdBy: req.user._id,
         ...who,
-        settings: { pickMode: s.pickMode, classLevel: s.classLevel, chapterIds: s.chapterIds, topicIds: s.topicIds, perChapter: s.perChapter, difficulty: s.difficulty, formats: s.formats },
+        settings: { pickMode: s.pickMode, classLevel: s.classLevel, chapterIds: s.chapterIds, topicIds: s.topicIds, perChapter: s.perChapter, difficulty: s.difficulty, formats: s.formats, formatCounts: s.formatCounts },
         questionIds: ids,
     });
     res.status(201).json({ assignment: (await summary([a.toObject()]))[0], wanted: s.total, got: ids.length, shortages });

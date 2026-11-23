@@ -7,6 +7,7 @@ import { Step } from "../../components/premium";
 import { toast } from "../../components/Toaster";
 import { toLocalInput } from "../../components/liveHelpers";
 import { CLASS_LABELS, FORMAT_LABELS, JEE_ONLY } from "../../components/assignmentHelpers";
+import QuestionTypeCounts, { cleanCounts, typedTotal } from "../../components/QuestionTypeCounts";
 
 const input = "w-full rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30";
 const LEVELS = [
@@ -80,6 +81,7 @@ export default function AssignmentForm() {
   const [diffMode, setDiffMode] = useState("equal");
   const [pct, setPct] = useState({ easy: 40, medium: 40, hard: 20 });
   const [formats, setFormats] = useState([]);
+  const [formatCounts, setFormatCounts] = useState({});
   const [college, setCollege] = useState("MB PU");
   const [sections, setSections] = useState([]);
   const [dueAt, setDueAt] = useState(nextWeek());
@@ -156,6 +158,8 @@ export default function AssignmentForm() {
         ? "Enter how many questions"
         : total > 200
           ? "At most 200 questions"
+          : typedTotal(formats, formatCounts) > total
+            ? `The question types add up to ${typedTotal(formats, formatCounts)}, more than ${total}`
           : diffMode === "custom" && pctSum !== 100
             ? `Difficulty adds up to ${pctSum}%, it must be 100%`
             : !dueAt
@@ -182,6 +186,7 @@ export default function AssignmentForm() {
         perChapter,
         difficulty: diffMode === "custom" ? { mode: "custom", ...pct } : { mode: diffMode },
         formats,
+        formatCounts: cleanCounts(formats, formatCounts),
         college,
         sections,
         dueAt: new Date(dueAt).toISOString(),
@@ -488,24 +493,14 @@ export default function AssignmentForm() {
             title="Question types"
             hint={`${formats.length ? `${formats.length} chosen` : "None chosen = every type"}${(opts?.formats || []).includes("numerical") ? "" : " · Multiple correct and numerical are for JEE only"}`}
           >
-            <div className="flex flex-wrap gap-2">
-              {(opts?.formats || Object.keys(FORMAT_LABELS).filter((f) => !JEE_ONLY.includes(f))).map((f) => {
-                const on = formats.includes(f);
-                return (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => toggle(formats, setFormats, f)}
-                    aria-pressed={on}
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${on ? "border-[#b8862b] bg-gradient-to-b from-[#fbecc4] to-[#f1d790] text-[#17140f]" : "border-[#e7dcc3] bg-white text-slate-700 hover:border-[#c9a24a]"}`}
-                  >
-                    {on && "✓ "}
-                    {FORMAT_LABELS[f] || f}
-                    {JEE_ONLY.includes(f) && <span className="rounded-full bg-[#17140f] px-1.5 py-0.5 text-[10px] font-bold text-[#e5c372]">JEE</span>}
-                  </button>
-                );
-              })}
-            </div>
+            <QuestionTypeCounts
+              options={opts?.formats || Object.keys(FORMAT_LABELS).filter((f) => !JEE_ONLY.includes(f))}
+              chosen={formats}
+              onChosen={setFormats}
+              counts={formatCounts}
+              onCounts={setFormatCounts}
+              total={total}
+            />
           </Card>
 
           </>)}

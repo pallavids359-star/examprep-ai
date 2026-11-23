@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import QuestionTypeCounts, { cleanCounts, typedTotal } from "../../components/QuestionTypeCounts";
 import BackLink from "../../components/BackLink";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
@@ -90,6 +91,7 @@ export default function LiveTestForm() {
   const [autoClass, setAutoClass] = useState("both");
   const [autoMix, setAutoMix] = useState({ easy: "", medium: "", hard: "" }); // typed %; empty = any difficulty
   const [autoFormats, setAutoFormats] = useState([]);
+  const [autoFormatCounts, setAutoFormatCounts] = useState({});
   const [perChapter, setPerChapter] = useState({}); // sectionKey -> { chapterId: count }
   const [chapterOpen, setChapterOpen] = useState({}); // sectionKey -> open
   const [showResults, setShowResults] = useState("after_submit"); // students see their result as soon as they finish
@@ -137,6 +139,7 @@ export default function LiveTestForm() {
         setAutoClass(au.classLevel || "both");
         setAutoMix(au.mix?.easy || au.mix?.medium || au.mix?.hard ? { easy: String(au.mix.easy || 0), medium: String(au.mix.medium || 0), hard: String(au.mix.hard || 0) } : { easy: "", medium: "", hard: "" });
         setAutoFormats(au.formats || []);
+        setAutoFormatCounts(Object.fromEntries(Object.entries(au.formatCounts || {}).map(([f, n]) => [f, String(n)])));
         const pc = {};
         (au.perChapter || []).forEach((x) => ((pc[x.sectionKey] = pc[x.sectionKey] || {})[x.chapterId] = String(x.count)));
         setPerChapter(pc);
@@ -207,11 +210,13 @@ export default function LiveTestForm() {
   }, [startsAt, endTouched]);
 
   const setRow = (key, patch) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const chapterSum = (key) => Object.values(perChapter[key] || {}).reduce((a, c) => a + (Number(c) || 0), 0);
   const anyAuto = rows.some((r) => r.include && r.picker === "auto");
+  // the smallest auto subject: type counts apply to every subject
+  const smallestAuto = Math.min(...rows.filter((r) => r.include && r.picker === "auto").map((r) => (chapterSum(r.key) > 0 ? chapterSum(r.key) : Number(r.mcqCount) || 0)), 9999);
   const mixTotal = (Number(autoMix.easy) || 0) + (Number(autoMix.medium) || 0) + (Number(autoMix.hard) || 0);
   const subjectKeyOf = (key) => [...(pattern?.sections || []), ...(pattern?.splitSections || [])].find((d) => d.key === key)?.subjectKey || key;
   const chaptersOf = (key) => (pattern?.chapters?.[subjectKeyOf(key)] || []).filter((c) => autoClass === "both" || String(c.classLevel) === autoClass);
-  const chapterSum = (key) => Object.values(perChapter[key] || {}).reduce((a, c) => a + (Number(c) || 0), 0);
   const setChapterCount = (key, chapterId, value) => {
     const next = { ...(perChapter[key] || {}), [chapterId]: value };
     setPerChapter((p) => ({ ...p, [key]: next }));
@@ -227,6 +232,7 @@ export default function LiveTestForm() {
     if (!included.length) return setError("Include at least one subject");
     if (included.some((r) => r.picker === "lecturer" && !r.lecturerId)) return setError("Choose a lecturer for each subject marked 'Lecturer'");
     if (!startsAt || !endsAt) return setError("Choose when the test opens and closes");
+    if (anyAuto && typedTotal(autoFormats, autoFormatCounts) > smallestAuto) return setError(`The question types add up to ${typedTotal(autoFormats, autoFormatCounts)}, more than the ${smallestAuto} questions in a subject.`);
     if (anyAuto && mixTotal && mixTotal !== 100) return setError(`Difficulty adds up to ${mixTotal}%. Easy + medium + hard must be 100%.`);
     if (endsAt <= startsAt) return setError("The test must close after it opens");
     setSaving(true);
@@ -243,6 +249,7 @@ export default function LiveTestForm() {
         classLevel: autoClass,
         mix: mixTotal ? { easy: Number(autoMix.easy) || 0, medium: Number(autoMix.medium) || 0, hard: Number(autoMix.hard) || 0 } : null,
         formats: autoFormats,
+        formatCounts: cleanCounts(autoFormats, autoFormatCounts),
         perChapter: Object.entries(perChapter).flatMap(([sectionKey, m]) =>
           included.some((r) => r.key === sectionKey && r.picker === "auto") ? Object.entries(m).filter(([, c]) => Number(c) > 0).map(([chapterId, c]) => ({ sectionKey, chapterId, count: Number(c) })) : []
         ),
@@ -445,18 +452,18 @@ export default function LiveTestForm() {
                   </div>
                 </div>
                 <div>
-                  <p className="gp-label">Types of questions</p>
-                  <div className="mt-1.5 flex flex-wrap gap-2">
-                    {(pattern?.formats || []).map((f) => {
-                      const on = autoFormats.includes(f);
-                      return (
-                        <button key={f} type="button" aria-pressed={on} className="gp-tile px-3.5 py-2 text-sm font-semibold text-slate-800" onClick={() => setAutoFormats(on ? autoFormats.filter((x) => x !== f) : [...autoFormats, f])}>
-                          {{ single_correct: "Single correct answer", assertion_reason: "Assertion and reason", statement_based: "Statement based", match_following: "Match the following", multi_correct: "Multiple correct (JEE)", numerical: "Numerical (JEE)" }[f] || f}
-                        </button>
-                      );
-                    })}
+                  <p className="gp-label">Types of questions (in each subject)</p>
+                  <div className="mt-1.5">
+                    <QuestionTypeCounts
+                      options={(pattern?.formats || []).filter((f) => f !== "numerical")}
+                      chosen={autoFormats}
+                      onChosen={setAutoFormats}
+                      counts={autoFormatCounts}
+                      onCounts={setAutoFormatCounts}
+                      total={smallestAuto < 9999 ? smallestAuto : 0}
+                      per=" in a subject"
+                    />
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{autoFormats.length ? `${autoFormats.length} chosen` : "None chosen = every type"}</p>
                 </div>
               </div>
             )}
