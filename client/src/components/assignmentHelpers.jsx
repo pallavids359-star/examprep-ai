@@ -1,15 +1,16 @@
 // Shared words and styles for the assignment pages
 export const FORMAT_LABELS = {
   single_correct: "Single correct answer",
-  multi_correct: "More than one correct",
-  assertion_reason: "Assertion & reason",
+  assertion_reason: "Assertion and reason",
+  statement_based: "Statement based questions",
   match_following: "Match the following",
-  statement_based: "Statement based",
+  multi_correct: "Multiple correct answer",
   numerical: "Numerical",
 };
+export const JEE_ONLY = ["multi_correct", "numerical"];
 export const FORMAT_SHORT = {
   single_correct: "Single correct",
-  multi_correct: "Multi correct",
+  multi_correct: "Multiple correct",
   assertion_reason: "Assertion–Reason",
   match_following: "Match",
   statement_based: "Statements",

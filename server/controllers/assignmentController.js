@@ -12,6 +12,10 @@ const Exam = require("../models/Exam");
 const User = require("../models/User");
 const TestAttempt = require("../models/TestAttempt");
 const { FORMATS } = require("../utils/questionFormat");
+// Multiple correct and numerical questions are only for JEE
+const JEE_ONLY = ["multi_correct", "numerical"];
+const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"];
+const formatsFor = (examCode) => ORDER.filter((f) => FORMATS.includes(f) && (examCode === "JEE" || !JEE_ONLY.includes(f)));
 const { STUDENT_FIELDS } = require("../utils/attemptHelpers");
 const { shape, namesFor, FULL_FIELDS } = require("./liveLecturerController");
 
@@ -65,7 +69,7 @@ const splitByLevel = (n, difficulty, used = {}) => {
 };
 
 // Picks the questions for every chapter. Returns { ids, shortages }.
-const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficulty, formats, exclude = [] }) => {
+const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficulty, formats, examCode, exclude = [] }) => {
     const topics = topicIds.length ? await Topic.find({ _id: { $in: topicIds } }).select("chapterId").lean() : [];
     const chapters = await Chapter.find({ _id: { $in: perChapter.map((p) => p.chapterId) } }).select("name").lean();
     const ids = [];
@@ -76,6 +80,7 @@ const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficul
         const own = topics.filter((t) => String(t.chapterId) === String(chapterId)).map((t) => t._id);
         if (own.length) base.topicId = { $in: own };
         if (formats.length) base.format = { $in: formats };
+        else if (examCode && examCode !== "JEE") base.format = { $nin: JEE_ONLY };
         const taken = () => [...exclude, ...ids].map(toId);
         let got = 0;
         for (const [level, k] of splitByLevel(count, difficulty, used)) {
@@ -132,7 +137,8 @@ const readSettings = async (req, body) => {
         LEVELS.forEach((l) => (difficulty[l] = Math.max(0, Math.min(100, Number(body.difficulty?.[l]) || 0))));
         if (difficulty.easy + difficulty.medium + difficulty.hard !== 100) throw userError("Easy + medium + hard must add up to 100%");
     }
-    const formats = (body.formats || []).filter((f) => FORMATS.includes(f));
+    const allowed = formatsFor(exam.code);
+    const formats = (body.formats || []).filter((f) => allowed.includes(f));
     const topicIds = (body.topicIds || []).filter(isValidId).map(String);
     return { exam, subject, classLevel, chapterIds, perChapter, difficulty, formats, topicIds, total };
 };
@@ -193,7 +199,8 @@ const options = handle("assignmentOptions", async (req, res) => {
         if (mine.length) subjects = mine;
     }
     const colleges = [...new Set([DEFAULT_COLLEGE, ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
-    res.json({ exams, examId, subjects, colleges, sections: SECTIONS, formats: FORMATS });
+    const exam = exams.find((e) => String(e._id) === String(examId));
+    res.json({ exams, examId, subjects, colleges, sections: SECTIONS, formats: formatsFor(exam?.code) });
 });
 
 // GET /api/lecturer/assignments/chapters?subjectId=
@@ -215,7 +222,7 @@ const listMine = handle("listAssignments", async (req, res) => {
 const create = handle("createAssignment", async (req, res) => {
     const s = await readSettings(req, req.body);
     const who = readAudience(req.body);
-    const { ids, shortages } = await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats });
+    const { ids, shortages } = await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats, examCode: s.exam.code });
     if (!ids.length) throw userError("No questions match these choices. Try more chapters, any difficulty or more question types.");
     const title =
         String(req.body.title || "").trim().slice(0, 140) ||

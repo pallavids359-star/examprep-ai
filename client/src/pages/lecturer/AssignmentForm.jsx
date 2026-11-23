@@ -6,7 +6,7 @@ import BackLink from "../../components/BackLink";
 import { Step } from "../../components/premium";
 import { toast } from "../../components/Toaster";
 import { toLocalInput } from "../../components/liveHelpers";
-import { CLASS_LABELS, FORMAT_LABELS } from "../../components/assignmentHelpers";
+import { CLASS_LABELS, FORMAT_LABELS, JEE_ONLY } from "../../components/assignmentHelpers";
 
 const input = "w-full rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30";
 const LEVELS = [
@@ -92,6 +92,7 @@ export default function AssignmentForm() {
         setOpts(res.data);
         if (!examId) setExamId(String(res.data.examId || ""));
         const subs = res.data.subjects || [];
+        setFormats((cur) => cur.filter((f) => (res.data.formats || []).includes(f)));
         setSubjectId((cur) => (subs.some((s) => String(s._id) === cur) ? cur : String(subs[0]?._id || "")));
       })
       .catch((err) => setError(getErrorMessage(err)));
@@ -436,9 +437,13 @@ export default function AssignmentForm() {
           </Card>
 
           {/* 7. Types */}
-          <Card n={7} title="Question types" hint={formats.length ? `${formats.length} chosen` : "None chosen = every type"}>
+          <Card
+            n={7}
+            title="Question types"
+            hint={`${formats.length ? `${formats.length} chosen` : "None chosen = every type"}${(opts?.formats || []).includes("numerical") ? "" : " · Multiple correct and numerical are for JEE only"}`}
+          >
             <div className="flex flex-wrap gap-2">
-              {(opts?.formats || Object.keys(FORMAT_LABELS)).map((f) => {
+              {(opts?.formats || Object.keys(FORMAT_LABELS).filter((f) => !JEE_ONLY.includes(f))).map((f) => {
                 const on = formats.includes(f);
                 return (
                   <button
@@ -450,6 +455,7 @@ export default function AssignmentForm() {
                   >
                     {on && "✓ "}
                     {FORMAT_LABELS[f] || f}
+                    {JEE_ONLY.includes(f) && <span className="rounded-full bg-[#17140f] px-1.5 py-0.5 text-[10px] font-bold text-[#e5c372]">JEE</span>}
                   </button>
                 );
               })}
