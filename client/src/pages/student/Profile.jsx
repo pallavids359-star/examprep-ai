@@ -25,7 +25,7 @@ export default function Profile() {
 
   const saved = (p) => {
     setProfile(p);
-    setUser((u) => ({ ...u, name: p.name }));
+    setUser((u) => ({ ...u, name: p.name, college: p.college, section: p.section }));
   };
 
   if (error) return <p className="max-w-4xl mx-auto px-4 py-10 text-red-700">{error}</p>;

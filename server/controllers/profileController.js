@@ -12,6 +12,8 @@ const profileOf = (u) => ({
   phone: u.phone || "",
   classLevel: u.classLevel || "",
   targetYear: u.targetYear || null,
+  college: u.college || "",
+  section: u.section || "",
   streak: u.streak || { current: 0, longest: 0 },
   createdAt: u.createdAt,
 });
@@ -33,7 +35,7 @@ const updateProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id || req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    const { name, phone, classLevel, targetYear } = req.body;
+    const { name, phone, classLevel, targetYear, college, section } = req.body;
 
     if (name !== undefined) {
       const clean = String(name).trim();
@@ -54,6 +56,20 @@ const updateProfile = async (req, res) => {
       const now = new Date().getFullYear();
       if (targetYear && (!Number.isInteger(year) || year < now || year > now + 4)) return res.status(400).json({ message: "Choose a valid target year" });
       user.targetYear = targetYear ? year : undefined;
+    }
+
+    if (college !== undefined) {
+      const clean = String(college).trim();
+      if (!clean) return res.status(400).json({ message: "Enter your college name" });
+      if (clean.length > 120) return res.status(400).json({ message: "The college name is too long" });
+      user.college = clean;
+    }
+    // Sections are only for MB PU
+    if (section !== undefined || college !== undefined) {
+      const isMB = String(user.college || "").trim().toLowerCase() === "mb pu";
+      const sec = String(section || "").toUpperCase();
+      if (isMB && !["A", "B", "C", "D"].includes(sec)) return res.status(400).json({ message: "Choose your section (A, B, C or D)" });
+      user.section = isMB ? sec : undefined;
     }
 
     await user.save();

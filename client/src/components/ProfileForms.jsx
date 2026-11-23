@@ -19,7 +19,11 @@ export function DetailsForm({ profile, onSaved }) {
     phone: profile.phone,
     classLevel: profile.classLevel,
     targetYear: profile.targetYear || "",
+    college: !profile.college || profile.college.toLowerCase() === "mb pu" ? "MB PU" : "Other",
+    otherCollege: profile.college && profile.college.toLowerCase() !== "mb pu" ? profile.college : "",
+    section: profile.section || "",
   });
+  const isMB = form.college === "MB PU";
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState(null);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -29,11 +33,19 @@ export function DetailsForm({ profile, onSaved }) {
     setSaving(true);
     setNote(null);
     try {
-      const res = await api.put("/auth/profile", { ...form, targetYear: form.targetYear ? Number(form.targetYear) : null });
+      if (form.college === "Other" && !form.otherCollege.trim()) throw new Error("Enter your college name");
+      if (isMB && !form.section) throw new Error("Choose your section");
+      const { otherCollege, ...rest } = form;
+      const res = await api.put("/auth/profile", {
+        ...rest,
+        college: form.college === "Other" ? otherCollege.trim() : "MB PU",
+        section: isMB ? form.section : "",
+        targetYear: form.targetYear ? Number(form.targetYear) : null,
+      });
       onSaved(res.data.user);
       toast("Your details were saved.");
     } catch (err) {
-      setNote({ ok: false, text: getErrorMessage(err) });
+      setNote({ ok: false, text: err.response ? getErrorMessage(err) : err.message });
     }
     setSaving(false);
   };
@@ -63,6 +75,37 @@ export function DetailsForm({ profile, onSaved }) {
             <option value="dropper">Dropper / repeater</option>
           </select>
         </label>
+        <label className={label}>
+          College
+          <select value={form.college} onChange={(e) => setForm((f) => ({ ...f, college: e.target.value, section: e.target.value === "MB PU" ? f.section : "" }))} className={input}>
+            <option value="MB PU">MB PU</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        {isMB ? (
+          <div className={label}>
+            Section
+            <div className="mt-1 flex gap-2" role="radiogroup" aria-label="Section">
+              {["A", "B", "C", "D"].map((x) => (
+                <button
+                  key={x}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.section === x}
+                  onClick={() => setForm((f) => ({ ...f, section: x }))}
+                  className={`h-10 w-12 rounded-lg border text-sm font-bold transition ${form.section === x ? "border-[#17140f] bg-[#17140f] text-[#e5c372]" : "border-slate-300 bg-white text-slate-700 hover:border-[#c9a24a]"}`}
+                >
+                  {x}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <label className={label}>
+            College name
+            <input value={form.otherCollege} onChange={set("otherCollege")} placeholder="Type your college name" maxLength={120} className={input} />
+          </label>
+        )}
         <label className={label}>
           Target exam year
           <select value={form.targetYear} onChange={set("targetYear")} className={input}>
@@ -115,7 +158,7 @@ export function PasswordForm() {
       setForm({ current: "", next: "", confirm: "" });
       toast("Password changed. Use the new one next time you log in.");
     } catch (err) {
-      setNote({ ok: false, text: getErrorMessage(err) });
+      setNote({ ok: false, text: err.response ? getErrorMessage(err) : err.message });
     }
     setSaving(false);
   };
