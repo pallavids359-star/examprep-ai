@@ -77,7 +77,8 @@ export default function LiveTestForm() {
   const [titleTouched, setTitleTouched] = useState(false);
   const [date, setDate] = useState(today());
   const [time, setTime] = useState("20:30");
-  const [openFor, setOpenFor] = useState("24h");
+  const [openFor, setOpenFor] = useState("custom");
+  const [endTouched, setEndTouched] = useState(false);
   const [customEnd, setCustomEnd] = useState("");
   const [duration, setDuration] = useState(180);
   const [otherDate, setOtherDate] = useState(false);
@@ -121,6 +122,7 @@ export default function LiveTestForm() {
         const ds = `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}`;
         setOtherDate(!DAYS.some(([o]) => dayString(o) === ds));
         setOpenFor("custom");
+        setEndTouched(true);
         setCustomEnd(toLocalInput(t.endsAt));
         setDuration(t.durationMinutes);
         setSplit(Boolean(t.live?.splitBiology));
@@ -184,6 +186,12 @@ export default function LiveTestForm() {
     if (openFor === "midnight") return new Date(`${date}T23:59`);
     return customEnd ? new Date(customEnd) : null;
   }, [startsAt, openFor, date, customEnd]);
+
+  // Until the end is changed by hand, it stays 24 hours after the start
+  useEffect(() => {
+    if (endTouched || !startsAt || Number.isNaN(startsAt.getTime())) return;
+    setCustomEnd(toLocalInput(new Date(startsAt.getTime() + 24 * 3600e3)));
+  }, [startsAt, endTouched]);
 
   const setRow = (key, patch) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const included = rows.filter((r) => r.include);
@@ -274,133 +282,8 @@ export default function LiveTestForm() {
         </section>
 
         {/* 2. When */}
-        <section className="gp-card space-y-6 p-6">
-          <Step n={2} title="When can students write it?" hint="They start any time inside this window" />
-
-          <div>
-            <p className={LABEL}>Day</p>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {WEEK.map((o) => {
-                const d = dayString(o);
-                const x = new Date(`${d}T00:00`);
-                const on = date === d;
-                return (
-                  <button
-                    key={o}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setDate(d)}
-                    className="gp-tile flex w-[72px] shrink-0 flex-col items-center py-2.5"
-                  >
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${on ? "text-amber-800" : "text-slate-500"}`}>
-                      {o === 0 ? "Today" : o === 1 ? "Tmrw" : x.toLocaleDateString("en-IN", { weekday: "short" })}
-                    </span>
-                    <span className="font-display text-2xl font-extrabold leading-tight text-slate-900">{x.getDate()}</span>
-                    <span className="text-[11px] text-slate-500">{x.toLocaleDateString("en-IN", { month: "short" })}</span>
-                  </button>
-                );
-              })}
-              <label
-                aria-pressed={!inWeek}
-                className="gp-tile relative flex w-[96px] shrink-0 cursor-pointer flex-col items-center justify-center py-2.5 text-center"
-                onClick={() => dateRef.current?.showPicker?.()}
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-amber-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={ICONS.calendar} />
-                </svg>
-                <span className="mt-1 text-xs font-semibold text-slate-800">{inWeek ? "Other date" : dayLabel(date)}</span>
-                <input
-                  ref={dateRef}
-                  type="date"
-                  aria-label="Pick another date"
-                  min={today()}
-                  value={date}
-                  onChange={(e) => e.target.value && setDate(e.target.value)}
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <p className={LABEL}>Start time</p>
-            <div className="space-y-2">
-              {SLOTS.map(([part, list]) => (
-                <div key={part} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 text-xs font-semibold text-slate-500">{part}</span>
-                  <div className="grid flex-1 grid-cols-3 gap-2 sm:grid-cols-6">
-                    {list.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        aria-pressed={time === t}
-                        onClick={() => setTime(t)}
-                        className="gp-tile py-2 text-sm font-semibold tabular-nums text-slate-800"
-                      >
-                        {timeLabel(t)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center gap-3">
-                <span className="w-20 shrink-0 text-xs font-semibold text-slate-500">Exact</span>
-                <input
-                  type="time"
-                  aria-label="Exact start time"
-                  value={time}
-                  onChange={(e) => e.target.value && setTime(e.target.value)}
-                  className={`${input} max-w-[9rem] ${ALL_SLOTS.includes(time) ? "" : "border-amber-500 ring-2 ring-amber-200"}`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <p className={LABEL}>Students can start it for</p>
-              <Segmented value={openFor} onChange={setOpenFor} options={OPEN_FOR} />
-              {openFor === "custom" && (
-                <input type="datetime-local" aria-label="Closes" className={`${input} mt-2`} value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
-              )}
-            </div>
-            <div>
-              <p className={LABEL}>Each student gets</p>
-              <Segmented
-                value={lengths.includes(Number(duration)) && !otherLength ? Number(duration) : "other"}
-                onChange={(v) => {
-                  if (v === "other") return setOtherLength(true);
-                  setOtherLength(false);
-                  setDuration(v);
-                }}
-                options={[...lengths.map((m) => [m, fmtMin(m), m === pattern?.minutes ? "real exam" : ""]), ["other", "Other"]]}
-              />
-              {(otherLength || !lengths.includes(Number(duration))) && (
-                <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-                  <input type="number" min={5} max={360} aria-label="Minutes" className={`${input} w-28`} value={duration} onChange={(e) => setDuration(e.target.value)} required />
-                  minutes
-                </label>
-              )}
-            </div>
-          </div>
-
-          {/* Timeline */}
-          {startsAt && endsAt && endsAt > startsAt ? (
-            <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-white p-4 ring-1 ring-amber-200/70">
-              <div className="flex items-center gap-3">
-                <TimePoint label="Opens" d={startsAt} />
-                <div className="relative flex-1">
-                  <div className="h-1.5 rounded-full bg-gradient-to-r from-amber-300 via-amber-500 to-slate-900" />
-                  <p className="mt-2 text-center text-xs text-slate-600">
-                    Open for <b>{fmtSpan(endsAt - startsAt)}</b> · each student gets <b>{fmtMin(Number(duration) || 0)}</b>
-                  </p>
-                </div>
-                <TimePoint label="Closes" d={endsAt} right />
-              </div>
-            </div>
-          ) : (
-            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">The closing time must be after the opening time.</p>
-          )}
+        <section className="gp-card space-y-5 p-6">
+          <Step n={2} title="Date and time" />
 
           <label className="block">
             <span className={LABEL}>Test name</span>
@@ -416,6 +299,53 @@ export default function LiveTestForm() {
               maxLength={140}
             />
           </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <span className={LABEL}>Starts</span>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" aria-label="Start date" className={input} value={date} onChange={(e) => setDate(e.target.value)} required />
+                <input type="time" aria-label="Start time" className={input} value={time} onChange={(e) => setTime(e.target.value)} required />
+              </div>
+            </div>
+            <div>
+              <span className={LABEL}>Ends</span>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  aria-label="End date"
+                  className={input}
+                  value={customEnd.slice(0, 10)}
+                  onChange={(e) => {
+                    setEndTouched(true);
+                    setCustomEnd(`${e.target.value}T${customEnd.slice(11, 16) || "23:59"}`);
+                  }}
+                  required
+                />
+                <input
+                  type="time"
+                  aria-label="End time"
+                  className={input}
+                  value={customEnd.slice(11, 16)}
+                  onChange={(e) => {
+                    setEndTouched(true);
+                    setCustomEnd(`${customEnd.slice(0, 10) || date}T${e.target.value}`);
+                  }}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <label className="block max-w-xs">
+            <span className={LABEL}>Exam duration (minutes)</span>
+            <input type="number" min={5} max={600} className={input} value={duration} onChange={(e) => setDuration(e.target.value)} required />
+            {pattern?.minutes && <span className="mt-1 block text-xs text-slate-500">Real {exam?.code} exam: {pattern.minutes} minutes</span>}
+          </label>
+
+          {startsAt && endsAt && endsAt <= startsAt && (
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">The end time must be after the start time.</p>
+          )}
         </section>
 
         {/* 2. Questions */}
