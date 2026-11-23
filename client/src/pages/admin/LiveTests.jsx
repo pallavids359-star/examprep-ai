@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { PHASE, fmtDateTime } from "../../components/liveHelpers";
+import { askConfirm } from "../../components/ConfirmDialog";
+import { toast } from "../../components/Toaster";
 import { Countdown, Hero, ICONS, Ring, Stat } from "../../components/premium";
 
 const TABS = [
@@ -15,6 +17,25 @@ const TABS = [
 // Head lecturer: every live test with where it stands
 export default function LiveTests() {
   const [tests, setTests] = useState(null);
+  const [deleting, setDeleting] = useState("");
+
+  const removeTest = async (t) => {
+    const ok = await askConfirm(
+      t.phase === "draft" ? `Delete "${t.title}"? Its picked questions go too. This can't be undone.` : `Delete "${t.title}"? Students won't see it any more. Results of anyone who already wrote it are kept.`,
+      { title: "Delete live test?", confirmText: "Delete", danger: true }
+    );
+    if (!ok) return;
+    setDeleting(t._id);
+    try {
+      await api.delete(`/admin/live-tests/${t._id}`);
+      setTests((list) => list.filter((x) => x._id !== t._id));
+      toast("Deleted");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setDeleting("");
+    }
+  };
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
 
@@ -110,8 +131,20 @@ export default function LiveTests() {
           const picked = t.sections.reduce((a, s) => a + Math.min(s.picked || 0, s.mcqCount + s.numericalCount), 0);
           const ready = total ? (picked / total) * 100 : 0;
           return (
-            <article key={t._id} className="gp-card gp-card-hover flex flex-col p-5">
-              <div className="flex items-start justify-between gap-3">
+            <article key={t._id} className="gp-card gp-card-hover relative flex flex-col p-5">
+              <button
+                type="button"
+                onClick={() => removeTest(t)}
+                disabled={deleting === t._id}
+                title="Delete test"
+                aria-label={`Delete ${t.title}`}
+                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" />
+                </svg>
+              </button>
+              <div className="flex items-start justify-between gap-3 pr-8">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="gp-chip">{t.exam}</span>

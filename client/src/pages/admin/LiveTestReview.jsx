@@ -87,18 +87,6 @@ export default function LiveTestReview() {
   };
   const accept = (s) => run(() => api.post(`/admin/live-tests/${id}/sections/${s.key}/accept`), `${s.name} marked as ready`);
   const extend = () => run(() => api.put(`/admin/live-tests/${id}`, { endsAt: new Date(newEnd).toISOString() }), "Closing time changed");
-  const remove = async () => {
-    if (!(await askConfirm("Delete this live test? If students already took it, their results are kept but the test is hidden.", { title: "Delete live test?", confirmText: "Delete", danger: true }))) return;
-    setBusy(true);
-    try {
-      await api.delete(`/admin/live-tests/${id}`);
-      toast("Deleted");
-      navigate("/admin/live-tests");
-    } catch (err) {
-      toast(getErrorMessage(err), "error");
-      setBusy(false);
-    }
-  };
 
   if (error || !test) {
     return (
@@ -381,20 +369,6 @@ export default function LiveTestReview() {
         </section>
       )}
 
-      <section className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50/50 p-5">
-        <div className="min-w-0">
-          <p className="font-bold text-red-800">Delete this live test</p>
-          <p className="mt-0.5 text-sm text-red-700/80">
-            {test.phase === "draft" ? "It disappears with all its picked questions. This can't be undone." : "Students won't see it any more. Results of anyone who already wrote it are kept."}
-          </p>
-        </div>
-        <button type="button" disabled={busy} onClick={remove} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" />
-          </svg>
-          Delete test
-        </button>
-      </section>
     </AdminLayout>
   );
 }
