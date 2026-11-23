@@ -7,6 +7,7 @@ const Exam = require("../models/Exam");
 const { finalizeAttempt, isExpired } = require("../utils/finalizeAttempt");
 const { STUDENT_FIELDS, buildReview, mockExtras } = require("../utils/attemptHelpers");
 const { saveAnswers, getAttempt } = require("./attemptSessionController");
+const { readMix, sampleMixed } = require("../utils/difficultyMix");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const toObjectId = (id) => new mongoose.Types.ObjectId(id);
@@ -52,9 +53,17 @@ const startPractice = async (req, res) => {
         );
 
         const match = { status: "published", $or: parts };
+        let mix;
+        try {
+            mix = readMix(difficulty, req.body.mix);
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
+        }
         if (["easy", "medium", "hard"].includes(difficulty)) match.difficulty = difficulty;
 
-        const questions = await Question.aggregate([{ $match: match }, { $sample: { size } }, { $project: STUDENT_FIELDS }]);
+        const sampleQs = (m, n) => (n > 0 ? Question.aggregate([{ $match: m }, { $sample: { size: n } }, { $project: STUDENT_FIELDS }]) : Promise.resolve([]));
+        let questions = mix ? await sampleMixed(match, size, mix, sampleQs) : await sampleQs(match, size);
+        if (mix) questions = questions.sort(() => Math.random() - 0.5);
         if (questions.length === 0) {
             return res.status(404).json({ message: "No questions found for these choices" });
         }
@@ -70,7 +79,7 @@ const startPractice = async (req, res) => {
             userId: req.user._id,
             examId: exam._id,
             mode: "practice",
-            filters: { chapterId: chapters[0]._id, topicIds: usedTopicIds, difficulty, count: size },
+            filters: { chapterId: chapters[0]._id, topicIds: usedTopicIds, difficulty: mix ? "mixed" : difficulty, count: size },
             markingScheme,
             answers: questions.map((q) => ({
                 questionId: q._id,

@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { getErrorMessage } from "../api/axios";
+import DifficultyPicker, { mixValid } from "./DifficultyPicker";
 
 // Mock test setup: full syllabus or chosen chapters, plus difficulty.
 // Same look and steps as the Practice page.
 
-const DIFFICULTIES = [
-    { value: "any", label: "Any" },
-    { value: "easy", label: "Easy" },
-    { value: "medium", label: "Medium" },
-    { value: "hard", label: "Hard" },
-];
 
 const pillClass = (selected) =>
     `px-4 py-2 rounded-lg border text-sm font-medium ${selected ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-700 hover:border-slate-400"}`;
@@ -41,6 +36,7 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
     const [chapterIds, setChapterIds] = useState([]);
     const [classLevel, setClassLevel] = useState("both");
     const [difficulty, setDifficulty] = useState("any");
+    const [mix, setMix] = useState({ easy: 40, medium: 40, hard: 20 });
     const [error, setError] = useState("");
 
     // Only the subjects that are in this exam's paper (KCET depends on the stream)
@@ -93,12 +89,13 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
     const perQ = minutes / totalQs;
     const maxQs = scope === "full" ? totalQs : subjectsUsed.reduce((a, s) => a + partCount(s.name), 0);
     const estMinutes = Math.max(5, Math.round(perQ * maxQs));
-    const canGo = scope === "full" || chosen.length > 0;
+    const canGo = (scope === "full" || chosen.length > 0) && mixValid(difficulty, mix);
 
     const go = () =>
         onContinue({
             scope,
             difficulty,
+            mix: difficulty === "custom" ? mix : difficulty === "equal" ? { easy: 34, medium: 33, hard: 33 } : null,
             classLevel,
             chapterIds: scope === "full" ? [] : chapterIds.filter((id) => allChapters.some((c) => c._id === id && inClass(c))),
             topicIds: [],
@@ -216,12 +213,8 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
             {/* Difficulty */}
             <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
                 <h3 className="font-semibold text-slate-900">{scope === "chapters" ? "4" : "3"}. Difficulty</h3>
-                <div className="flex flex-wrap gap-2 mt-3">
-                    {DIFFICULTIES.map((d) => (
-                        <button key={d.value} type="button" onClick={() => setDifficulty(d.value)} className={pillClass(d.value === difficulty)}>
-                            {d.label}
-                        </button>
-                    ))}
+                <div className="mt-3">
+                    <DifficultyPicker value={difficulty} onChange={setDifficulty} mix={mix} onMixChange={setMix} total={maxQs} />
                 </div>
             </section>
 
@@ -251,7 +244,12 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
                         <p className="text-xs text-slate-500 mt-2">If the chosen chapters have fewer questions, you get all of them and the time is shortened to match.</p>
                     </>
                 )}
-                {difficulty !== "any" && <p className="mt-1 text-xs text-slate-500">Only {difficulty} questions.</p>}
+                {["easy", "medium", "hard"].includes(difficulty) && <p className="mt-1 text-xs text-slate-500">Only {difficulty} questions.</p>}
+                {(difficulty === "equal" || difficulty === "custom") && mixValid(difficulty, mix) && (
+                    <p className="mt-1 text-xs text-slate-500">
+                        {difficulty === "equal" ? "34% easy · 33% medium · 33% hard" : `${mix.easy}% easy · ${mix.medium}% medium · ${mix.hard}% hard`}
+                    </p>
+                )}
             </section>
 
             <button

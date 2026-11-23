@@ -66,6 +66,7 @@ export default function MockTests() {
                 chapterIds: filters?.chapterIds || [],
                 topicIds: filters?.topicIds || [],
                 difficulty: filters?.difficulty || "any",
+                mix: filters?.mix || undefined,
                 classLevel: filters?.classLevel || "both",
             });
             (res.data.notes || []).forEach((n) => toast(n, "error"));
@@ -191,7 +192,8 @@ export default function MockTests() {
                                     {total(chosenPattern)} questions in {hours(chosenPattern.minutes)}. Questions come one by one.
                                 </li>
                             )}
-                            {filters?.difficulty && filters.difficulty !== "any" && <li>Only {filters.difficulty} questions.</li>}
+                            {["easy", "medium", "hard"].includes(filters?.difficulty) && <li>Only {filters.difficulty} questions.</li>}
+                            {filters?.mix && <li>Difficulty: {filters.mix.easy}% easy, {filters.mix.medium}% medium, {filters.mix.hard}% hard.</li>}
                             <li>
                                 +{chosen.markingScheme?.correct ?? 4} for a correct answer, {chosen.markingScheme?.incorrect ?? -1} for a wrong one, 0 if left blank.
                             </li>

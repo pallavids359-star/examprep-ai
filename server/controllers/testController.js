@@ -4,6 +4,7 @@ const Question = require("../models/Question");
 const Exam = require("../models/Exam");
 const Subject = require("../models/Subject");
 const Chapter = require("../models/Chapter");
+const { readMix, sampleMixed, mixLabel } = require("../utils/difficultyMix");
 const Topic = require("../models/Topic");
 const TestAttempt = require("../models/TestAttempt");
 const { finalizeAttempt, isExpired } = require("../utils/finalizeAttempt");
@@ -278,7 +279,7 @@ const sample = (match, size) =>
 // Numericals are looked for in the chosen chapters and difficulty first, then any difficulty, then
 // the whole subject (wider), so JEE gets its 5 whenever the bank has them. Only if the subject has
 // none left are the missing places filled with MCQs.
-const pickSection = async (baseMatch, count, numericalCount, wider = []) => {
+const pickSection = async (baseMatch, count, numericalCount, wider = [], mix = null) => {
     const numericals = await sample({ ...baseMatch, type: "numerical" }, numericalCount);
     for (const w of wider) {
         if (numericals.length >= numericalCount) break;
@@ -286,6 +287,12 @@ const pickSection = async (baseMatch, count, numericalCount, wider = []) => {
     }
     const mcqCount = count - numericals.length; // too few numericals: fill with MCQs
     const mcqMatch = { ...baseMatch, type: { $ne: "numerical" } };
+
+    if (mix) {
+        // Difficulty in percentages: MCQs follow the mix; numericals come from any level
+        const mcqs = await sampleMixed(mcqMatch, mcqCount, mix, sample);
+        return [...shuffle(mcqs), ...numericals];
+    }
 
     const diagrams = await sample({ ...mcqMatch, $and: [HAS_DIAGRAM] }, Math.min(diagramTarget(count), mcqCount));
     const taken = diagrams.map((q) => q._id);
@@ -334,6 +341,7 @@ const generateMock = async (req, res) => {
     try {
         const { examId, stream, chapterIds, topicIds } = req.body;
         const difficulty = ["easy", "medium", "hard"].includes(req.body.difficulty) ? req.body.difficulty : "any";
+        const mix = readMix(req.body.difficulty, req.body.mix);
         if (!isValidId(examId)) throw userError("Choose an exam");
         const exam = await Exam.findById(examId);
         if (!exam) throw userError("Exam not found", 404);
@@ -375,7 +383,7 @@ const generateMock = async (req, res) => {
             const anyLevel = { ...match };
             delete anyLevel.difficulty;
             const wholeSubject = { examId: exam._id, subjectId: subject._id, status: "published", ...(match.chapterId ? { chapterId: match.chapterId } : {}) };
-            const picked = await pickSection(match, count, numNeed, [anyLevel, wholeSubject]);
+            const picked = await pickSection(match, count, numNeed, [anyLevel, wholeSubject], mix);
             const gotNum = picked.filter((q) => q.type === "numerical").length;
             if (numNeed && gotNum < numNeed) notes.push(`${subject.name}: only ${gotNum} numerical question${gotNum === 1 ? "" : "s"} in the bank, so ${numNeed - gotNum} MCQ${numNeed - gotNum === 1 ? "" : "s"} added instead`);
             if (picked.length) sections.push({ name: subject.name, subjectId: subject._id, picked });
@@ -388,7 +396,7 @@ const generateMock = async (req, res) => {
         // Full paper: the real time. Chapter-wise: time in proportion to the questions
         const patternTotal = pattern.sections.reduce((a, [, n]) => a + n, 0);
         const minutes = custom ? Math.max(5, Math.round((pattern.minutes * all.length) / patternTotal)) : pattern.minutes;
-        const level = difficulty === "any" ? "" : ` (${difficulty[0].toUpperCase()}${difficulty.slice(1)})`;
+        const level = mix ? ` (${mixLabel(mix)})` : difficulty === "any" ? "" : ` (${difficulty[0].toUpperCase()}${difficulty.slice(1)})`;
 
         const markingScheme = {
             correct: exam.markingScheme.correct,

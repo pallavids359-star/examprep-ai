@@ -2,13 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui";
 import api, { getErrorMessage } from "../../api/axios";
+import DifficultyPicker, { mixValid } from "../../components/DifficultyPicker";
 
-const DIFFICULTIES = [
-    { value: "any", label: "Any" },
-    { value: "easy", label: "Easy" },
-    { value: "medium", label: "Medium" },
-    { value: "hard", label: "Hard" },
-];
 const COUNTS = [10, 20, 30];
 
 // Style for the choice buttons: highlighted when selected
@@ -51,6 +46,7 @@ export default function PracticeSetup() {
     const [topicIds, setTopicIds] = useState([]); // ticked concepts (none = whole chapter)
     const [classLevel, setClassLevel] = useState("both");
     const [difficulty, setDifficulty] = useState("any");
+    const [mix, setMix] = useState({ easy: 40, medium: 40, hard: 20 });
     const [count, setCount] = useState(20);
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [starting, setStarting] = useState(false);
@@ -129,12 +125,13 @@ export default function PracticeSetup() {
     // Ask the backend for random questions, then open the test screen
     const startPractice = async () => {
         setError("");
+        if (!mixValid(difficulty, mix)) return setError("Easy + medium + hard must add up to 100%");
         setStarting(true);
         try {
             const ok = chapters.filter((c) => chapterIds.includes(c._id) && (classLevel === "both" || String(c.classLevel || "") === classLevel));
             const okIds = ok.map((c) => c._id);
             const okTopics = topicIds.filter((t) => okIds.some((cid) => topicsOf(cid).some((x) => x._id === t)));
-            const res = await api.post("/attempts/practice", { chapterIds: okIds, topicIds: okTopics, difficulty, count });
+            const res = await api.post("/attempts/practice", { chapterIds: okIds, topicIds: okTopics, difficulty, mix, count });
             navigate(`/attempt/${res.data.attemptId}`);
         } catch (err) {
             setError(getErrorMessage(err));
@@ -293,12 +290,8 @@ export default function PracticeSetup() {
                             <h2 className="font-semibold text-slate-900">4. Settings</h2>
 
                             <p className="text-sm text-slate-500 mt-3">Difficulty</p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {DIFFICULTIES.map((d) => (
-                                    <button key={d.value} onClick={() => setDifficulty(d.value)} className={pillClass(d.value === difficulty)}>
-                                        {d.label}
-                                    </button>
-                                ))}
+                            <div className="mt-2">
+                                <DifficultyPicker value={difficulty} onChange={setDifficulty} mix={mix} onMixChange={setMix} total={count} />
                             </div>
 
                             <p className="text-sm text-slate-500 mt-4">Number of questions</p>
