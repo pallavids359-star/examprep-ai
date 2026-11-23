@@ -67,6 +67,7 @@ export default function AssignmentForm() {
   const [examId, setExamId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
+  const [pickMode, setPickMode] = useState("auto");
   const [classLevel, setClassLevel] = useState("both");
   const [chapters, setChapters] = useState(null);
   const [chapterIds, setChapterIds] = useState([]);
@@ -140,10 +141,17 @@ export default function AssignmentForm() {
   const tabChapter = picked.find((c) => String(c._id) === topicTab);
   const conceptsIn = (c) => c.topics.filter((t) => topicIds.includes(String(t._id))).length;
 
+  const manual = pickMode === "manual";
   const problem = !subjectId
     ? "Choose the subject"
     : !chapterIds.length
       ? "Tick at least one chapter"
+      : manual
+        ? !dueAt
+          ? "Choose the due date"
+          : new Date(dueAt) <= new Date()
+            ? "The due date must be in the future"
+            : ""
       : total < 1
         ? "Enter how many questions"
         : total > 200
@@ -163,6 +171,7 @@ export default function AssignmentForm() {
       const res = await api.post("/lecturer/assignments", {
         title,
         instructions,
+        pickMode,
         examId,
         subjectId,
         classLevel,
@@ -178,6 +187,11 @@ export default function AssignmentForm() {
         dueAt: new Date(dueAt).toISOString(),
       });
       const { got, wanted, shortages } = res.data;
+      if (manual) {
+        toast("Saved. Now add your questions.");
+        navigate(`/lecturer/assignments/${res.data.assignment._id}`, { state: { pick: true } });
+        return;
+      }
       toast(got < wanted ? `Found ${got} of ${wanted} questions. Check them before publishing.` : `${got} questions ready. Check them, then publish.`, got < wanted ? "error" : "success");
       navigate(`/lecturer/assignments/${res.data.assignment._id}`, { state: { shortages } });
     } catch (err) {
@@ -201,7 +215,36 @@ export default function AssignmentForm() {
 
         {error && <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-        <div className="mt-6 space-y-5">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="How to choose questions">
+          {[
+            ["auto", "Auto fetch", "Set the count, difficulty and types. Questions are picked for you, then you check them.", "M13 2L3 14h8l-1 8 10-12h-8z"],
+            ["manual", "Choose manually", "Browse the question bank like a live test and add each question yourself.", "M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"],
+          ].map(([v, l, sub, icon]) => {
+            const on = pickMode === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setPickMode(v)}
+                className={`flex items-start gap-4 rounded-3xl border p-5 text-left transition ${on ? "border-[#17140f] bg-[#17140f] text-white shadow-xl shadow-black/10" : "border-[#e7dcc3] bg-white hover:border-[#c9a24a]"}`}
+              >
+                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${on ? "bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f]" : "bg-[#f3ecdc] text-[#b8862b]"}`}>
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={icon} />
+                  </svg>
+                </span>
+                <span>
+                  <span className="block text-base font-extrabold">{l}</span>
+                  <span className={`mt-0.5 block text-sm ${on ? "text-amber-50/80" : "text-slate-500"}`}>{sub}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 space-y-5">
           {/* 1. Subject */}
           <Card n={1} title="Exam & subject" hint="Students see the title on their list">
             <div className="grid gap-4 md:grid-cols-2">
@@ -296,7 +339,7 @@ export default function AssignmentForm() {
           </Card>
 
           {/* 4. Concepts */}
-          <Card n={4} title="Concepts" hint={topicIds.length ? `${topicIds.length} concepts chosen` : "Optional · leave empty to use every concept"}
+          <Card n={4} title="Concepts" hint={topicIds.length ? `${topicIds.length} concepts chosen` : manual ? "Optional · limits what you browse" : "Optional · leave empty to use every concept"}
             right={topicIds.length > 0 && <button type="button" onClick={() => setTopicIds([])} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">Clear</button>}>
             {!picked.length ? (
               <p className="rounded-xl bg-[#faf6ec] px-4 py-6 text-center text-sm text-slate-500">Tick chapters first.</p>
@@ -350,6 +393,7 @@ export default function AssignmentForm() {
             )}
           </Card>
 
+          {!manual && (<>
           {/* 5. Count */}
           <Card n={5} title="How many questions" hint={`${total} in all`}>
             <div className="grid grid-cols-2 gap-3 sm:max-w-md">
@@ -462,8 +506,10 @@ export default function AssignmentForm() {
             </div>
           </Card>
 
+          </>)}
+
           {/* 8. Who & when */}
-          <Card n={8} title="Students & due date" hint="No timer. Students can answer any time before the due date.">
+          <Card n={manual ? 5 : 8} title="Students & due date" hint="No timer. Students can answer any time before the due date.">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="gp-label">College</span>
@@ -516,15 +562,15 @@ export default function AssignmentForm() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3 md:px-8">
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg font-extrabold text-slate-900">
-              {total} question{total === 1 ? "" : "s"}
+              {manual ? "Choose manually" : `${total} question${total === 1 ? "" : "s"}`}
               <span className="ml-2 text-sm font-semibold text-slate-500">
-                {chapterIds.length} chapter{chapterIds.length === 1 ? "" : "s"} · {CLASS_LABELS[classLevel]} · {diffMode === "custom" ? `${pct.easy}/${pct.medium}/${pct.hard}` : diffMode === "equal" ? "Equal" : "Any"} difficulty
+                {chapterIds.length} chapter{chapterIds.length === 1 ? "" : "s"} · {CLASS_LABELS[classLevel]}{manual ? "" : " · "}{manual ? "" : diffMode === "custom" ? `${pct.easy}/${pct.medium}/${pct.hard}` : diffMode === "equal" ? "Equal" : "Any"}{manual ? "" : " difficulty"}
               </span>
             </p>
             <p className={`truncate text-xs ${problem ? "text-rose-700" : "text-emerald-700"}`}>{problem || `Ready · ${college}${sections.length ? ` · Section ${sections.join(", ")}` : ""}`}</p>
           </div>
           <button type="button" onClick={create} disabled={saving} className="gp-gold-btn px-6 py-3 text-sm disabled:opacity-60">
-            {saving ? "Picking questions…" : "Create & review →"}
+            {saving ? (manual ? "Saving…" : "Picking questions…") : manual ? "Next: choose questions →" : "Create & review →"}
           </button>
         </div>
       </div>

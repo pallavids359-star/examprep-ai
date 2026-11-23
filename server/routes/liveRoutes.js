@@ -48,6 +48,8 @@ lecturerRouter.post("/assignments", assignments.create);
 lecturerRouter.get("/assignments/:id", assignments.getOne);
 lecturerRouter.put("/assignments/:id", assignments.update);
 lecturerRouter.post("/assignments/:id/swap", assignments.swap);
+lecturerRouter.get("/assignments/:id/browse", assignments.browse);
+lecturerRouter.post("/assignments/:id/add", assignments.addQuestion);
 lecturerRouter.post("/assignments/:id/publish", assignments.publish);
 lecturerRouter.post("/assignments/:id/unpublish", assignments.unpublish);
 lecturerRouter.delete("/assignments/:id", assignments.remove);

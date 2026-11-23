@@ -116,6 +116,14 @@ const readSettings = async (req, body) => {
     const chapters = await Chapter.find({ _id: { $in: chapterIds }, subjectId: subject._id }).select("_id classLevel").lean();
     if (chapters.length !== chapterIds.length) throw userError("Some chapters are not part of this subject");
 
+    const pickMode = body.pickMode === "manual" ? "manual" : "auto";
+    const allowed = formatsFor(exam.code);
+    const formats = (body.formats || []).filter((f) => allowed.includes(f));
+    const topicIds = (body.topicIds || []).filter(isValidId).map(String);
+    if (pickMode === "manual") {
+        return { exam, subject, classLevel, chapterIds, perChapter: [], difficulty: { mode: "any" }, formats, topicIds, total: 0, pickMode };
+    }
+
     // How many questions: in total (shared out between chapters) or per chapter
     let perChapter;
     if (body.countMode === "per_chapter") {
@@ -137,10 +145,7 @@ const readSettings = async (req, body) => {
         LEVELS.forEach((l) => (difficulty[l] = Math.max(0, Math.min(100, Number(body.difficulty?.[l]) || 0))));
         if (difficulty.easy + difficulty.medium + difficulty.hard !== 100) throw userError("Easy + medium + hard must add up to 100%");
     }
-    const allowed = formatsFor(exam.code);
-    const formats = (body.formats || []).filter((f) => allowed.includes(f));
-    const topicIds = (body.topicIds || []).filter(isValidId).map(String);
-    return { exam, subject, classLevel, chapterIds, perChapter, difficulty, formats, topicIds, total };
+    return { exam, subject, classLevel, chapterIds, perChapter, difficulty, formats, topicIds, total, pickMode };
 };
 
 const readAudience = (body) => {
@@ -222,8 +227,8 @@ const listMine = handle("listAssignments", async (req, res) => {
 const create = handle("createAssignment", async (req, res) => {
     const s = await readSettings(req, req.body);
     const who = readAudience(req.body);
-    const { ids, shortages } = await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats, examCode: s.exam.code });
-    if (!ids.length) throw userError("No questions match these choices. Try more chapters, any difficulty or more question types.");
+    const { ids, shortages } = s.pickMode === "manual" ? { ids: [], shortages: [] } : await pickQuestions({ examId: s.exam._id, subjectId: s.subject._id, perChapter: s.perChapter, topicIds: s.topicIds, difficulty: s.difficulty, formats: s.formats, examCode: s.exam.code });
+    if (!ids.length && s.pickMode !== "manual") throw userError("No questions match these choices. Try more chapters, any difficulty or more question types.");
     const title =
         String(req.body.title || "").trim().slice(0, 140) ||
         `${s.subject.name} assignment – ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
@@ -234,7 +239,7 @@ const create = handle("createAssignment", async (req, res) => {
         subjectId: s.subject._id,
         createdBy: req.user._id,
         ...who,
-        settings: { classLevel: s.classLevel, chapterIds: s.chapterIds, topicIds: s.topicIds, perChapter: s.perChapter, difficulty: s.difficulty, formats: s.formats },
+        settings: { pickMode: s.pickMode, classLevel: s.classLevel, chapterIds: s.chapterIds, topicIds: s.topicIds, perChapter: s.perChapter, difficulty: s.difficulty, formats: s.formats },
         questionIds: ids,
     });
     res.status(201).json({ assignment: (await summary([a.toObject()]))[0], wanted: s.total, got: ids.length, shortages });
@@ -298,6 +303,75 @@ const swap = handle("swapAssignmentQuestion", async (req, res) => {
     const q = await Question.findById(next._id).select(`${FULL_FIELDS} format`).lean();
     const [chaptersById, topicsById] = await namesFor([q]);
     res.json({ position: pos, question: { ...shape(q, chaptersById, topicsById), format: q.format || "" } });
+});
+
+// GET /api/lecturer/assignments/:id/browse?chapterId=&topicId=&difficulty=&format=&q=&page=
+//   the question bank for this assignment's chapters, to add questions by hand
+const BROWSE_PAGE = 15;
+const browse = handle("browseAssignmentQuestions", async (req, res) => {
+    const a = await loadOwn(req);
+    const exam = await Exam.findById(a.examId).select("code").lean();
+    const chapterIds = (a.settings?.chapterIds || []).map(String);
+    const chapterList = await Chapter.find(chapterIds.length ? { _id: { $in: chapterIds } } : { subjectId: a.subjectId })
+        .select("name classLevel order")
+        .sort({ classLevel: 1, order: 1, name: 1 })
+        .lean();
+    const topicList = await Topic.find({ chapterId: { $in: chapterList.map((c) => c._id) } }).select("name chapterId order").sort({ order: 1, name: 1 }).lean();
+
+    const match = { examId: a.examId, subjectId: a.subjectId, status: "published", chapterId: { $in: chapterList.map((c) => c._id) } };
+    if (isValidId(req.query.chapterId) && chapterList.some((c) => String(c._id) === req.query.chapterId)) match.chapterId = toId(req.query.chapterId);
+    if (isValidId(req.query.topicId)) match.topicId = toId(req.query.topicId);
+    else if ((a.settings?.topicIds || []).length) {
+        // the concepts chosen on the form, for the chapters that had any
+        const chosen = new Set(a.settings.topicIds.map(String));
+        const limited = new Set(topicList.filter((t) => chosen.has(String(t._id))).map((t) => String(t.chapterId)));
+        const ok = topicList.filter((t) => !limited.has(String(t.chapterId)) || chosen.has(String(t._id))).map((t) => t._id);
+        match.topicId = { $in: ok };
+    }
+    if (LEVELS.includes(req.query.difficulty)) match.difficulty = req.query.difficulty;
+    const allowed = formatsFor(exam?.code);
+    if (allowed.includes(req.query.format)) match.format = req.query.format;
+    else if (exam?.code !== "JEE") match.format = { $nin: JEE_ONLY };
+    const words = String(req.query.q || "").trim().slice(0, 60);
+    if (words) match.text = new RegExp(words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    if (req.query.hideAdded === "1") match._id = { $nin: a.questionIds };
+
+    const total = await Question.countDocuments(match);
+    const pages = Math.max(1, Math.ceil(total / BROWSE_PAGE));
+    const page = Math.min(Math.max(1, parseInt(req.query.page) || 1), pages);
+    const docs = await Question.find(match).sort({ chapterId: 1, topicId: 1, difficulty: 1, _id: 1 }).skip((page - 1) * BROWSE_PAGE).limit(BROWSE_PAGE).select(`${FULL_FIELDS} format`).lean();
+    const [chaptersById, topicsById] = await namesFor(docs);
+    const added = new Set(a.questionIds.map(String));
+    res.json({
+        total,
+        page,
+        pages,
+        formats: allowed,
+        chapters: chapterList.map((c) => ({ _id: c._id, name: c.name, classLevel: c.classLevel, topics: topicList.filter((t) => String(t.chapterId) === String(c._id)).map((t) => ({ _id: t._id, name: t.name })) })),
+        questions: docs.map((q) => ({ ...shape(q, chaptersById, topicsById), format: q.format || "", added: added.has(String(q._id)) })),
+    });
+});
+
+// POST /api/lecturer/assignments/:id/add   { questionId }   (or remove with { questionId, remove: true })
+const addQuestion = handle("addAssignmentQuestion", async (req, res) => {
+    const a = await loadOwn(req);
+    if (await started(a)) throw userError("Students have started this assignment, so its questions can't change");
+    if (!isValidId(req.body.questionId)) throw userError("Invalid question");
+    const ids = a.questionIds.map(String);
+    const id = String(req.body.questionId);
+    if (req.body.remove) {
+        if (!ids.includes(id)) return res.json({ count: ids.length });
+        if (a.status === "published" && ids.length === 1) throw userError("A published assignment needs at least one question");
+        a.questionIds = a.questionIds.filter((x) => String(x) !== id);
+    } else {
+        if (ids.includes(id)) return res.json({ count: ids.length });
+        if (ids.length >= 200) throw userError("An assignment can have at most 200 questions");
+        const q = await Question.findOne({ _id: id, subjectId: a.subjectId, status: "published" }).select("_id").lean();
+        if (!q) throw userError("That question is not from this subject");
+        a.questionIds.push(q._id);
+    }
+    await a.save();
+    res.json({ count: a.questionIds.length });
 });
 
 // POST /api/lecturer/assignments/:id/publish  and  /unpublish
@@ -421,4 +495,4 @@ const startAssignment = handle("startAssignment", async (req, res) => {
     res.status(201).json({ attemptId: attempt._id, status: attempt.status });
 });
 
-module.exports = { options, chapters, listMine, create, getOne, update, swap, publish, unpublish, remove, submissions, myAssignments, startAssignment, pickQuestions, splitByLevel };
+module.exports = { options, chapters, listMine, create, getOne, update, swap, browse, addQuestion, publish, unpublish, remove, submissions, myAssignments, startAssignment, pickQuestions, splitByLevel };

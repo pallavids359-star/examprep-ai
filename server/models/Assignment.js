@@ -15,6 +15,7 @@ const assignmentSchema = new mongoose.Schema(
         dueAt: { type: Date, required: true },
         // How the questions were chosen (kept so the lecturer can see it later)
         settings: {
+            pickMode: { type: String, enum: ["auto", "manual"], default: "auto" },
             classLevel: { type: String, enum: ["11", "12", "both"], default: "both" },
             chapterIds: [{ type: ObjectId, ref: "Chapter" }],
             topicIds: [{ type: ObjectId, ref: "Topic" }],

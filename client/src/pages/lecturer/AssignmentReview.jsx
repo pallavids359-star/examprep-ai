@@ -4,6 +4,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import BackLink from "../../components/BackLink";
 import QuestionBody from "../../components/QuestionBody";
+import AssignmentPicker from "../../components/AssignmentPicker";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
 import { fmtDateTime, fmtDuration, fmtUntil, toLocalInput } from "../../components/liveHelpers";
@@ -25,6 +26,7 @@ export default function AssignmentReview() {
   const [form, setForm] = useState(null);
   const [opts, setOpts] = useState(null);
   const shortages = location.state?.shortages || [];
+  const [picking, setPicking] = useState(Boolean(location.state?.pick));
 
   const load = useCallback(() => {
     api
@@ -262,9 +264,27 @@ export default function AssignmentReview() {
           ))}
         </div>
 
+        {tab === "questions" && editable && !picking && (
+          <button onClick={() => setPicking(true)} className="gp-gold-btn ml-3 px-4 py-2 text-sm">
+            + Add questions
+          </button>
+        )}
+        {tab === "questions" && editable && picking && <AssignmentPicker id={id} count={questions.length} onChange={load} onClose={() => setPicking(false)} />}
+
         {tab === "questions" ? (
           <div className="mt-4 space-y-3">
-            {!questions.length && <p className="gp-card px-5 py-10 text-center text-sm text-slate-500">No questions left. Delete this assignment and make a new one.</p>}
+            {!questions.length && !picking && (
+              <div className="gp-card grid place-items-center px-6 py-12 text-center">
+                <p className="text-lg font-bold text-slate-900">No questions yet</p>
+                <p className="mt-1 text-sm text-slate-500">Choose them from the question bank.</p>
+                {editable && (
+                  <button onClick={() => setPicking(true)} className="gp-gold-btn mt-4 px-5 py-2.5 text-sm">
+                    + Add questions
+                  </button>
+                )}
+              </div>
+            )}
+            {questions.length > 0 && picking && <h3 className="pt-2 text-base font-bold text-slate-900">In this assignment ({questions.length})</h3>}
             {questions.map((q, i) => {
               const isOpen = open[q._id];
               return (
