@@ -5,6 +5,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import LiveResultsBrowser from "../../components/LiveResultsBrowser";
 import { fmtDateTime, fmtDuration } from "../../components/liveHelpers";
+import { useReportPrinter } from "../../components/ReportPrinter";
 
 
 // Admin view of one student: details plus the same Analytics the student sees
@@ -57,7 +58,7 @@ export default function StudentDetail() {
                             {student.section ? ` · Section ${student.section}` : ""}
                         </p>
                     )}
-                    <StudentResults id={id} />
+                    <StudentResults id={id} name={student.name} />
 
                 </>
             )}
@@ -92,8 +93,9 @@ const KINDS = [
 const DONE = ["submitted", "auto_submitted"];
 
 // Every kind of result for one student, in tabs
-function StudentResults({ id }) {
+function StudentResults({ id, name = "Student" }) {
     const [tab, setTab] = useState("live");
+    const printer = useReportPrinter();
     const [attempts, setAttempts] = useState(null);
     const [error, setError] = useState("");
     useEffect(() => {
@@ -101,7 +103,9 @@ function StudentResults({ id }) {
             .then((res) => setAttempts(res.data.attempts))
             .catch((err) => setError(getErrorMessage(err)));
     }, [id]);
-    const countOf = (modes) => (attempts || []).filter((a) => modes.includes(a.mode)).length;
+    const countOf = (modes) => (attempts || []).filter((a) => (modes || ["live"]).includes(a.mode)).length;
+    const kind = KINDS.find((x) => x[0] === tab);
+    const finishedHere = (attempts || []).filter((a) => (kind[2] || ["live"]).includes(a.mode) && DONE.includes(a.status));
 
     return (
         <div className="mt-8">
@@ -115,11 +119,30 @@ function StudentResults({ id }) {
                         className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${tab === k ? "bg-[#17140f] text-[#e5c372] shadow" : "text-slate-600 hover:text-slate-900"}`}
                     >
                         {label}
-                        {modes && attempts && <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${tab === k ? "bg-[#e5c372] text-[#17140f]" : "bg-white text-slate-600"}`}>{countOf(modes)}</span>}
+                        {attempts && <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${tab === k ? "bg-[#e5c372] text-[#17140f]" : "bg-white text-slate-600"}`}>{countOf(modes)}</span>}
                     </button>
                 ))}
             </div>
-            <div className="mt-5">
+            {printer.node}
+            {attempts && (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-slate-600">
+                        <b className="font-display text-lg text-slate-900">{finishedHere.length}</b> {kind[1].toLowerCase()} attended
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => printer.printReports(finishedHere.map((r) => r.attemptId), "all", `${name}_${kind[1]}`)}
+                        disabled={!finishedHere.length || Boolean(printer.busy)}
+                        className="gp-gold-btn inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50"
+                    >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+                    </svg>
+                        {printer.busy === "all" ? `Preparing ${printer.progress}…` : "Download result"}
+                    </button>
+                </div>
+            )}
+            <div className="mt-4">
                 {tab === "live" ? (
                     <StudentLive id={id} />
                 ) : error ? (
@@ -127,7 +150,7 @@ function StudentResults({ id }) {
                 ) : !attempts ? (
                     <div className="gp-card h-40 animate-pulse bg-white/60" />
                 ) : (
-                    <AttemptList rows={attempts.filter((a) => KINDS.find((x) => x[0] === tab)[2].includes(a.mode))} kind={KINDS.find((x) => x[0] === tab)[1]} />
+                    <AttemptList rows={attempts.filter((a) => kind[2].includes(a.mode))} kind={kind[1]} />
                 )}
             </div>
         </div>
@@ -159,9 +182,6 @@ function AttemptList({ rows, kind }) {
                     <span />
                 )}
                 <div className="flex gap-3 text-sm">
-                    <span className="rounded-xl bg-white px-3 py-1.5 ring-1 ring-[#e7dcc3]">
-                        <b className="font-display text-slate-900">{done.length}</b> <span className="text-slate-500">finished</span>
-                    </span>
                     {avg !== null && (
                         <span className="rounded-xl bg-white px-3 py-1.5 ring-1 ring-[#e7dcc3]">
                             <b className="font-display text-slate-900">{avg}%</b> <span className="text-slate-500">average</span>
@@ -227,3 +247,4 @@ function AttemptList({ rows, kind }) {
         </div>
     );
 }
+

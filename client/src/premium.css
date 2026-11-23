@@ -332,6 +332,15 @@ table tbody tr:hover {
   .gp-print-card, .gp-print-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:not(.gp-printing-card) .gp-print-card { display: none !important; }
 }
+/* Many reports in one PDF: one scorecard per page */
+.gp-print-batch { display: none; }
+@media print {
+  body.gp-printing-batch > *:not(.gp-print-batch) { display: none !important; }
+  body.gp-printing-batch .gp-print-batch { display: block !important; }
+  body.gp-printing-batch .gp-print-batch, body.gp-printing-batch .gp-print-batch * { visibility: visible !important; }
+  body.gp-printing-batch .gp-print-batch .gp-print-card { position: static !important; display: block !important; break-after: page; page-break-after: always; }
+  body.gp-printing-batch .gp-print-batch .gp-print-card:last-child { break-after: auto; page-break-after: auto; }
+}
 @page { size: A4; margin: 0; }
 
 /* Result sheet: plain report look (Arial, navy header, grey/white rows), unaffected by the app theme */

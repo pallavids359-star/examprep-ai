@@ -132,7 +132,15 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
   const answeredCount = s.correct + s.wrong;
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
-      {back}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {back}
+        <button type="button" onClick={downloadScorecard} className="gp-gold-btn inline-flex items-center gap-2 px-5 py-2.5 text-sm print:hidden">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+          </svg>
+          Download result
+        </button>
+      </div>
 
       {/* Score hero */}
       <section className="gp-hero mt-4 p-6 md:p-8">
@@ -169,12 +177,6 @@ export default function LiveReport({ testId, studentId, backTo, backLabel } = {}
                   See the leaderboard →
                 </Link>
               )}
-              <button type="button" onClick={downloadScorecard} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-100 ring-1 ring-amber-200/40 hover:bg-white/10">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-                </svg>
-                Download scorecard
-              </button>
             </div>
           </div>
           <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />

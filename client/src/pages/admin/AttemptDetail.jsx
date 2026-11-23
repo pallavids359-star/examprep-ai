@@ -60,9 +60,17 @@ export default function AttemptDetail() {
 
   return (
     <AdminLayout>
-      {data.student && (
-        <BackLink to={`/admin/students/${data.student._id}`}>{data.student.name}</BackLink>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {data.student ? <BackLink to={`/admin/students/${data.student._id}`}>{data.student.name}</BackLink> : <span />}
+        {data.status !== "in_progress" && (
+          <button type="button" onClick={downloadScorecard} className="gp-gold-btn inline-flex items-center gap-2 px-5 py-2.5 text-sm print:hidden">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+            </svg>
+            Download result
+          </button>
+        )}
+      </div>
 
       {/* Header */}
       <div className="mt-3 flex flex-wrap items-end justify-between gap-6 border-b border-slate-200 pb-6">
@@ -76,12 +84,6 @@ export default function AttemptDetail() {
             {data.status === "auto_submitted" ? " · time ran out" : data.status === "in_progress" ? " · still writing" : ""}
           </p>
         </div>
-        <button type="button" onClick={downloadScorecard} className="order-last inline-flex items-center gap-2 rounded-lg bg-[#17140f] px-3.5 py-2 text-sm font-semibold text-[#e5c372] hover:bg-black print:hidden">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-          </svg>
-          Download scorecard
-        </button>
         <dl className="flex gap-8">
           {s.score !== null && <Fig label="Score" value={`${s.score}`} sub={`/ ${s.maxScore}`} />}
           {data.rank && <Fig label="Rank" value={`${data.rank.rank}`} sub={`of ${data.rank.total}`} />}

@@ -12,17 +12,22 @@ export default function ManageStudents() {
     const [query, setQuery] = useState(""); // the search actually sent to the server
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [college, setCollege] = useState(""); // "" = all students
+    const [section, setSection] = useState("");
+    const [colleges, setColleges] = useState(["MB PU"]);
 
     useEffect(() => {
+        setLoading(true);
         api
-            .get("/admin/students", { params: query ? { search: query } : {} })
+            .get("/admin/students", { params: { ...(query ? { search: query } : {}), ...(college ? { college } : {}), ...(college && section ? { section } : {}) } })
             .then((res) => {
                 setStudents(res.data.students);
+                if (res.data.colleges) setColleges(res.data.colleges);
                 setError("");
             })
             .catch((err) => setError(getErrorMessage(err)))
             .finally(() => setLoading(false));
-    }, [query]);
+    }, [query, college, section]);
 
     const runSearch = (e) => {
         e.preventDefault();
@@ -44,7 +49,40 @@ export default function ManageStudents() {
 
     return (
         <AdminLayout title="Students">
-            <form onSubmit={runSearch} className="mt-6 flex gap-2 max-w-md">
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+                <div className="inline-flex flex-wrap rounded-2xl bg-[#f3ecdc] p-1.5" role="tablist" aria-label="College">
+                    {[["", "Overall students"], ...colleges.map((c) => [c, c])].map(([v, l]) => (
+                        <button
+                            key={v || "all"}
+                            role="tab"
+                            aria-selected={college === v}
+                            onClick={() => {
+                                setCollege(v);
+                                setSection("");
+                            }}
+                            className={`rounded-xl px-4 py-2 text-sm font-bold transition ${college === v ? "bg-[#17140f] text-[#e5c372] shadow" : "text-slate-600 hover:text-slate-900"}`}
+                        >
+                            {l}
+                        </button>
+                    ))}
+                </div>
+                {college && (
+                    <div className="inline-flex rounded-2xl bg-white p-1.5 ring-1 ring-[#e7dcc3]" aria-label="Section">
+                        {["", "A", "B", "C", "D"].map((x) => (
+                            <button
+                                key={x || "all"}
+                                onClick={() => setSection(x)}
+                                aria-pressed={section === x}
+                                className={`rounded-xl px-3.5 py-1.5 text-sm font-bold transition ${section === x ? "bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f]" : "text-slate-600 hover:text-slate-900"}`}
+                            >
+                                {x ? `Sec ${x}` : "All sections"}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {!loading && <span className="ml-auto text-sm text-slate-500"><b className="text-slate-900">{students.length}</b> student{students.length === 1 ? "" : "s"}</span>}
+            </div>
+            <form onSubmit={runSearch} className="mt-4 flex gap-2 max-w-md">
                 <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
