@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
-        // Students: their college, and section (A-D) for MB PU
+        // Students: their college, and section (A-D) for MBPU
         college: { type: String, trim: true, maxlength: 120 },
         section: { type: String, enum: ["A", "B", "C", "D"] },
         phone: {

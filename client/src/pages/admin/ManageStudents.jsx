@@ -14,7 +14,7 @@ export default function ManageStudents() {
     const [error, setError] = useState("");
     const [college, setCollege] = useState(""); // "" = all students
     const [section, setSection] = useState("");
-    const [colleges, setColleges] = useState(["MB PU"]);
+    const [colleges, setColleges] = useState(["MBPU"]);
 
     useEffect(() => {
         setLoading(true);
@@ -68,7 +68,7 @@ export default function ManageStudents() {
                         ))}
                     </select>
                 </label>
-                {college.toLowerCase() === "mb pu" && (
+                {college.toLowerCase() === "mbpu" && (
                     <label className="block">
                         <span className="gp-label">Section</span>
                         <select

@@ -11,6 +11,7 @@ const Topic = require("../models/Topic");
 const { buildReport, loadQuestions, questionBody } = require("../utils/attemptReport");
 const { finalizeAttempt, isExpired, computeRank } = require("../utils/finalizeAttempt");
 const { liveResultsOf } = require("../utils/liveResults");
+const { sameCollege } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -44,7 +45,7 @@ const shuffle = (list) => {
 const forMe = (t, user) => {
     const college = t.live?.college || "";
     if (!college) return true;
-    if (String(user.college || "").trim().toLowerCase() !== college.toLowerCase()) return false;
+    if (!sameCollege(user.college, college)) return false;
     const secs = t.live?.sections || [];
     return !secs.length || secs.includes(user.section);
 };

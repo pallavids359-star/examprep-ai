@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const { MAIN_COLLEGE, normalizeCollege } = require("../utils/college");
 
 const CLASS_LEVELS = ["11", "12", "dropper"];
 
@@ -59,14 +60,14 @@ const updateProfile = async (req, res) => {
     }
 
     if (college !== undefined) {
-      const clean = String(college).trim();
+      const clean = normalizeCollege(college);
       if (!clean) return res.status(400).json({ message: "Enter your college name" });
       if (clean.length > 120) return res.status(400).json({ message: "The college name is too long" });
       user.college = clean;
     }
-    // Sections are only for MB PU
+    // Sections are only for MBPU
     if (section !== undefined || college !== undefined) {
-      const isMB = String(user.college || "").trim().toLowerCase() === "mb pu";
+      const isMB = user.college === MAIN_COLLEGE;
       const sec = String(section || "").toUpperCase();
       if (isMB && !["A", "B", "C", "D"].includes(sec)) return res.status(400).json({ message: "Choose your section (A, B, C or D)" });
       user.section = isMB ? sec : undefined;

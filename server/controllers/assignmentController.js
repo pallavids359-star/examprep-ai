@@ -19,6 +19,7 @@ const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_f
 const formatsFor = (examCode) => ORDER.filter((f) => FORMATS.includes(f) && (examCode === "JEE" || !JEE_ONLY.includes(f)));
 const { STUDENT_FIELDS } = require("../utils/attemptHelpers");
 const { shape, namesFor, FULL_FIELDS } = require("./liveLecturerController");
+const { normalizeCollege } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const toId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -34,7 +35,7 @@ const handle = (where, fn) => async (req, res) => {
     }
 };
 
-const DEFAULT_COLLEGE = "MB PU";
+const DEFAULT_COLLEGE = "MBPU";
 const SECTIONS = ["A", "B", "C", "D"];
 const LEVELS = ["easy", "medium", "hard"];
 const FINISHED = ["submitted", "auto_submitted"];
@@ -189,7 +190,7 @@ const readSettings = async (req, body) => {
 };
 
 const readAudience = (body) => {
-    const college = String(body.college || DEFAULT_COLLEGE).trim().slice(0, 120);
+    const college = normalizeCollege(body.college || DEFAULT_COLLEGE);
     if (!college) throw userError("Choose the college");
     const sections = [...new Set((body.sections || []).map((s) => String(s).toUpperCase()))].filter((s) => SECTIONS.includes(s));
     const dueAt = new Date(body.dueAt);

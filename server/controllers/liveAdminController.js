@@ -10,6 +10,7 @@ const Chapter = require("../models/Chapter");
 const TestAttempt = require("../models/TestAttempt");
 const { sectionsFor, patternFor, canSplitBiology, subjectKey } = require("../utils/livePattern");
 const { syncLiveStatus, canEditQuestions, autoPick, sectionState } = require("../utils/liveSchedule");
+const { normalizeCollege } = require("../utils/college");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 const userError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -191,7 +192,7 @@ const getPattern = handle("getPattern", async (req, res) => {
     if (!exam) throw userError("Exam not found", 404);
     const pattern = patternFor(exam.code);
     if (!pattern) throw userError(`Live tests are not set up for ${exam.code}`);
-    const colleges = [...new Set(["MB PU", ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
+    const colleges = [...new Set(["MBPU", ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
     const subjects = await Subject.find({ examId: exam._id }).select("name").lean();
     const chapterDocs = await Chapter.find({ examId: exam._id }).select("name classLevel order subjectId").sort({ classLevel: 1, order: 1, name: 1 }).lean();
     const chapters = {};
@@ -311,7 +312,7 @@ const buildDetails = async (body, exam, existing, me) => {
             auto,
             showResults: "after_submit",
             shuffle: body.shuffle !== false,
-            college: String(body.college || "").trim().slice(0, 120),
+            college: normalizeCollege(body.college),
             sections: String(body.college || "").trim() ? [...new Set((body.audienceSections || []).map((x) => String(x).toUpperCase()))].filter((x) => ["A", "B", "C", "D"].includes(x)) : [],
             publishedAt: existing?.live?.publishedAt,
         },
@@ -487,7 +488,7 @@ const publishLiveTest = handle("publishLiveTest", async (req, res) => {
     if (test.availability.endsAt <= new Date()) throw userError("The closing time has already passed. Change it first.");
     const allIds = test.sections.flatMap((s) => s.questionIds.map(String));
     if (new Set(allIds).size !== allIds.length) throw userError("The same question is in two sections");
-    const { status, state } = await syncLiveStatus(test);
+    const { status, state } = await syncLiveStatus(test, { publish: true });
     if (status !== "published") {
         const missing = state.sections
             .filter((x) => !x.ready)

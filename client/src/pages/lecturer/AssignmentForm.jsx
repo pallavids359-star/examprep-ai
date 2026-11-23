@@ -82,7 +82,7 @@ export default function AssignmentForm() {
   const [pct, setPct] = useState({ easy: 40, medium: 40, hard: 20 });
   const [formats, setFormats] = useState([]);
   const [formatCounts, setFormatCounts] = useState({});
-  const [college, setCollege] = useState("MB PU");
+  const [college, setCollege] = useState("MBPU");
   const [sections, setSections] = useState([]);
   const [dueAt, setDueAt] = useState(nextWeek());
   const [instructions, setInstructions] = useState("");
@@ -511,7 +511,7 @@ export default function AssignmentForm() {
               <label className="block">
                 <span className="gp-label">College</span>
                 <select className={`${input} mt-1.5`} value={college} onChange={(e) => setCollege(e.target.value)}>
-                  {(opts?.colleges || ["MB PU"]).map((c) => (
+                  {(opts?.colleges || ["MBPU"]).map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </select>

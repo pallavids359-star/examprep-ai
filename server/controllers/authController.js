@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { normalizeCollege } = require("../utils/college");
 
 // Creates a login token that expires in 7 days
 const createToken = (userId, role) => {
@@ -19,13 +20,13 @@ const publicUser = (user) => ({
     section: user.section || "",
 });
 
-const DEFAULT_COLLEGE = "MB PU";
+const DEFAULT_COLLEGE = "MBPU";
 
 // POST /api/auth/register
 const register = async (req, res) => {
     try {
         const { name, email, password, phone } = req.body;
-        const college = String(req.body.college || DEFAULT_COLLEGE).trim().slice(0, 120);
+        const college = normalizeCollege(req.body.college || DEFAULT_COLLEGE);
         const section = String(req.body.section || "").trim().toUpperCase();
         if (!college) return res.status(400).json({ message: "Please choose your college" });
         if (college === DEFAULT_COLLEGE && !["A", "B", "C", "D"].includes(section)) {

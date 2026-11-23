@@ -134,7 +134,7 @@ const listStudents = handle("listStudents", async (req, res) => {
         const safe = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // treat the search as plain text
         filter.$or = [{ name: { $regex: safe, $options: "i" } }, { email: { $regex: safe, $options: "i" } }];
     }
-    // college=MB PU (or another), section=A..D
+    // college=MBPU (or another), section=A..D
     const college = String(req.query.college || "").trim();
     if (college) filter.college = new RegExp(`^${college.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
     if (["A", "B", "C", "D"].includes(req.query.section)) filter.section = req.query.section;
@@ -152,7 +152,7 @@ const listStudents = handle("listStudents", async (req, res) => {
         { $group: { _id: "$userId", tests: { $sum: 1 } } },
     ]);
     const testsById = new Map(counts.map((c) => [String(c._id), c.tests]));
-    res.json({ colleges: [...new Set(["MB PU", ...colleges])], students: students.map((s) => ({ ...s, testsTaken: testsById.get(String(s._id)) || 0 })) });
+    res.json({ colleges: [...new Set(["MBPU", ...colleges])], students: students.map((s) => ({ ...s, testsTaken: testsById.get(String(s._id)) || 0 })) });
 });
 
 // GET /api/admin/students/:id

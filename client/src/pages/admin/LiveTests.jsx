@@ -18,6 +18,21 @@ const TABS = [
 export default function LiveTests() {
   const [tests, setTests] = useState(null);
   const [deleting, setDeleting] = useState("");
+  const [publishing, setPublishing] = useState("");
+
+  const publish = async (t) => {
+    if (!(await askConfirm(`Publish "${t.title}"? Students will see it and can write it from ${fmtDateTime(t.startsAt)}.`, { title: "Publish live test?", confirmText: "Publish" }))) return;
+    setPublishing(t._id);
+    try {
+      await api.post(`/admin/live-tests/${t._id}/publish`);
+      setTests((list) => list.map((x) => (x._id === t._id ? { ...x, status: "published", phase: new Date(x.startsAt) > new Date() ? "scheduled" : "open" } : x)));
+      toast("Published. Students can see it now.");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setPublishing("");
+    }
+  };
 
   const removeTest = async (t) => {
     const ok = await askConfirm(
@@ -71,7 +86,7 @@ export default function LiveTests() {
       <Hero
         eyebrow="Live tests"
         title="Run a test the whole batch writes"
-        subtitle="Pick the day and time, let each subject fill itself or hand it to a lecturer, and it goes live on its own once every subject is ready."
+        subtitle="Pick the day and time, let each subject fill itself or hand it to a lecturer, and then press Publish when every subject is ready."
         right={newBtn}
       />
 
@@ -151,7 +166,7 @@ export default function LiveTests() {
                     {t.college && <span className="gp-chip">{t.college}{t.audienceSections?.length ? ` · ${t.audienceSections.join(", ")}` : ""}</span>}
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ph.cls}`}>
                       {t.phase === "open" && <span className="gp-live-dot" />}
-                      {t.phase === "draft" ? "Waiting for questions" : ph.label}
+                      {t.phase === "draft" ? (t.sections.every((s) => s.ready) ? "Ready to publish" : "Waiting for questions") : ph.label}
                     </span>
                   </div>
                   <h2 className="mt-2 truncate text-lg font-bold text-slate-900">{t.title}</h2>
@@ -204,8 +219,13 @@ export default function LiveTests() {
               </ul>
 
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                {t.phase === "draft" && t.sections.every((s) => s.ready) && (
+                  <button type="button" onClick={() => publish(t)} disabled={publishing === t._id} className="gp-gold-btn px-5 py-2 text-sm disabled:opacity-60">
+                    {publishing === t._id ? "Publishing…" : "Publish"}
+                  </button>
+                )}
                 <Link to={`/admin/live-tests/${t._id}`} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-amber-200 hover:bg-black">
-                  {t.phase === "draft" ? "Finish setting up" : "Open"}
+                  {t.phase === "draft" ? (t.sections.every((s) => s.ready) ? "Check questions" : "Finish setting up") : "Open"}
                 </Link>
                 {t.phase !== "archived" && (
                   <Link to={`/admin/live-tests/${t._id}/edit`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-300" title="Change the date, time or anything else">

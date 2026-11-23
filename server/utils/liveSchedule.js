@@ -51,11 +51,12 @@ const canEditQuestions = async (test) => test.status === "draft" || (test.status
 
 // Publishes once every section is ready; goes back to draft if a section is no longer full
 // (or, with { pullBack: true }, no longer ready) before the test opens. Saves. Returns { status, state }.
-const syncLiveStatus = async (test, { pullBack = false } = {}) => {
+// publish: only when the head lecturer presses "Publish" (tests never go live by themselves)
+const syncLiveStatus = async (test, { pullBack = false, publish = false } = {}) => {
     if (test.status === "archived") return { status: test.status };
     const state = await sectionState(test);
     const now = new Date();
-    if (test.status === "draft" && state.ready && new Date(test.availability.endsAt) > now) {
+    if (publish && test.status === "draft" && state.ready && new Date(test.availability.endsAt) > now) {
         test.status = "published";
         test.live.publishedAt = now;
     } else if (test.status === "published" && !(pullBack ? state.ready : state.full) && !(await hasStarted(test, now))) {

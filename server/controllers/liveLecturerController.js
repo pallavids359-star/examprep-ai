@@ -279,7 +279,7 @@ const savePicks = handle("savePicks", async (req, res) => {
     // MCQs first, numericals at the end, otherwise in the order given
     section.questionIds = [...ids.filter((id) => byId.get(id).type !== "numerical"), ...ids.filter((id) => byId.get(id).type === "numerical")].map(toId);
     await test.save();
-    const { status } = await syncLiveStatus(test); // goes live by itself once every section is full
+    const { status } = await syncLiveStatus(test); // the head lecturer publishes it
     res.json({ message: "Saved", mcqPicked: c.mcq, numericalPicked: c.numerical, questionIds: section.questionIds, testStatus: status });
 });
 
@@ -332,7 +332,7 @@ const swapQuestion = handle("swapQuestion", async (req, res) => {
 });
 
 // POST /api/lecturer/live-tests/:id/sections/:key/submit   ("Send to head lecturer")
-// The section must be full. Once every section is ready the test goes live by itself.
+// The section must be full. The head lecturer then publishes the test.
 const submitSection = handle("submitSection", async (req, res) => {
     const { test, section, editable } = await loadSection(req);
     if (!editable) throw userError("Students have already started this test");

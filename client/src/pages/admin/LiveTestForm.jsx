@@ -267,7 +267,7 @@ export default function LiveTestForm() {
     try {
       const res = id ? await api.put(`/admin/live-tests/${id}`, body) : await api.post("/admin/live-tests", body);
       (res.data.notes || []).forEach((n) => toast(n, "error"));
-      toast(res.data.status === "published" ? "All set. The test opens by itself at the start time." : "Saved. Lecturers can start picking. The test opens once every subject is ready.");
+      toast(res.data.status === "published" ? "Saved. The test is published." : "Saved. When every subject is ready, open the test and press Publish.");
       navigate(`/admin/live-tests/${id || res.data.testId}`);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -545,7 +545,7 @@ export default function LiveTestForm() {
         <section className="gp-card space-y-4 p-6">
           <Step n={4} title="Who can write it?" hint="Students only see tests meant for their college and section" />
           <div className="flex flex-wrap gap-2">
-            {[["", "All students"], ...[...new Set(["MB PU", ...(pattern?.colleges || []), ...(college ? [college] : [])])].map((c) => [c, c])].map(([v, l]) => (
+            {[["", "All students"], ...[...new Set(["MBPU", ...(pattern?.colleges || []), ...(college ? [college] : [])])].map((c) => [c, c])].map(([v, l]) => (
               <button
                 key={v || "all"}
                 type="button"
@@ -625,7 +625,7 @@ export default function LiveTestForm() {
               <button type="submit" disabled={saving || !examId || !pattern} className="gp-gold-btn mt-5 w-full px-6 py-3.5 text-sm disabled:opacity-50">
                 {saving ? "Saving..." : id ? "Save changes" : "Create live test"}
               </button>
-              <p className="mt-2 text-center text-xs text-amber-100/60">It opens by itself once every subject is ready (lecturers send theirs to you).</p>
+              <p className="mt-2 text-center text-xs text-amber-100/60">When every subject is ready, press Publish. Students only see it after that.</p>
             </div>
           </div>
         </aside>

@@ -19,11 +19,11 @@ export function DetailsForm({ profile, onSaved }) {
     phone: profile.phone,
     classLevel: profile.classLevel,
     targetYear: profile.targetYear || "",
-    college: !profile.college || profile.college.toLowerCase() === "mb pu" ? "MB PU" : "Other",
-    otherCollege: profile.college && profile.college.toLowerCase() !== "mb pu" ? profile.college : "",
+    college: !profile.college || profile.college.toLowerCase() === "mbpu" ? "MBPU" : "Other",
+    otherCollege: profile.college && profile.college.toLowerCase() !== "mbpu" ? profile.college : "",
     section: profile.section || "",
   });
-  const isMB = form.college === "MB PU";
+  const isMB = form.college === "MBPU";
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState(null);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -38,7 +38,7 @@ export function DetailsForm({ profile, onSaved }) {
       const { otherCollege, ...rest } = form;
       const res = await api.put("/auth/profile", {
         ...rest,
-        college: form.college === "Other" ? otherCollege.trim() : "MB PU",
+        college: form.college === "Other" ? otherCollege.trim() : "MBPU",
         section: isMB ? form.section : "",
         targetYear: form.targetYear ? Number(form.targetYear) : null,
       });
@@ -77,8 +77,8 @@ export function DetailsForm({ profile, onSaved }) {
         </label>
         <label className={label}>
           College
-          <select value={form.college} onChange={(e) => setForm((f) => ({ ...f, college: e.target.value, section: e.target.value === "MB PU" ? f.section : "" }))} className={input}>
-            <option value="MB PU">MB PU</option>
+          <select value={form.college} onChange={(e) => setForm((f) => ({ ...f, college: e.target.value, section: e.target.value === "MBPU" ? f.section : "" }))} className={input}>
+            <option value="MBPU">MBPU</option>
             <option value="Other">Other</option>
           </select>
         </label>

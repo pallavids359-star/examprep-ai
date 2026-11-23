@@ -204,7 +204,6 @@ export default function PickQuestions() {
     setSaving(true);
     try {
       const res = await api.put(`/lecturer/live-tests/${id}/sections/${key}`, { questionIds: next.map((q) => q._id) });
-      if (res.data.testStatus === "published" && testStatus !== "published") toast("Every subject is ready. The test opens by itself at its start time.");
       setTestStatus(res.data.testStatus);
       return true;
     } catch (err) {
@@ -234,7 +233,7 @@ export default function PickQuestions() {
     if (await save([])) toast("All questions removed. Press Undo to bring them back.");
   };
 
-  // "Send to head lecturer": the lecturer is done; the test goes live once every subject is ready
+  // "Send to head lecturer": the lecturer is done; the head lecturer publishes the test
   const needsSend = sec?.picker === "lecturer";
   const sentAt = sec?.submittedAt;
   const sendToHead = async () => {
@@ -245,7 +244,7 @@ export default function PickQuestions() {
         ? await api.post(`/admin/live-tests/${id}/sections/${key}/accept`)
         : await api.post(`/lecturer/live-tests/${id}/sections/${key}/submit`);
       setHistory([]);
-      toast(res.data.testStatus === "published" ? "Sent. Every subject is ready, so the test opens by itself at its start time." : `Sent to the head lecturer.${res.data.waitingFor?.length ? ` Still waiting for: ${res.data.waitingFor.join(", ")}.` : ""}`);
+      toast(res.data.testStatus === "published" ? "Sent." : `Sent to the head lecturer.${res.data.waitingFor?.length ? ` Still waiting for: ${res.data.waitingFor.join(", ")}.` : ""}`);
       load();
     } catch (err) {
       toast(getErrorMessage(err), "error");
@@ -842,7 +841,7 @@ function SendCard({ sec, complete, sentAt, editable, canChange, isAdmin, saving,
           ) : complete ? (
             <>
               <h2 className="mt-1 text-xl font-extrabold text-white">Happy with all {sec.mcqCount + sec.numericalCount} questions?</h2>
-              <p className="gp-muted mt-1 text-sm">Send your {sec.name} paper to the head lecturer. The test goes live once every subject is sent.</p>
+              <p className="gp-muted mt-1 text-sm">Send your {sec.name} paper to the head lecturer. The head lecturer publishes the test.</p>
             </>
           ) : (
             <>

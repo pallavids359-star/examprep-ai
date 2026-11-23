@@ -4,8 +4,8 @@ import { useAuth } from "../../context/AuthContext";
 import AuthShell from "../../components/AuthShell";
 import { getErrorMessage } from "../../api/axios";
 
-// The college list: MB PU first (the default), then others. Section A-D is asked only for MB PU.
-const DEFAULT_COLLEGE = "MB PU";
+// The college list: MBPU first (the default), then others. Section A-D is asked only for MBPU.
+const DEFAULT_COLLEGE = "MBPU";
 const COLLEGES = [DEFAULT_COLLEGE, "Other"];
 
 export default function Register() {

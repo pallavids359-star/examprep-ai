@@ -11,8 +11,8 @@ import { Countdown, Ring } from "../../components/premium";
 
 const PICKER_LABEL = { auto: "Auto-picked", me: "Set by you (admin)", lecturer: "Lecturer picks" };
 
-// Head lecturer: one page to see where the test stands. No publish button:
-// the test goes live by itself once every subject has its questions.
+// Head lecturer: one page to see where the test stands. When every subject is ready,
+// press "Publish" — only then do students see the test.
 export default function LiveTestReview() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -85,6 +85,11 @@ export default function LiveTestReview() {
     const who = lecturers.find((l) => l._id === newLecturer);
     run(() => api.put(`/admin/live-tests/${id}/sections/${s.key}/lecturer`, { lecturerId: newLecturer, keepQuestions: keepQs }), `${s.name} is now with ${who?.name || "the new lecturer"}`).then(() => setChanging(null));
   };
+  const publish = async () => {
+    if (!(await askConfirm(`Publish "${test.title}"? Students will see it and can write it from ${fmtDateTime(test.startsAt)}.`, { title: "Publish live test?", confirmText: "Publish" }))) return;
+    run(() => api.post(`/admin/live-tests/${id}/publish`), "Published. Students can see it now.");
+  };
+  const unpublish = () => run(() => api.post(`/admin/live-tests/${id}/unpublish`), "Unpublished. Students can't see it now.");
   const accept = (s) => run(() => api.post(`/admin/live-tests/${id}/sections/${s.key}/accept`), `${s.name} marked as ready`);
   const extend = () => run(() => api.put(`/admin/live-tests/${id}`, { endsAt: new Date(newEnd).toISOString() }), "Closing time changed");
 
@@ -102,12 +107,14 @@ export default function LiveTestReview() {
 
   // One clear sentence about where the test stands
   let banner;
-  if (test.phase === "draft") {
+  if (test.phase === "draft" && !waiting.length) {
+    banner = { cls: "border-green-200 bg-green-50 text-green-900", text: "Every subject is ready. Check the questions, then press Publish. Students can't see the test until you do." };
+  } else if (test.phase === "draft") {
     banner = {
       cls: "border-amber-200 bg-amber-50 text-amber-900",
       text: `Waiting for: ${waiting
         .map((s) => (s.full ? `${s.name} (${s.lecturer?.name || "lecturer"} has to send it)` : `${s.name} ${s.picked}/${s.mcqCount + s.numericalCount}`))
-        .join(", ")}. The test goes live by itself once every subject is ready.`,
+        .join(", ")}. Once every subject is ready, press Publish.`,
     };
   } else if (test.phase === "scheduled") {
     banner = { cls: "border-green-200 bg-green-50 text-green-900", text: `Ready ✓ Students can see it now, and it opens ${fmtUntil(test.startsAt)} (${fmtDateTime(test.startsAt)}). You can still change questions until then.` };
@@ -130,7 +137,7 @@ export default function LiveTestReview() {
               <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-amber-200">{test.exam?.code}</span>
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ph.cls}`}>
                 {test.phase === "open" && <span className="gp-live-dot" />}
-                {test.phase === "draft" ? "Waiting for questions" : ph.label}
+                {test.phase === "draft" ? (waiting.length ? "Waiting for questions" : "Ready to publish") : ph.label}
               </span>
             </div>
             <h1 className="mt-3 text-2xl font-extrabold text-white md:text-3xl">{test.title}</h1>
@@ -144,6 +151,22 @@ export default function LiveTestReview() {
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-2">
+              {test.phase === "draft" && (
+                <button
+                  type="button"
+                  onClick={publish}
+                  disabled={busy || waiting.length > 0}
+                  title={waiting.length ? "Every subject must be ready first" : "Students will see the test"}
+                  className="gp-gold-btn px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Publish
+                </button>
+              )}
+              {test.phase === "scheduled" && test.editable && (
+                <button type="button" onClick={unpublish} disabled={busy} className="rounded-xl border border-amber-200/30 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-white/10">
+                  Unpublish
+                </button>
+              )}
               {test.phase !== "archived" && (
                 <Link to={`/admin/live-tests/${id}/edit`} className="rounded-xl border border-amber-200/30 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-white/10">
                   ✎ {test.editable ? "Edit date, time & subjects" : "Edit closing time"}
