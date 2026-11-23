@@ -49,6 +49,7 @@ export default function PracticeSetup() {
     const [chapterIds, setChapterIds] = useState([]); // ticked chapters
     const [topicsByChapter, setTopicsByChapter] = useState({}); // chapterId -> topics
     const [topicIds, setTopicIds] = useState([]); // ticked concepts (none = whole chapter)
+    const [classLevel, setClassLevel] = useState("both");
     const [difficulty, setDifficulty] = useState("any");
     const [count, setCount] = useState(20);
     const [loadingChapters, setLoadingChapters] = useState(false);
@@ -130,7 +131,10 @@ export default function PracticeSetup() {
         setError("");
         setStarting(true);
         try {
-            const res = await api.post("/attempts/practice", { chapterIds, topicIds, difficulty, count });
+            const ok = chapters.filter((c) => chapterIds.includes(c._id) && (classLevel === "both" || String(c.classLevel || "") === classLevel));
+            const okIds = ok.map((c) => c._id);
+            const okTopics = topicIds.filter((t) => okIds.some((cid) => topicsOf(cid).some((x) => x._id === t)));
+            const res = await api.post("/attempts/practice", { chapterIds: okIds, topicIds: okTopics, difficulty, count });
             navigate(`/attempt/${res.data.attemptId}`);
         } catch (err) {
             setError(getErrorMessage(err));
@@ -151,8 +155,9 @@ export default function PracticeSetup() {
         );
     }
 
-    const classes = [...new Set(chapters.map((c) => String(c.classLevel || "")))].sort();
-    const chosenChapters = chapters.filter((c) => chapterIds.includes(c._id));
+    const inClass = (c) => classLevel === "both" || String(c.classLevel || "") === classLevel;
+    const classes = [...new Set(chapters.filter(inClass).map((c) => String(c.classLevel || "")))].sort();
+    const chosenChapters = chapters.filter((c) => chapterIds.includes(c._id) && inClass(c));
 
     return (
         <div className="bg-slate-50">
@@ -173,20 +178,47 @@ export default function PracticeSetup() {
                     </div>
                 </section>
 
-                {/* Step 2: chapters (many) */}
+                {/* Step 2: class */}
+                {subjectId && (
+                    <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
+                        <h2 className="font-semibold text-slate-900">2. Class</h2>
+                        <div className="grid grid-cols-3 gap-2 mt-3">
+                            {[
+                        ["11", "1st PUC", "Class 11"],
+                        ["12", "2nd PUC", "Class 12"],
+                        ["both", "Both", "Class 11 + 12"],
+                    ].map(([v, l, sub]) => (
+                        <button
+                            key={v}
+                            type="button"
+                            onClick={() => setClassLevel(v)}
+                            aria-pressed={classLevel === v}
+                            className={`rounded-2xl border px-4 py-3 text-left transition ${classLevel === v ? "border-[#17140f] bg-[#17140f] text-white shadow-lg shadow-black/10" : "border-[#e7dcc3] bg-white text-slate-800 hover:border-[#c9a24a]"}`}
+                        >
+                            <span className="block text-sm font-bold">{l}</span>
+                            <span className={`mt-0.5 block text-xs ${classLevel === v ? "text-[#e5c372]" : "text-slate-500"}`}>{sub}</span>
+                        </button>
+                    ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Step 3: chapters (many) */}
                 {subjectId && (
                     <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <h2 className="font-semibold text-slate-900">2. Chapters</h2>
+                            <h2 className="font-semibold text-slate-900">3. Chapters</h2>
                             <span className="text-xs text-slate-500">{chapterIds.length} selected</span>
                         </div>
                         {loadingChapters ? (
                             <p className="text-sm text-slate-500 mt-3">Loading chapters...</p>
                         ) : chapters.length === 0 ? (
                             <p className="text-sm text-slate-500 mt-3">No chapters added for this subject yet.</p>
+                        ) : classes.length === 0 ? (
+                            <p className="text-sm text-slate-500 mt-3">No {classLevel === "11" ? "1st PUC" : "2nd PUC"} chapters for this subject.</p>
                         ) : (
                             classes.map((cl) => {
-                                const list = chapters.filter((c) => String(c.classLevel || "") === cl);
+                                const list = chapters.filter((c) => inClass(c) && String(c.classLevel || "") === cl);
                                 const ids = list.map((c) => c._id);
                                 const allOn = ids.every((id) => chapterIds.includes(id));
                                 return (
@@ -213,7 +245,7 @@ export default function PracticeSetup() {
                 {chosenChapters.length > 0 && (
                     <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <h2 className="font-semibold text-slate-900">3. Concepts <span className="font-normal text-slate-500 text-sm">(optional)</span></h2>
+                            <h2 className="font-semibold text-slate-900">4. Concepts <span className="font-normal text-slate-500 text-sm">(optional)</span></h2>
                             <span className="text-xs text-slate-500">{topicIds.length ? `${topicIds.length} selected` : "All concepts"}</span>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">

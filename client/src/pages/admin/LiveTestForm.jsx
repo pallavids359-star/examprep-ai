@@ -87,6 +87,8 @@ export default function LiveTestForm() {
   const [rows, setRows] = useState([]); // { key, name, include, picker, lecturerId, mcqCount, numericalCount }
   const [editCounts, setEditCounts] = useState(false);
   const [showResults, setShowResults] = useState("after_close");
+  const [college, setCollege] = useState(""); // "" = every student
+  const [audSections, setAudSections] = useState([]); // none = all sections
   const [loadedSections, setLoadedSections] = useState(null);
   const [openTest, setOpenTest] = useState(null); // test already open: only its name and closing time can change
 
@@ -123,6 +125,8 @@ export default function LiveTestForm() {
         setDuration(t.durationMinutes);
         setSplit(Boolean(t.live?.splitBiology));
         setShowResults(t.live?.showResults || "after_close");
+        setCollege(t.live?.college || "");
+        setAudSections(t.live?.sections || []);
         setLoadedSections(t.sections);
       })
       .catch((err) => setError(getErrorMessage(err)));
@@ -202,6 +206,8 @@ export default function LiveTestForm() {
       splitBiology: split,
       showResults,
       shuffle: true,
+      college,
+      audienceSections: college ? audSections : [],
       sections: included.map((r) => ({
         key: r.key,
         picker: r.picker,
@@ -525,6 +531,54 @@ export default function LiveTestForm() {
           </div>
         </section>
 
+        {/* 5. Who */}
+        <section className="gp-card space-y-4 p-6">
+          <Step n={5} title="Who can write it?" hint="Students only see tests meant for their college and section" />
+          <div className="flex flex-wrap gap-2">
+            {[["", "All students"], ...[...new Set(["MB PU", ...(pattern?.colleges || []), ...(college ? [college] : [])])].map((c) => [c, c])].map(([v, l]) => (
+              <button
+                key={v || "all"}
+                type="button"
+                aria-pressed={college === v}
+                className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800"
+                onClick={() => {
+                  setCollege(v);
+                  if (!v) setAudSections([]);
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          {college && (
+            <div>
+              <p className="gp-label">Sections</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" aria-pressed={!audSections.length} className="gp-tile px-4 py-2 text-sm font-semibold text-slate-800" onClick={() => setAudSections([])}>
+                  All sections
+                </button>
+                {["A", "B", "C", "D"].map((x) => {
+                  const on = audSections.includes(x);
+                  return (
+                    <button
+                      key={x}
+                      type="button"
+                      aria-pressed={on}
+                      className="gp-tile h-10 w-12 text-sm font-bold text-slate-800"
+                      onClick={() => setAudSections(on ? audSections.filter((y) => y !== x) : [...audSections, x].sort())}
+                    >
+                      {x}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {audSections.length ? `Only ${college} section ${audSections.join(", ")} students will see this test.` : `Every ${college} student will see this test.`}
+              </p>
+            </div>
+          )}
+        </section>
+
        </div>
 
         {/* Summary */}
@@ -541,6 +595,7 @@ export default function LiveTestForm() {
                   ["Length", duration ? fmtDuration(Number(duration) * 60) : "—"],
                   ["Questions", totalQs || "—"],
                   ["Results", showResults === "after_close" ? "After it closes" : "Right after submit"],
+                  ["Students", college ? `${college} · ${audSections.length ? `Sec ${audSections.join(", ")}` : "All sections"}` : "All students"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3 border-b border-white/10 pb-2">
                     <dt className="text-amber-100/70">{k}</dt>

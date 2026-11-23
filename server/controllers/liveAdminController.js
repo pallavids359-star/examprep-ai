@@ -190,8 +190,10 @@ const getPattern = handle("getPattern", async (req, res) => {
     if (!exam) throw userError("Exam not found", 404);
     const pattern = patternFor(exam.code);
     if (!pattern) throw userError(`Live tests are not set up for ${exam.code}`);
+    const colleges = [...new Set(["MB PU", ...(await User.distinct("college", { role: "student", college: { $nin: [null, ""] } }))])];
     res.json({
         exam,
+        colleges,
         minutes: pattern.minutes,
         canSplitBiology: canSplitBiology(exam.code),
         sections: sectionsFor(exam.code, false),
@@ -272,6 +274,8 @@ const buildDetails = async (body, exam, existing, me) => {
             splitBiology,
             showResults: body.showResults === "after_submit" ? "after_submit" : "after_close",
             shuffle: body.shuffle !== false,
+            college: String(body.college || "").trim().slice(0, 120),
+            sections: String(body.college || "").trim() ? [...new Set((body.audienceSections || []).map((x) => String(x).toUpperCase()))].filter((x) => ["A", "B", "C", "D"].includes(x)) : [],
             publishedAt: existing?.live?.publishedAt,
         },
     };
@@ -317,6 +321,8 @@ const listLiveTests = handle("listLiveTests", async (req, res) => {
             startsAt: t.availability.startsAt,
             endsAt: t.availability.endsAt,
             durationMinutes: t.durationMinutes,
+            college: t.live?.college || "",
+            audienceSections: t.live?.sections || [],
             totalQuestions: t.sections.reduce((a, s) => a + (s.mcqCount || 0) + (s.numericalCount || 0), 0),
             sections: t.sections.map((s) => ({ ...sectionSummary(s, lecturers), ...readiness(t, states.get(String(t._id))?.sections.find((x) => x.key === s.key)) })),
             started: byTest.get(String(t._id))?.started || 0,

@@ -56,6 +56,9 @@ const testSchema = new mongoose.Schema(
             splitBiology: { type: Boolean, default: false },
             showResults: { type: String, enum: ["after_submit", "after_close"], default: "after_close" },
             shuffle: { type: Boolean, default: true }, // question order within each section, per student
+            // Who can take it: no college = every student; otherwise that college, and only these sections (none = all sections)
+            college: { type: String, default: "" },
+            sections: [{ type: String, enum: ["A", "B", "C", "D"] }],
             publishedAt: { type: Date },
         },
         createdBy: { type: ObjectId, ref: "User" },

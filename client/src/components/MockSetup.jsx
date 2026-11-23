@@ -39,6 +39,7 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
     const [subjectId, setSubjectId] = useState("");
     const [chaptersBySubject, setChaptersBySubject] = useState({}); // subjectId -> chapters | "loading"
     const [chapterIds, setChapterIds] = useState([]);
+    const [classLevel, setClassLevel] = useState("both");
     const [difficulty, setDifficulty] = useState("any");
     const [error, setError] = useState("");
 
@@ -79,11 +80,12 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
 
     // Chosen chapters per subject (for the tab badges and the summary)
     const allChapters = subjects.flatMap((s) => chaptersOf(s._id).map((c) => ({ ...c, subjectId: s._id })));
-    const chosen = allChapters.filter((c) => chapterIds.includes(c._id));
+    const chosen = allChapters.filter((c) => chapterIds.includes(c._id) && (classLevel === "both" || String(c.classLevel || "") === classLevel));
     const countIn = (sid) => chosen.filter((c) => c.subjectId === sid).length;
     const subjectsUsed = subjects.filter((s) => countIn(s._id) > 0);
 
-    const chapters = chaptersOf(subjectId);
+    const inClass = (c) => classLevel === "both" || String(c.classLevel || "") === classLevel;
+    const chapters = chaptersOf(subjectId).filter(inClass);
     const classes = [...new Set(chapters.map((c) => String(c.classLevel || "")))].sort();
 
     const partCount = (name) => (parts.find(([n]) => subjectKey(n) === subjectKey(name)) || [null, 0])[1];
@@ -97,7 +99,8 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
         onContinue({
             scope,
             difficulty,
-            chapterIds: scope === "full" ? [] : chapterIds,
+            classLevel,
+            chapterIds: scope === "full" ? [] : chapterIds.filter((id) => allChapters.some((c) => c._id === id && inClass(c))),
             topicIds: [],
             maxQuestions: maxQs,
             minutes: scope === "full" ? minutes : estMinutes,
@@ -139,11 +142,37 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
                 </p>
             </section>
 
-            {/* 2. Chapters */}
+            {/* 2. Class */}
+            <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900">2. Class</h3>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                    {[
+                    ["11", "1st PUC", "Class 11"],
+                    ["12", "2nd PUC", "Class 12"],
+                    ["both", "Both", "Class 11 + 12"],
+                ].map(([v, l, sub]) => (
+                    <button
+                        key={v}
+                        type="button"
+                        onClick={() => setClassLevel(v)}
+                        aria-pressed={classLevel === v}
+                        className={`rounded-2xl border px-4 py-3 text-left transition ${classLevel === v ? "border-[#17140f] bg-[#17140f] text-white shadow-lg shadow-black/10" : "border-[#e7dcc3] bg-white text-slate-800 hover:border-[#c9a24a]"}`}
+                    >
+                        <span className="block text-sm font-bold">{l}</span>
+                        <span className={`mt-0.5 block text-xs ${classLevel === v ? "text-[#e5c372]" : "text-slate-500"}`}>{sub}</span>
+                    </button>
+                ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-3">
+                    {classLevel === "both" ? "Questions from 1st and 2nd PUC chapters." : `Only ${classLevel === "11" ? "1st PUC" : "2nd PUC"} chapters.`}
+                </p>
+            </section>
+
+            {/* 3. Chapters */}
             {scope === "chapters" && (
                 <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h3 className="font-semibold text-slate-900">2. Chapters</h3>
+                        <h3 className="font-semibold text-slate-900">3. Chapters</h3>
                         <span className="text-xs text-slate-500">{chosen.length} selected</span>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
@@ -186,7 +215,7 @@ export default function MockSetup({ exam, stream, parts, minutes, onBack, onCont
 
             {/* Difficulty */}
             <section className="mt-4 bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900">{scope === "chapters" ? "3" : "2"}. Difficulty</h3>
+                <h3 className="font-semibold text-slate-900">{scope === "chapters" ? "4" : "3"}. Difficulty</h3>
                 <div className="flex flex-wrap gap-2 mt-3">
                     {DIFFICULTIES.map((d) => (
                         <button key={d.value} type="button" onClick={() => setDifficulty(d.value)} className={pillClass(d.value === difficulty)}>

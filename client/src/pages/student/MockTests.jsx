@@ -66,6 +66,7 @@ export default function MockTests() {
                 chapterIds: filters?.chapterIds || [],
                 topicIds: filters?.topicIds || [],
                 difficulty: filters?.difficulty || "any",
+                classLevel: filters?.classLevel || "both",
             });
             (res.data.notes || []).forEach((n) => toast(n, "error"));
             navigate(`/attempt/${res.data.attemptId}`);

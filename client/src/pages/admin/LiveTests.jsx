@@ -115,6 +115,7 @@ export default function LiveTests() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="gp-chip">{t.exam}</span>
+                    {t.college && <span className="gp-chip">{t.college}{t.audienceSections?.length ? ` · ${t.audienceSections.join(", ")}` : ""}</span>}
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ph.cls}`}>
                       {t.phase === "open" && <span className="gp-live-dot" />}
                       {t.phase === "draft" ? "Waiting for questions" : ph.label}

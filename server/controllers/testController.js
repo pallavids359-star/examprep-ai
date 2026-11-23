@@ -349,6 +349,9 @@ const generateMock = async (req, res) => {
         }
 
         const custom = await chosenSyllabus(exam, chapterIds, topicIds);
+        // Full syllabus of one class only: 1st PUC (11) or 2nd PUC (12)
+        const classLevel = !custom && ["11", "12"].includes(String(req.body.classLevel)) ? String(req.body.classLevel) : null;
+        const classChapters = classLevel ? await Chapter.find({ examId: exam._id, classLevel }).select("_id subjectId").lean() : null;
 
         const subjects = await Subject.find({ examId: exam._id }).lean();
         const sections = [];
@@ -362,11 +365,16 @@ const generateMock = async (req, res) => {
                 if (!parts) continue; // no chapters chosen in this subject
                 match.$or = parts;
             }
+            if (classChapters) {
+                const mine = classChapters.filter((c) => String(c.subjectId) === String(subject._id)).map((c) => c._id);
+                if (!mine.length) continue;
+                match.chapterId = { $in: mine };
+            }
             if (difficulty !== "any") match.difficulty = difficulty;
             const numNeed = NUMERICAL_PER_SUBJECT[exam.code] || 0;
             const anyLevel = { ...match };
             delete anyLevel.difficulty;
-            const wholeSubject = { examId: exam._id, subjectId: subject._id, status: "published" };
+            const wholeSubject = { examId: exam._id, subjectId: subject._id, status: "published", ...(match.chapterId ? { chapterId: match.chapterId } : {}) };
             const picked = await pickSection(match, count, numNeed, [anyLevel, wholeSubject]);
             const gotNum = picked.filter((q) => q.type === "numerical").length;
             if (numNeed && gotNum < numNeed) notes.push(`${subject.name}: only ${gotNum} numerical question${gotNum === 1 ? "" : "s"} in the bank, so ${numNeed - gotNum} MCQ${numNeed - gotNum === 1 ? "" : "s"} added instead`);
@@ -374,7 +382,7 @@ const generateMock = async (req, res) => {
         }
         const all = sections.flatMap((s) => s.picked);
         if (all.length === 0) {
-            throw userError(custom || difficulty !== "any" ? "No questions found for these choices. Try more chapters or another difficulty." : `No questions are available for ${label} yet`);
+            throw userError(custom || classLevel || difficulty !== "any" ? "No questions found for these choices. Try more chapters or another difficulty." : `No questions are available for ${label} yet`);
         }
 
         // Full paper: the real time. Chapter-wise: time in proportion to the questions
@@ -389,7 +397,7 @@ const generateMock = async (req, res) => {
         };
         const number = (await Test.countDocuments({ ownerId: req.user._id, examId: exam._id })) + 1;
         const test = await Test.create({
-            title: `${label} ${custom ? "Chapter-wise " : ""}Mock Test ${number}${level}`,
+            title: `${label} ${custom ? "Chapter-wise " : classLevel ? (classLevel === "11" ? "1st PUC " : "2nd PUC ") : ""}Mock Test ${number}${level}`,
             examId: exam._id,
             type: custom ? "custom" : "full_syllabus",
             sections: sections.map((s) => ({ name: s.name, subjectId: s.subjectId, questionIds: s.picked.map((q) => q._id) })),

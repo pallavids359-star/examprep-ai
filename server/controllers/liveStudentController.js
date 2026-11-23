@@ -38,6 +38,15 @@ const shuffle = (list) => {
     return a;
 };
 
+// Is this live test for this student? (no college set = every student)
+const forMe = (t, user) => {
+    const college = t.live?.college || "";
+    if (!college) return true;
+    if (String(user.college || "").trim().toLowerCase() !== college.toLowerCase()) return false;
+    const secs = t.live?.sections || [];
+    return !secs.length || secs.includes(user.section);
+};
+
 // GET /api/live-tests?examId=...
 const listLive = handle("listLive", async (req, res) => {
     if (!isValidId(req.query.examId)) throw userError("A valid examId is required");
@@ -45,8 +54,9 @@ const listLive = handle("listLive", async (req, res) => {
     const tests = await Test.find({ examId: req.query.examId, type: "live", status: "published" })
         .sort({ "availability.startsAt": -1 })
         .limit(100)
-        .select("title durationMinutes totalQuestions totalMarks markingScheme availability live.showResults sections.name sections.mcqCount sections.numericalCount")
-        .lean();
+        .select("title durationMinutes totalQuestions totalMarks markingScheme availability live.showResults live.college live.sections sections.name sections.mcqCount sections.numericalCount")
+        .lean()
+        .then((list) => list.filter((t) => forMe(t, req.user)));
     const attempts = await TestAttempt.find({ userId: req.user._id, testId: { $in: tests.map((t) => t._id) } })
         .select("testId status expiresAt startedAt submittedAt result.score result.maxScore result.percentage")
         .lean();
@@ -87,8 +97,9 @@ const listLive = handle("listLive", async (req, res) => {
     }
     // Live tests of the other exams (so a student on the wrong exam can switch)
     const otherTests = await Test.find({ examId: { $ne: req.query.examId }, type: "live", status: "published", "availability.endsAt": { $gt: now } })
-        .select("examId availability.startsAt")
-        .lean();
+        .select("examId availability.startsAt live.college live.sections")
+        .lean()
+        .then((list) => list.filter((t) => forMe(t, req.user)));
     const otherExams = otherTests.length ? await Exam.find({ _id: { $in: otherTests.map((t) => t.examId) } }).select("code").lean() : [];
     const others = otherExams.map((e) => {
         const mine = otherTests.filter((t) => String(t.examId) === String(e._id));
@@ -101,7 +112,7 @@ const listLive = handle("listLive", async (req, res) => {
 const startLive = handle("startLive", async (req, res) => {
     if (!isValidId(req.params.id)) throw userError("Invalid test id");
     const test = await Test.findOne({ _id: req.params.id, type: "live", status: "published" }).lean();
-    if (!test) throw userError("Live test not found", 404);
+    if (!test || !forMe(test, req.user)) throw userError("Live test not found", 404);
 
     const existing = await TestAttempt.findOne({ userId: req.user._id, testId: test._id });
     if (existing) {
