@@ -73,8 +73,8 @@ export default function SupabaseSyncPanel() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Supabase question databases</h2>
           <p className="text-sm text-slate-500">
-            New and edited questions arrive instantly by webhook. A daily check fills any gaps. Edit synced questions in Supabase:
-            changes made here are overwritten on the next sync.
+            New questions from the Question Bank Portal come in with "Sync now" (and every night). Questions you edit or publish
+            here are kept, and the change is sent back to the Question Bank Portal.
           </p>
         </div>
         {!none && (
