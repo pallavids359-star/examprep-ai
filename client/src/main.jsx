@@ -9,8 +9,10 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import WakeUpBanner from "./components/WakeUpBanner.jsx";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import { watchErrors } from "./utils/reportError";
+import { startRipples } from "./utils/ripple";
 
 watchErrors();
+startRipples();
 
 // Installable app + offline page (only in the built site, not while developing)
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

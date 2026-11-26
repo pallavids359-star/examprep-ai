@@ -71,15 +71,31 @@ body {
   box-shadow: none !important;
   position: relative;
 }
+.gp-nav-link {
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.gp-nav-link svg {
+  transition: transform 0.2s ease;
+}
+/* Pointing at a link: a light wash and the icon nudges right (clearly different from the open page) */
 .gp-nav-link:hover {
   color: var(--ink) !important;
-  background: #f1e9d6 !important;
+  background: #f6efdf !important;
 }
+.gp-nav-link:hover svg {
+  transform: translateX(2px);
+}
+/* The page you are on: dark with gold text */
 .gp-nav-link.active,
 .gp-nav-link[aria-current="page"] {
-  color: var(--ink) !important;
-  background: #efe2c2 !important;
+  color: #e5c372 !important;
+  background: #17140f !important;
   font-weight: 700;
+  box-shadow: 0 8px 18px -12px rgba(23, 20, 15, 0.9) !important;
+}
+.gp-nav-link.active:hover svg,
+.gp-nav-link[aria-current="page"]:hover svg {
+  transform: none;
 }
 .gp-nav-link.active::before,
 .gp-nav-link[aria-current="page"]::before {
@@ -406,3 +422,45 @@ button:disabled { cursor: not-allowed; }
 
 /* Nothing can make the page scroll sideways on phones */
 html, body { overflow-x: clip; }
+
+
+/* ---------- Every button and link responds to a press ---------- */
+button:not(:disabled),
+a.gp-btn,
+a.gp-gold-btn,
+a.gp-ghost-btn,
+.gp-btn,
+.gp-gold-btn,
+.gp-ghost-btn,
+.gp-nav-link,
+.gp-tab {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled):active,
+a.gp-btn:active,
+a.gp-gold-btn:active,
+a.gp-ghost-btn:active,
+.gp-nav-link:active,
+.gp-tab:active {
+  transform: scale(0.97);
+}
+/* Gold ripple from where you clicked (added by utils/ripple.js) */
+.gp-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  transform: scale(0);
+  opacity: 0.35;
+  background: currentColor;
+  animation: gp-ripple 0.55s ease-out forwards;
+}
+@keyframes gp-ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-ripple { display: none; }
+  button:active, a:active, .gp-nav-link:active { transform: none !important; }
+}
