@@ -5,23 +5,26 @@ import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import Loading from "../../components/Loading";
+import MultiSelect from "../../components/MultiSelect";
 
-const selectClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
+const selectClass = "w-full rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm outline-none transition hover:border-[#c9a24a] focus:border-[#c9a24a] disabled:opacity-50";
 const STATUS_STYLES = {
     published: "bg-green-50 text-green-700",
     draft: "bg-amber-50 text-amber-700",
     archived: "bg-slate-100 text-slate-500",
 };
 const QTYPES = [
-    ["", "All question types"],
-    ["mcq", "MCQ (single correct)"],
-    ["multi", "MCQ (more than one correct)"],
-    ["assertion", "Assertion and reason"],
-    ["match", "Match the following"],
-    ["statement", "Statement based"],
-    ["numerical", "Numerical"],
+    ["single_correct", "MCQ (single correct)"],
+    ["assertion_reason", "Assertion and reason"],
+    ["statement_based", "Statement based"],
+    ["match_following", "Match the following"],
+    ["diagram_based", "Diagram based"],
+    ["true_false", "True / False"],
+    ["multi_correct", "Multiple correct"],
+    ["numerical", "Numerical / integer"],
 ];
-const EMPTY = { subjectId: "", classLevel: "", chapterId: "", topicId: "", qtype: "", difficulty: "", status: "", q: "" };
+// Lists can hold several choices; the rest are single
+const EMPTY = { subjectId: [], classLevel: "", chapterId: [], topicId: [], qtype: [], difficulty: [], status: "", q: "" };
 
 export default function ManageQuestions() {
     const [exams, setExams] = useState([]);
@@ -67,7 +70,7 @@ export default function ManageQuestions() {
         if (!examId) return;
         const params = { page, limit: 20, examId };
         Object.entries(filters).forEach(([key, value]) => {
-            if (value) params[key] = value;
+            if (Array.isArray(value) ? value.length : value) params[key] = Array.isArray(value) ? value.join(",") : value;
         });
         api.get("/admin/questions", { params })
             .then((res) => {
@@ -85,10 +88,16 @@ export default function ManageQuestions() {
     };
 
     const chapters = useMemo(
-        () => tree.chapters.filter((c) => (!filters.subjectId || String(c.subjectId) === filters.subjectId) && (!filters.classLevel || c.classLevel === filters.classLevel)),
+        () =>
+            tree.chapters
+                .filter((c) => (!filters.subjectId.length || filters.subjectId.includes(String(c.subjectId))) && (!filters.classLevel || c.classLevel === filters.classLevel))
+                // grouped by subject in the list
+                .sort((a, b) => tree.subjects.findIndex((x) => String(x._id) === String(a.subjectId)) - tree.subjects.findIndex((x) => String(x._id) === String(b.subjectId))),
         [tree, filters.subjectId, filters.classLevel]
     );
-    const topics = useMemo(() => tree.topics.filter((t) => String(t.chapterId) === filters.chapterId), [tree, filters.chapterId]);
+    const topics = useMemo(() => tree.topics.filter((t) => filters.chapterId.includes(String(t.chapterId))), [tree, filters.chapterId]);
+    const chapterName = (id) => tree.chapters.find((c) => String(c._id) === String(id))?.name || "";
+    const subjectName = (id) => tree.subjects.find((x) => String(x._id) === String(id))?.name || "";
 
     const remove = async (q) => {
         if (!await askConfirm("Delete this question? Students won't see it, but old results keep it.")) return;
@@ -100,7 +109,7 @@ export default function ManageQuestions() {
         }
     };
 
-    const anyFilter = Object.values(filters).some(Boolean);
+    const anyFilter = Object.values(filters).some((v) => (Array.isArray(v) ? v.length : v));
 
     return (
         <AdminLayout
@@ -114,34 +123,48 @@ export default function ManageQuestions() {
                     <select value={examId} onChange={(e) => { setLoading(true); setPage(1); setFilters(EMPTY); setSearch(""); setExamId(e.target.value); }} className={selectClass} aria-label="Exam">
                         {exams.map((e) => <option key={e._id} value={e._id}>{e.code}</option>)}
                     </select>
-                    <select value={filters.subjectId} onChange={(e) => change({ subjectId: e.target.value, chapterId: "", topicId: "" })} className={selectClass} aria-label="Subject">
-                        <option value="">All subjects</option>
-                        {tree.subjects.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-                    </select>
-                    <select value={filters.classLevel} onChange={(e) => change({ classLevel: e.target.value, chapterId: "", topicId: "" })} className={selectClass} aria-label="Class">
+                    <MultiSelect
+                        options={tree.subjects.map((s) => [String(s._id), s.name])}
+                        value={filters.subjectId}
+                        onChange={(v) => change({ subjectId: v, chapterId: filters.chapterId.filter((c) => { const ch = tree.chapters.find((x) => String(x._id) === c); return !v.length || (ch && v.includes(String(ch.subjectId))); }), topicId: [] })}
+                        allLabel="All subjects"
+                        noun="subjects"
+                    />
+                    <select value={filters.classLevel} onChange={(e) => change({ classLevel: e.target.value, chapterId: [], topicId: [] })} className={selectClass} aria-label="Class">
                         <option value="">All classes</option>
                         <option value="11">Class 11</option>
                         <option value="12">Class 12</option>
                     </select>
                 </div>
-                <select value={filters.chapterId} onChange={(e) => change({ chapterId: e.target.value, topicId: "" })} className={selectClass} aria-label="Chapter">
-                    <option value="">All chapters</option>
-                    {chapters.map((c) => <option key={c._id} value={c._id}>{c.name} (Class {c.classLevel})</option>)}
-                </select>
-                <select value={filters.topicId} onChange={(e) => change({ topicId: e.target.value })} disabled={!filters.chapterId} className={selectClass} aria-label="Concept">
-                    <option value="">{filters.chapterId ? "All concepts" : "All concepts (choose a chapter first)"}</option>
-                    {topics.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
-                </select>
+                <div className="grid gap-3 md:grid-cols-2">
+                    <MultiSelect
+                        options={chapters.map((c) => [String(c._id), `${c.name} (Class ${c.classLevel})`, filters.subjectId.length !== 1 ? subjectName(c.subjectId) : undefined])}
+                        value={filters.chapterId}
+                        onChange={(v) => change({ chapterId: v, topicId: filters.topicId.filter((t) => { const tp = tree.topics.find((x) => String(x._id) === t); return tp && v.includes(String(tp.chapterId)); }) })}
+                        allLabel="All chapters"
+                        noun="chapters"
+                        search
+                    />
+                    <MultiSelect
+                        options={topics.map((t) => [String(t._id), t.name, filters.chapterId.length > 1 ? chapterName(t.chapterId) : undefined])}
+                        value={filters.topicId}
+                        onChange={(v) => change({ topicId: v })}
+                        allLabel="All concepts"
+                        noun="concepts"
+                        disabled={!filters.chapterId.length}
+                        disabledLabel="All concepts (choose chapters first)"
+                        search
+                    />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_2fr]">
-                    <select value={filters.qtype} onChange={(e) => change({ qtype: e.target.value })} className={selectClass} aria-label="Question type">
-                        {QTYPES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-                    </select>
-                    <select value={filters.difficulty} onChange={(e) => change({ difficulty: e.target.value })} className={selectClass} aria-label="Difficulty">
-                        <option value="">Any difficulty</option>
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
-                    </select>
+                    <MultiSelect options={QTYPES} value={filters.qtype} onChange={(v) => change({ qtype: v })} allLabel="All question types" noun="types" />
+                    <MultiSelect
+                        options={[["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]]}
+                        value={filters.difficulty}
+                        onChange={(v) => change({ difficulty: v })}
+                        allLabel="Any difficulty"
+                        noun="levels"
+                    />
                     <select value={filters.status} onChange={(e) => change({ status: e.target.value })} className={selectClass} aria-label="Status">
                         <option value="">Published and drafts</option>
                         <option value="published">Published only</option>

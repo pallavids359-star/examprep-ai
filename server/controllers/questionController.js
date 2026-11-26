@@ -110,39 +110,38 @@ const createQuestion = async (req, res) => {
 };
 
 // GET /api/admin/questions?examId=&subjectId=&classLevel=&chapterId=&topicId=&qtype=&difficulty=&status=&q=&page=1&limit=20
-const QTYPE_RULES = {
-    assertion: { $or: [{ tags: /assert/i }, { text: /Assertion\s*(\(A\))?\s*:/i }] },
-    match: { $or: [{ tags: /match/i }, { text: /(column|list)[\s\-–]*(I|1)\b/i }] },
-    statement: { text: /Statement[\s\-–]*(I|1)\b/i },
-};
 const listQuestions = async (req, res) => {
     try {
-        const { examId, subjectId, chapterId, topicId, difficulty, status, classLevel, qtype } = req.query;
+        const { examId, status, classLevel } = req.query;
+        // Every filter can hold several values, comma separated (subject=a,b)
+        const many = (k) => String(req.query[k] || "").split(",").map((x) => x.trim()).filter(Boolean);
+        const ids = (k) => many(k).filter(isValidId);
+        const oneOrMany = (list) => (list.length === 1 ? list[0] : { $in: list });
 
         const filter = {};
         const and = [];
         if (isValidId(examId)) filter.examId = examId;
-        if (isValidId(subjectId)) filter.subjectId = subjectId;
-        if (isValidId(chapterId)) filter.chapterId = chapterId;
+        const subjectIds = ids("subjectId");
+        const chapterIds = ids("chapterId");
+        const topicIds = ids("topicId");
+        if (subjectIds.length) filter.subjectId = oneOrMany(subjectIds);
+        if (chapterIds.length) filter.chapterId = oneOrMany(chapterIds);
         else if (classLevel === "11" || classLevel === "12") {
             // Only chapters of that class
             const chapterFilter = { classLevel };
             if (filter.examId) chapterFilter.examId = filter.examId;
             if (filter.subjectId) chapterFilter.subjectId = filter.subjectId;
-            const ids = await Chapter.find(chapterFilter).distinct("_id");
-            filter.chapterId = { $in: ids };
+            const classChapters = await Chapter.find(chapterFilter).distinct("_id");
+            filter.chapterId = { $in: classChapters };
         }
-        if (isValidId(topicId)) filter.topicId = topicId;
-        if (difficulty) filter.difficulty = difficulty;
+        if (topicIds.length) filter.topicId = oneOrMany(topicIds);
+        const levels = many("difficulty").filter((d) => ["easy", "medium", "hard"].includes(d));
+        if (levels.length) filter.difficulty = oneOrMany(levels);
 
-        // Question type
-        if (qtype === "numerical") filter.type = "numerical";
-        else if (qtype === "multi") filter.type = "mcq_multi";
-        else if (QTYPE_RULES[qtype]) and.push(QTYPE_RULES[qtype]);
-        else if (qtype === "mcq") {
-            filter.type = "mcq_single";
-            and.push({ $nor: Object.values(QTYPE_RULES).flatMap((r) => r.$or || [r]) });
-        }
+        // Question type (the labelled type; old names still work)
+        const OLD = { mcq: "single_correct", multi: "multi_correct", assertion: "assertion_reason", match: "match_following", statement: "statement_based" };
+        const types = many("qtype").map((t) => OLD[t] || t).filter((t) => require("../utils/questionFormat").FORMATS.includes(t));
+        if (types.length) filter.format = oneOrMany(types);
 
         const search = String(req.query.q || "").trim().slice(0, 100);
         if (search) {
