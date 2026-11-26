@@ -354,3 +354,13 @@ table tbody tr:hover {
 .gp-sheet tbody td { color: #475569; font-weight: 700; }
 .gp-sheet tbody td.gp-total { color: #0f172a; }
 .gp-sheet, .gp-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* ---------- Loaders ---------- */
+.gp-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px 0; color: #8a7d66; font-size: 14px; font-weight: 500; }
+.gp-spinner { width: 22px; height: 22px; border-radius: 999px; border: 2.5px solid rgba(201, 162, 74, 0.25); border-top-color: #c9a24a; animation: gp-spin 0.75s linear infinite; }
+.gp-splash { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(circle at 50% 40%, #fffdf8, #f6efe0); }
+.gp-splash p { color: #8a7d66; font: 600 13px/1 Poppins, "Plus Jakarta Sans", sans-serif; letter-spacing: 0.18em; text-transform: uppercase; animation: gp-fade 1.6s ease-in-out infinite; }
+.gp-splash-ring { position: relative; width: 104px; height: 104px; display: grid; place-items: center; }
+.gp-splash-ring::before { content: ""; position: absolute; inset: 0; border-radius: 999px; border: 3px solid rgba(201, 162, 74, 0.18); border-top-color: #c9a24a; border-right-color: #e5c372; animation: gp-spin 1.1s linear infinite; }
+.gp-splash-ring img { width: 78px; height: 78px; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(70, 48, 10, 0.6); }
+@keyframes gp-spin { to { transform: rotate(360deg); } }
+@keyframes gp-fade { 50% { opacity: 0.45; } }

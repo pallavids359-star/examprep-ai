@@ -6,6 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 import { Hero, ICONS, Stat } from "../../components/premium";
 import { fmtDateTime, fmtUntil } from "../../components/liveHelpers";
 import { Pill, STATE, audienceText } from "../../components/assignmentHelpers";
+import { askConfirm } from "../../components/ConfirmDialog";
+import { toast } from "../../components/Toaster";
 
 const TABS = [
   ["all", "All"],
@@ -20,6 +22,26 @@ export default function Assignments() {
   const [list, setList] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
+  const [deleting, setDeleting] = useState("");
+
+  // Delete from the card (top-right bin)
+  const remove = async (a) => {
+    const ok = await askConfirm(
+      a.status === "draft" ? `Delete "${a.title}"? This can't be undone.` : `Delete "${a.title}"? Students won't see it any more, and answers already handed in are deleted too. This can't be undone.`,
+      { title: "Delete assignment?", confirmText: "Delete", danger: true }
+    );
+    if (!ok) return;
+    setDeleting(a._id);
+    try {
+      await api.delete(`/lecturer/assignments/${a._id}`);
+      setList((l) => l.filter((x) => x._id !== a._id));
+      toast("Deleted");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setDeleting("");
+    }
+  };
 
   useEffect(() => {
     api
@@ -115,8 +137,21 @@ export default function Assignments() {
             const past = isPast(a);
             const st = a.status === "draft" ? STATE.draft : past ? { label: "Past due", cls: "bg-slate-100 text-slate-600 ring-slate-200" } : STATE.published;
             return (
-              <Link key={a._id} to={`/lecturer/assignments/${a._id}`} className="gp-card gp-card-hover group flex flex-col p-5">
-                <div className="flex flex-wrap items-center gap-2">
+              <div key={a._id} className="relative">
+              <button
+                type="button"
+                onClick={() => remove(a)}
+                disabled={deleting === a._id}
+                title="Delete assignment"
+                aria-label={`Delete ${a.title}`}
+                className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" />
+                </svg>
+              </button>
+              <Link to={`/lecturer/assignments/${a._id}`} className="gp-card gp-card-hover group flex h-full flex-col p-5">
+                <div className="flex flex-wrap items-center gap-2 pr-8">
                   <span className="gp-chip">{a.exam}</span>
                   <span className="gp-chip">{a.subject}</span>
                   <Pill cls={st.cls}>{st.label}</Pill>
@@ -143,6 +178,7 @@ export default function Assignments() {
                   </span>
                 </div>
               </Link>
+              </div>
             );
           })}
         </div>

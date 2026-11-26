@@ -3,6 +3,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
+import Loading from "../../components/Loading";
 
 const fmt = (d) => new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const device = (ua = "") => (/Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iPhone" : /Windows/i.test(ua) ? "Windows" : /Mac/i.test(ua) ? "Mac" : ua ? "Other" : "");
@@ -19,7 +20,7 @@ export default function AppErrors() {
   }, [reload]);
 
   const clear = async () => {
-    if (!(await askConfirm("Remove every error from this list? Do this after the problems are fixed.", { title: "Clear the list?", confirmLabel: "Clear" }))) return;
+    if (!(await askConfirm("Remove every error from this list? Do this after the problems are fixed.", { title: "Clear the list?", confirmText: "Clear" }))) return;
     await api.delete("/admin/app-errors");
     toast("Cleared");
     setReload((r) => r + 1);
@@ -42,7 +43,7 @@ export default function AppErrors() {
         </div>
       </section>
       {error && <div className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!list && !error && <p className="mt-6 text-slate-500">Loading...</p>}
+      {!list && !error && <Loading />}
       {list && !list.length && <div className="gp-card mt-5 p-10 text-center text-slate-500">No errors. Everything is working. ✓</div>}
       <div className="mt-5 space-y-3">
         {list?.map((e) => (

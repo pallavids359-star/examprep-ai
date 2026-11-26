@@ -6,6 +6,7 @@ import QuestionBody from "../../components/QuestionBody";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
 import { FLAG_REASON_LABEL } from "../../components/ReportQuestion";
+import Loading from "../../components/Loading";
 
 const TABS = [
   ["open", "To check"],
@@ -35,7 +36,7 @@ export default function ReportedQuestions() {
     const n = g.affectedStudents ?? 0;
     const ok = await askConfirm(
       `${plural(n, "student")} got this question. All of them will get full marks for it, whatever they answered, and their results and ranks will be updated. This cannot be undone.`,
-      { title: "Give full marks for this question?", confirmLabel: "Give full marks", danger: false }
+      { title: "Give full marks for this question?", confirmText: "Give full marks", danger: false }
     );
     if (!ok) return;
     setBusy(g.questionId);
@@ -52,7 +53,7 @@ export default function ReportedQuestions() {
   };
 
   const reject = async (g) => {
-    const ok = await askConfirm("The question is correct. Marks stay the same.", { title: "No mistake in this question?", confirmLabel: "Yes, no mistake", danger: false });
+    const ok = await askConfirm("The question is correct. Marks stay the same.", { title: "No mistake in this question?", confirmText: "Yes, no mistake", danger: false });
     if (!ok) return;
     setBusy(g.questionId);
     try {
@@ -99,7 +100,7 @@ export default function ReportedQuestions() {
         </div>
       )}
       {error && <div className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!data && !error && <p className="mt-6 text-slate-500">Loading...</p>}
+      {!data && !error && <Loading />}
       {data && !data.length && (
         <div className="gp-card mt-5 p-10 text-center text-slate-500">
           {status === "open" ? "No reported questions to check. 🎉" : "Nothing here yet."}
