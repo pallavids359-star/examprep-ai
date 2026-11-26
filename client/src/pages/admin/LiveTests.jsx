@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
@@ -9,7 +9,8 @@ import { Countdown, Hero, ICONS, Ring, Stat } from "../../components/premium";
 
 const TABS = [
   ["all", "All"],
-  ["active", "Live & upcoming"],
+  ["open", "Open now"],
+  ["scheduled", "Scheduled"],
   ["draft", "Need questions"],
   ["closed", "Finished"],
 ];
@@ -53,6 +54,12 @@ export default function LiveTests() {
   };
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
+  const listRef = useRef(null);
+  // A number card shows its group of tests below (press again for All)
+  const showTab = (k) => {
+    setTab((cur) => (cur === k ? "all" : k));
+    setTimeout(() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
 
   useEffect(() => {
     api
@@ -72,7 +79,7 @@ export default function LiveTests() {
   }, [tests]);
 
   const shown = (tests || []).filter((t) =>
-    tab === "all" ? true : tab === "active" ? ["open", "scheduled"].includes(t.phase) : tab === "draft" ? t.phase === "draft" : ["closed", "archived"].includes(t.phase)
+    tab === "all" ? true : tab === "open" || tab === "scheduled" ? t.phase === tab : tab === "draft" ? t.phase === "draft" : ["closed", "archived"].includes(t.phase)
   );
 
   const newBtn = (
@@ -91,16 +98,16 @@ export default function LiveTests() {
       />
 
       <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Open right now" value={counts.open} sub="students can start" icon={ICONS.bolt} accent />
-        <Stat label="Scheduled" value={counts.scheduled} sub="ready, open by themselves" icon={ICONS.calendar} />
-        <Stat label="Waiting for questions" value={counts.draft} sub="a subject is not full yet" icon={ICONS.book} />
-        <Stat label="Papers written" value={counts.writers} sub="across every live test" icon={ICONS.users} />
+        <Stat label="Open right now" value={counts.open} sub="students can start" icon={ICONS.bolt} accent onClick={() => showTab("open")} active={tab === "open"} />
+        <Stat label="Scheduled" value={counts.scheduled} sub="ready, open by themselves" icon={ICONS.calendar} onClick={() => showTab("scheduled")} active={tab === "scheduled"} />
+        <Stat label="Waiting for questions" value={counts.draft} sub="a subject is not full yet" icon={ICONS.book} onClick={() => showTab("draft")} active={tab === "draft"} />
+        <Stat label="Papers written" value={counts.writers} sub="across every live test" icon={ICONS.users} onClick={() => showTab("closed")} active={tab === "closed"} />
       </div>
 
       {error && <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {tests && tests.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-2" role="tablist">
+        <div ref={listRef} className="mt-6 flex scroll-mt-4 flex-wrap gap-2" role="tablist">
           {TABS.map(([k, l]) => (
             <button
               key={k}
@@ -137,7 +144,14 @@ export default function LiveTests() {
         </div>
       )}
 
-      {tests && tests.length > 0 && shown.length === 0 && <p className="mt-6 text-sm text-slate-500">Nothing here.</p>}
+      {tests && tests.length > 0 && shown.length === 0 && (
+        <p className="gp-card mt-4 px-5 py-8 text-center text-sm text-slate-500">
+          {{ open: "No live test is open right now.", scheduled: "No live test is scheduled.", draft: "Every live test has its questions.", closed: "No live test has finished yet." }[tab] || "Nothing here."}{" "}
+          <button type="button" onClick={() => setTab("all")} className="font-semibold text-[#9a7a2c] hover:underline">
+            Show all
+          </button>
+        </p>
+      )}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         {shown.map((t) => {

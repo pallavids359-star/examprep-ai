@@ -120,9 +120,14 @@ export function Countdown({ to, onDone, dark = true, compact = false }) {
 }
 
 // Number tile with an icon
-export function Stat({ label, value, sub, icon, accent = false }) {
+// With onClick it becomes a button (e.g. shows that group of tests); "active" outlines it
+export function Stat({ label, value, sub, icon, accent = false, onClick, active = false }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div className="gp-card min-w-0 p-3.5 sm:p-5">
+    <Tag
+      {...(onClick ? { type: "button", onClick, "aria-pressed": active } : {})}
+      className={`gp-card min-w-0 p-3.5 text-left sm:p-5 ${onClick ? "group w-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-[#e5c372]/50" : ""} ${active ? "ring-2 ring-[#c9a24a]" : ""}`}
+    >
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <p className="min-w-0 text-[11px] font-semibold uppercase leading-tight tracking-wider text-slate-500 sm:text-xs">{label}</p>
         {icon && (
@@ -135,7 +140,8 @@ export function Stat({ label, value, sub, icon, accent = false }) {
       </div>
       <p className="mt-1.5 whitespace-nowrap font-display text-2xl font-extrabold tabular-nums text-slate-900 sm:mt-2 sm:text-3xl">{value}</p>
       {sub && <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-xs">{sub}</p>}
-    </div>
+      {onClick && <p className="mt-2 text-[11px] font-semibold text-[#b8862b] opacity-70 transition group-hover:opacity-100 sm:text-xs">{active ? "Showing ✓" : "Show these →"}</p>}
+    </Tag>
   );
 }
 

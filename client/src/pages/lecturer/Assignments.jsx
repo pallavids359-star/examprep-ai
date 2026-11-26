@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
@@ -22,6 +22,11 @@ export default function Assignments() {
   const [list, setList] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("all");
+  const listRef = useRef(null);
+  const showTab = (k) => {
+    setTab((cur) => (cur === k ? "all" : k));
+    setTimeout(() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const [deleting, setDeleting] = useState("");
 
   // Delete from the card (top-right bin)
@@ -80,8 +85,8 @@ export default function Assignments() {
 
         {list && list.length > 0 && (
           <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <Stat label="Open now" value={live} sub="students can answer" icon={ICONS.bolt} accent />
-            <Stat label="Drafts" value={drafts} sub="waiting for you to publish" icon={ICONS.book} />
+            <Stat label="Open now" value={live} sub="students can answer" icon={ICONS.bolt} accent onClick={() => showTab("published")} active={tab === "published"} />
+            <Stat label="Drafts" value={drafts} sub="waiting for you to publish" icon={ICONS.book} onClick={() => showTab("draft")} active={tab === "draft"} />
             <Stat label="Handed in" value={handedIn} sub="submissions so far" icon={ICONS.check} />
           </div>
         )}
@@ -89,7 +94,7 @@ export default function Assignments() {
         {error && <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         {list && list.length > 0 && (
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <div ref={listRef} className="mt-8 flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-slate-900">Your assignments</h2>
             <div className="inline-flex rounded-full bg-white p-1 ring-1 ring-[#e7dcc3]" role="tablist">
               {TABS.map(([k, l]) => (
