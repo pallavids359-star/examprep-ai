@@ -9,6 +9,7 @@ import { toast } from "../../components/Toaster";
 import { useAuth } from "../../context/AuthContext";
 import { fmtDateTime, fmtDuration, lecturersFor, toLocalInput } from "../../components/liveHelpers";
 import { Hero, ICONS, Step } from "../../components/premium";
+import { ModeBar, ModeModal, PaperPreview, StepsPanel, WizardNav } from "../../components/Wizard";
 
 // Head lecturer: create a live test (or edit one before it opens) in one short form.
 const input = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none";
@@ -65,6 +66,20 @@ const timeLabel = (t) => {
 };
 const dayLabel = (d) => new Date(`${d}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
+// The five steps of a live test
+const LIVE_STEPS = [
+  ["Exam", "Which exam"],
+  ["Date & time", "When it opens"],
+  ["Questions", "Who sets them"],
+  ["Students", "Who can write it"],
+  ["Preview & create", "Check and save"],
+];
+const LIVE_MODES = [
+  ["auto", "Auto fetch", "Set class, difficulty, question types and per-chapter counts. GenPrep picks every subject's questions; you check them before publishing.", "M13 2L3 14h8l-1 8 10-12h-8z", "Use auto fetch"],
+  ["me", "Manual fetch", "Hand-pick every question yourself from the question bank, by chapter, concept, difficulty and type.", "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z", "Hand-pick"],
+  ["lecturer", "Lecturers pick", "Each subject's lecturer picks its questions and sends them to you to check.", "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1", "Ask lecturers"],
+];
+
 // A new test's unfinished choices are kept in this browser, so going back by mistake loses nothing
 const liveDraftKey = (user) => `gp-livetest-draft:${user?._id || user?.email || "me"}`;
 const readLiveDraft = (user) => {
@@ -83,6 +98,9 @@ export default function LiveTestForm() {
   const [draft] = useState(() => (id ? null : readLiveDraft(user)));
   const d = (k, fallback) => (draft && draft[k] !== undefined ? draft[k] : fallback);
   const keepDuration = useRef(Boolean(draft?.duration));
+  const [step, setStep] = useState(() => d("step", 1));
+  const [modeAsked, setModeAsked] = useState(() => (id ? true : d("modeAsked", false)));
+  const [modeOpen, setModeOpen] = useState(false);
   const [restored, setRestored] = useState(Boolean(draft && (draft.titleTouched || Object.keys(draft.perChapter || {}).length || (draft.autoFormats || []).length || draft.college))); // only if something was really filled in
   const [exams, setExams] = useState([]);
   const [lecturers, setLecturers] = useState([]);
@@ -213,13 +231,13 @@ export default function LiveTestForm() {
   // Save every change to a new test (not when editing one that already exists)
   useEffect(() => {
     if (id || !rows.length) return;
-    const data = { examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections };
+    const data = { examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections, step, modeAsked };
     try {
       localStorage.setItem(liveDraftKey(user), JSON.stringify({ ...data, savedAt: Date.now() }));
     } catch {
       /* storage full or blocked */
     }
-  }, [id, user, examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections]);
+  }, [id, user, examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections, step, modeAsked]);
   const startOver = () => {
     try {
       localStorage.removeItem(liveDraftKey(user));
@@ -263,8 +281,49 @@ export default function LiveTestForm() {
   const included = rows.filter((r) => r.include);
   const totalQs = included.reduce((a, r) => a + (r.picker === "auto" && chapterSum(r.key) > 0 ? chapterSum(r.key) : Number(r.mcqCount || 0)) + Number(r.numericalCount || 0), 0);
 
+  // What each step needs before the next one
+  const stepProblem = (n) => {
+    if (n === 1) return !examId || !pattern ? "Choose the exam" : "";
+    if (n === 2) return !startsAt || !endsAt ? "Choose when the test opens and closes" : endsAt <= startsAt ? "The test must close after it opens" : "";
+    if (n === 3) {
+      if (!included.length) return "Include at least one subject";
+      if (included.some((r) => r.picker === "lecturer" && !r.lecturerId)) return "Choose a lecturer for each subject marked 'Lecturer'";
+      if (anyAuto && typedTotal(autoFormats, autoFormatCounts) > smallestAuto) return `The question types add up to ${typedTotal(autoFormats, autoFormatCounts)}, more than the ${smallestAuto} questions in a subject.`;
+      if (anyAuto && mixTotal && mixTotal !== 100) return `Difficulty adds up to ${mixTotal}%. Easy + medium + hard must be 100%.`;
+    }
+    return "";
+  };
+  const doneSteps = [1, 2, 3, 4, 5].map((n) => n < step && !stepProblem(n));
+  const goTo = (n) => {
+    if (n > step) {
+      for (let k = step; k < n; k++) {
+        const why = stepProblem(k);
+        if (why) {
+          setStep(k);
+          return toast(why, "error");
+        }
+      }
+    }
+    setStep(n);
+    if (n === 3 && !modeAsked) setModeOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const pickerNow = included.length && included.every((r) => r.picker === included[0].picker) ? included[0].picker : "mixed";
+  const setAllPickers = (v) =>
+    setRows((rs) => rs.map((r) => (r.include ? { ...r, picker: v, lecturerId: v === "lecturer" ? r.lecturerId || lecturersFor(lecturers, r.key).match[0]?._id || "" : r.lecturerId } : r)));
+  const paperRows = [
+    ["Exam", exam?.code || "—"],
+    ["Opens", startsAt ? fmtDateTime(startsAt) : "—"],
+    ["Closes", endsAt && startsAt && endsAt > startsAt ? fmtDateTime(endsAt) : "—"],
+    ["Length", duration ? fmtDuration(Number(duration) * 60) : "—"],
+    ["Questions", totalQs ? `${totalQs}` : "—"],
+    ["Set by", pickerNow === "auto" ? "Auto fetch" : pickerNow === "me" ? "You (manual)" : pickerNow === "lecturer" ? "Lecturers" : "Mixed"],
+    ["Students", college ? `${college} · ${audSections.length ? `Sec ${audSections.join(", ")}` : "All sections"}` : "All students"],
+  ];
+
   const submit = async (e) => {
     e.preventDefault();
+    if (step < 5) return goTo(step + 1); // Enter in a box moves on instead of saving
     setError("");
     if (!included.length) return setError("Include at least one subject");
     if (included.some((r) => r.picker === "lecturer" && !r.lecturerId)) return setError("Choose a lecturer for each subject marked 'Lecturer'");
@@ -340,12 +399,13 @@ export default function LiveTestForm() {
         <Hero
           eyebrow={id ? "Edit live test" : "New live test"}
           title={id ? "Change the plan" : "Set up a live test"}
-          subtitle="Three quick choices. Everything has a sensible default, so you can create it straight away."
+          subtitle={`Step ${step} of 5 · ${LIVE_STEPS[step - 1][0]}. Everything has a sensible default, so you can move quickly.`}
         />
       </div>
-      <form onSubmit={submit} className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <form onSubmit={submit} className="mt-6 grid items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+       <StepsPanel steps={LIVE_STEPS} step={step} done={doneSteps} onGo={goTo} paper={paperRows} paperTitle="Your test" />
        <div className="min-w-0 space-y-5">
-        {/* 1. Exam */}
+        {step === 1 && (
         <section className="gp-card space-y-4 p-6">
           <Step n={1} title="Which exam?" hint={id ? "The exam can't change after creating the test" : "Subjects and question counts follow the real exam"} />
           <div className="grid gap-3 sm:grid-cols-3">
@@ -375,8 +435,9 @@ export default function LiveTestForm() {
             })}
           </div>
         </section>
+        )}
 
-        {/* 2. When */}
+        {step === 2 && (
         <section className="gp-card space-y-5 p-6">
           <Step n={2} title="Date and time" />
 
@@ -442,9 +503,16 @@ export default function LiveTestForm() {
             <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">The end time must be after the start time.</p>
           )}
         </section>
+        )}
 
-        {/* 2. Questions */}
-        {pattern && (
+        {step === 3 && !pattern && <section className="gp-card p-6 text-sm text-slate-500">Choose the exam first.</section>}
+        {step === 3 && pattern && (<>
+          <ModeBar
+            manual={pickerNow !== "auto"}
+            onChange={() => setModeOpen(true)}
+            label={pickerNow === "auto" ? "Auto fetch" : pickerNow === "me" ? "Manual fetch" : pickerNow === "lecturer" ? "Lecturers pick" : "Mixed"}
+            sub={pickerNow === "auto" ? "questions are picked for you with the settings below" : pickerNow === "me" ? "you hand-pick every question after saving" : pickerNow === "lecturer" ? "each subject's lecturer picks and sends to you" : "different for each subject (see below)"}
+          />
           <section className="gp-card space-y-4 p-6">
             <Step n={3} title="Who sets the questions?" right={<span className="gp-chip">{totalQs} questions</span>} />
             <div className="grid grid-cols-3 gap-3">
@@ -594,9 +662,9 @@ export default function LiveTestForm() {
               ))}
             </div>
           </section>
-        )}
+        </>)}
 
-        {/* 5. Who */}
+        {step === 4 && (
         <section className="gp-card space-y-4 p-6">
           <Step n={4} title="Who can write it?" hint="Students only see tests meant for their college and section" />
           <div className="flex flex-wrap gap-2">
@@ -643,48 +711,55 @@ export default function LiveTestForm() {
             </div>
           )}
         </section>
+        )}
 
-       </div>
-
-        {/* Summary */}
-        <aside className="lg:sticky lg:top-6">
-          <div className="gp-hero p-6">
-            <div className="relative">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">Summary</p>
-              <p className="mt-2 truncate font-display text-xl font-extrabold text-white">{title || "Live test"}</p>
-              <dl className="mt-4 space-y-3 text-sm">
-                {[
-                  ["Exam", exam?.code || "—"],
-                  ["Opens", startsAt ? fmtDateTime(startsAt) : "—"],
-                  ["Closes", endsAt && startsAt && endsAt > startsAt ? fmtDateTime(endsAt) : "—"],
-                  ["Length", duration ? fmtDuration(Number(duration) * 60) : "—"],
-                  ["Questions", totalQs || "—"],
-                  ["Students", college ? `${college} · ${audSections.length ? `Sec ${audSections.join(", ")}` : "All sections"}` : "All students"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-3 border-b border-white/10 pb-2">
-                    <dt className="text-amber-100/70">{k}</dt>
-                    <dd className="text-right font-semibold text-white">{v}</dd>
-                  </div>
+        {step === 5 && (<>
+          <PaperPreview rows={[["Name", title || "Live test"], ...paperRows]} />
+          {included.length > 0 && (
+            <section className="gp-card p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8862b]">Subjects</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {included.map((r) => (
+                  <span key={r.key} className="rounded-full bg-[#f3ecdc] px-3 py-1.5 text-sm font-semibold text-slate-800">
+                    {r.name} · {r.picker === "auto" ? "Auto" : r.picker === "me" ? "You" : lecturers.find((l) => l._id === r.lecturerId)?.name || "Lecturer"}
+                  </span>
                 ))}
-              </dl>
-              {included.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {included.map((r) => (
-                    <span key={r.key} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-amber-100">
-                      {r.name} · {r.picker === "auto" ? "Auto" : r.picker === "me" ? "You" : lecturers.find((l) => l._id === r.lecturerId)?.name || "Lecturer"}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {error && <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-              <button type="submit" disabled={saving || !examId || !pattern} className="gp-gold-btn mt-5 w-full px-6 py-3.5 text-sm disabled:opacity-50">
-                {saving ? "Saving..." : id ? "Save changes" : "Create live test"}
-              </button>
-              <p className="mt-2 text-center text-xs text-amber-100/60">When every subject is ready, press Publish. Students only see it after that.</p>
-            </div>
-          </div>
-        </aside>
+              </div>
+            </section>
+          )}
+          <p className="text-sm text-slate-500">When every subject is ready, open the test and press Publish. Students only see it after that.</p>
+        </>)}
+
+        {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        <WizardNav
+          steps={LIVE_STEPS}
+          step={step}
+          onGo={goTo}
+          last={
+            <button type="submit" disabled={saving || !examId || !pattern} className="gp-btn gp-btn-gold px-6 py-3.5 text-sm">
+              {saving ? <><span className="gp-spinner" />Saving…</> : id ? "Save changes" : "Create live test →"}
+            </button>
+          }
+        />
+       </div>
       </form>
+
+      {modeOpen && (
+        <ModeModal
+          label={`${exam?.code || ""} · live test`}
+          modes={LIVE_MODES}
+          current={pickerNow}
+          onPick={(v) => {
+            setAllPickers(v);
+            setModeAsked(true);
+            setModeOpen(false);
+          }}
+          onClose={() => {
+            setModeAsked(true);
+            setModeOpen(false);
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }

@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { toLocalInput } from "../../components/liveHelpers";
 import { CLASS_LABELS, FORMAT_LABELS, JEE_ONLY } from "../../components/assignmentHelpers";
 import QuestionTypeCounts, { cleanCounts, typedTotal } from "../../components/QuestionTypeCounts";
+import { ModeBar, ModeModal, PaperPreview, StepsPanel } from "../../components/Wizard";
 
 const input = "w-full rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30";
 const LEVELS = [
@@ -68,148 +69,6 @@ const STEPS = [
   ["Select questions", "Auto or by hand"],
   ["Preview & save", "Students and due date"],
 ];
-
-const CheckIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-// Left: "Your steps" and "Your paper"
-function StepsPanel({ step, done, onGo, paper }) {
-  return (
-    <aside className="lg:sticky lg:top-6 lg:self-start">
-      {/* Phones: a slim progress row */}
-      <ol className="flex gap-1.5 lg:hidden" aria-label="Steps">
-        {STEPS.map(([name], i) => (
-          <li key={name} className="flex-1">
-            <button type="button" onClick={() => onGo(i + 1)} className="w-full text-left">
-              <span className={`block h-1.5 rounded-full ${i + 1 === step ? "bg-[#c9a24a]" : done[i] ? "bg-[#17140f]" : "bg-[#e7dcc3]"}`} />
-              <span className={`mt-1 block truncate text-[11px] font-semibold ${i + 1 === step ? "text-slate-900" : "text-slate-400"}`}>{name}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-
-      <div className="gp-card hidden p-4 lg:block">
-        <p className="px-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8862b]">Your steps</p>
-        <ol className="mt-3 space-y-1">
-          {STEPS.map(([name, sub], i) => {
-            const n = i + 1;
-            const now = n === step;
-            return (
-              <li key={name}>
-                <button type="button" onClick={() => onGo(n)} aria-current={now ? "step" : undefined} className={`flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition ${now ? "bg-[#f6eedb]" : "hover:bg-[#fbf7ee]"}`}>
-                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${done[i] && !now ? "bg-emerald-600 text-white" : now ? "bg-[#17140f] text-[#e5c372]" : "bg-[#f3ecdc] text-slate-500"}`}>
-                    {done[i] && !now ? <CheckIcon /> : n}
-                  </span>
-                  <span className="min-w-0">
-                    <span className={`block text-sm font-semibold ${now ? "text-slate-900" : "text-slate-700"}`}>{name}</span>
-                    <span className="block truncate text-xs text-slate-500">{sub}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      <div className="mt-4 hidden rounded-3xl bg-[#17140f] p-5 text-white shadow-xl shadow-black/10 lg:block">
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e5c372]">Your paper</p>
-        <dl className="mt-3 space-y-3">
-          {paper.map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-[11px] font-semibold uppercase tracking-wider text-amber-100/50">{k}</dt>
-              <dd className="text-sm font-bold">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </aside>
-  );
-}
-
-// Step 4: which way the questions are found, with a "Change" link
-function ModeBar({ manual, onChange }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-[#fbf6ea] px-4 py-3 ring-1 ring-[#efe6d2]">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f]">
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d={manual ? "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" : "M13 2L3 14h8l-1 8 10-12h-8z"} />
-        </svg>
-      </span>
-      <span className="flex-1 text-sm">
-        <b className="text-slate-900">{manual ? "Manual fetch" : "Auto fetch"}</b>
-        <span className="text-slate-500"> · {manual ? "you hand-pick every question" : "set the count, difficulty and types; questions are picked for you"}</span>
-      </span>
-      <button type="button" onClick={onChange} className="text-sm font-semibold text-[#9a7a2c] hover:underline">
-        Change
-      </button>
-    </div>
-  );
-}
-
-// The pop-up when step 4 opens: Auto fetch or Manual fetch
-function ModeModal({ label, current, onPick, onClose }) {
-  useEffect(() => {
-    const k = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
-  const MODES = [
-    ["auto", "Auto fetch", "Set chapter counts, difficulty and question types. GenPrep balances and picks the questions; you check them before publishing.", "M13 2L3 14h8l-1 8 10-12h-8z", "Use auto fetch"],
-    ["manual", "Manual fetch", "Hand-pick every question. Filter by chapter, concept, difficulty and question type, like a live test.", "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z", "Use manual fetch"],
-  ];
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#17140f]/45 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby="mode-title" className="w-full max-w-2xl rounded-3xl bg-[#fffdf8] p-6 shadow-2xl md:p-8" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <span className="rounded-full bg-[#f3ecdc] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#8a6420]">{label}</span>
-            <h2 id="mode-title" className="mt-3 font-display text-2xl font-extrabold text-slate-900">How should questions be chosen?</h2>
-            <p className="mt-1 text-sm text-slate-500">You can change this later.</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:bg-[#f3ecdc] hover:text-slate-900">
-            ✕
-          </button>
-        </div>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {MODES.map(([v, title, sub, icon, cta]) => (
-            <div key={v} className={`flex flex-col rounded-2xl border p-5 ${current === v ? "border-[#c9a24a] bg-[#fbf6ea]" : "border-[#e7dcc3] bg-white"}`}>
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f]">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={icon} />
-                </svg>
-              </span>
-              <p className="mt-3 font-display text-lg font-extrabold text-slate-900">{title}</p>
-              <p className="mt-1 flex-1 text-sm text-slate-600">{sub}</p>
-              <button type="button" onClick={() => onPick(v)} className="gp-btn gp-btn-dark mt-4 w-full text-sm">
-                {cta} →
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Step 5: everything chosen, in one place
-function PaperPreview({ rows }) {
-  return (
-    <section className="gp-card p-5 md:p-6">
-      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#b8862b]">Preview</p>
-      <dl className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-        {rows.map(([k, v]) => (
-          <div key={k} className="rounded-xl bg-[#fbf7ee] px-3.5 py-2.5 ring-1 ring-[#efe6d2]">
-            <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{k}</dt>
-            <dd className="mt-0.5 text-sm font-bold text-slate-900">{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
 
 // Unfinished choices are kept in this browser, so going back by mistake loses nothing
 const draftKey = (user) => `gp-assignment-draft:${user?._id || user?.email || "me"}`;
@@ -480,7 +339,7 @@ export default function AssignmentForm() {
         {error && <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <StepsPanel step={step} done={doneSteps} onGo={goTo} paper={paperRows} />
+        <StepsPanel steps={STEPS} step={step} done={doneSteps} onGo={goTo} paper={paperRows} />
         <div className="min-w-0 space-y-5">
           {step === 1 && (<>
           {/* 1. Subject */}
