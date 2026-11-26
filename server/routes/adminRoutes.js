@@ -59,7 +59,8 @@ router.put("/students/:id/status", admin.setStudentStatus);
 const { questionBreakdown } = require("../controllers/questionStatsController");
 router.get("/stats/questions", questionBreakdown);
 
-const { syllabusFilters } = require("../controllers/questionStatsController");
+const { syllabusFilters, questionCounts } = require("../controllers/questionStatsController");
+router.get("/question-counts", questionCounts);
 router.get("/syllabus-filters", syllabusFilters);
 
 // Supabase question databases

@@ -10,6 +10,7 @@ const Privacy = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Pri
 const Terms = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Terms })));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const AppErrors = lazy(() => import("./pages/admin/AppErrors"));
+const QuestionCounts = lazy(() => import("./pages/admin/QuestionCounts"));
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -110,6 +111,7 @@ export default function App() {
       <Route path="/admin/drafts" element={adminOnly(<DraftQuestions />)} />
       <Route path="/admin/reported" element={adminOnly(<ReportedQuestions />)} />
       <Route path="/admin/errors" element={adminOnly(<AppErrors />)} />
+      <Route path="/admin/question-counts" element={adminOnly(<QuestionCounts />)} />
       <Route path="/admin/questions/bulk" element={adminOnly(<BulkUpload />)} />
       <Route path="/admin/questions/:id" element={adminOnly(<QuestionForm />)} />
       <Route path="/admin/tests" element={adminOnly(<ManageTests />)} />

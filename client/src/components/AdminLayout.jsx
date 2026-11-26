@@ -7,6 +7,7 @@ const LINKS = [
   { to: "/admin", label: "Overview", end: true, icon: "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" },
   { to: "/admin/questions", label: "Questions", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
   { to: "/admin/drafts", label: "Draft questions", icon: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" },
+  { to: "/admin/question-counts", label: "Question counts", icon: "M4 20V10M10 20V4M16 20v-6M2 20h20" },
   { to: "/admin/reported", label: "Reported questions", badge: "reports", icon: "M4 22V4M4 4h13l-2 4 2 4H4" },
   { to: "/admin/syllabus", label: "Syllabus", icon: "M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7" },
   { to: "/admin/tests", label: "Mock tests", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" },
@@ -29,7 +30,7 @@ function Icon({ d }) {
 
 const GROUPS = [
   ["Overview", ["/admin"]],
-  ["Content", ["/admin/questions", "/admin/drafts", "/admin/reported", "/admin/syllabus"]],
+  ["Content", ["/admin/questions", "/admin/drafts", "/admin/question-counts", "/admin/reported", "/admin/syllabus"]],
   ["Tests", ["/admin/tests", "/admin/live-tests", "/lecturer/assignments", "/admin/results"]],
   ["People", ["/admin/students", "/admin/lecturers"]],
   ["Help", ["/admin/errors", "/admin/guide"]],
