@@ -372,7 +372,7 @@ export default function PickQuestions() {
   return (
     <LecturerLayout>
       {/* Header */}
-      <div className="mx-auto max-w-7xl px-4 pt-6">
+      <div className="mx-auto max-w-[1600px] px-4 pt-6">
         <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
           <Link to={info.isAdmin ? `/admin/live-tests/${id}` : "/lecturer"} className="font-semibold text-amber-800 hover:underline">
             {info.isAdmin ? "Live test" : "My subjects"}
@@ -477,7 +477,7 @@ export default function PickQuestions() {
 
       {/* Toolbar */}
       <div className="sticky top-0 z-20 mt-4 border-y border-amber-200/60 bg-[#fbf7ee]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-amber-200/70" role="tablist">
             {[
               ["add", "Add questions", null],
@@ -556,7 +556,7 @@ export default function PickQuestions() {
 
 
       {view === "add" && (
-      <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-6">
         {stage !== "questions" ? (
           <SelectWizard
             stage={stage}

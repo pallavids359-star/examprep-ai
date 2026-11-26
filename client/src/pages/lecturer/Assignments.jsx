@@ -66,7 +66,7 @@ export default function Assignments() {
 
   return (
     <LecturerLayout>
-      <main className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+      <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">
         <Hero
           eyebrow={user?.role === "admin" ? "All lecturers" : "Your class"}
           title="Assignments"
@@ -108,7 +108,7 @@ export default function Assignments() {
         )}
 
         {!list && !error && (
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="gp-card h-36 animate-pulse bg-white/60" />
             ))}
@@ -132,7 +132,7 @@ export default function Assignments() {
 
         {list && list.length > 0 && shown.length === 0 && <p className="gp-card mt-4 px-5 py-8 text-center text-sm text-slate-500">Nothing here.</p>}
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {shown.map((a) => {
             const past = isPast(a);
             const st = a.status === "draft" ? STATE.draft : past ? { label: "Past due", cls: "bg-slate-100 text-slate-600 ring-slate-200" } : STATE.published;

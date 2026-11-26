@@ -34,7 +34,7 @@ export default function LecturerHome() {
 
   return (
     <LecturerLayout>
-      <main className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+      <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">
         <Hero
           eyebrow="Lecturer"
           title={`${greeting()}${firstName ? `, ${firstName}` : ""}`}

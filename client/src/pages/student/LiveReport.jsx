@@ -151,7 +151,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
   const r = data.rank;
   const answeredCount = s.correct + s.wrong;
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 md:py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {back}
         <button type="button" onClick={downloadScorecard} className="gp-gold-btn inline-flex items-center gap-2 px-5 py-2.5 text-sm print:hidden">

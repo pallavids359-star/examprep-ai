@@ -317,7 +317,7 @@ export default function AssignmentForm() {
 
   return (
     <LecturerLayout>
-      <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 md:px-8 md:pt-8">
+      <main className="mx-auto max-w-[1600px] px-4 pb-24 pt-6 md:px-8 md:pt-8">
         <BackLink to="/lecturer/assignments">Assignments</BackLink>
         {restored && (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">

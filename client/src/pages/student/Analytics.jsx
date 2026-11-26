@@ -164,7 +164,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
   };
 
   return (
-    <div className={showHeader ? "mx-auto max-w-6xl px-4 py-6 md:py-8" : ""}>
+    <div className={showHeader ? "mx-auto max-w-[1600px] px-4 py-6 md:py-8" : ""}>
       {showHeader && (
         <PageHeader eyebrow={`${exam?.code || ""} performance`} title="Analytics" subtitle="Every test you finished, with marks by subject and chapter." />
       )}

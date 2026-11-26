@@ -84,7 +84,7 @@ export default function MockTests() {
 
     return (
         <div className="bg-slate-50">
-            <main className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+            <main className="max-w-[1600px] mx-auto px-4 py-6 md:py-8">
                 <PageHeader eyebrow="Full-length tests" title="Mock tests" subtitle="Pick an exam and get a full test made just for you, with the real pattern and timer." />
 
                 {error && <div className="mt-5 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}

@@ -22,7 +22,7 @@ export default function GuidePage({ role }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">
       <div className="gp-print-sheet">
         <section className="gp-hero p-6 md:p-8 print:rounded-none">
           <div className="relative flex flex-wrap items-center justify-between gap-6">

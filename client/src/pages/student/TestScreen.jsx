@@ -120,7 +120,7 @@ export default function TestScreen() {
         onSubmit={() => setSummaryOpen(true)}
       />
 
-      <main className="max-w-6xl mx-auto px-4 pt-6 pb-28 grid lg:grid-cols-4 gap-6">
+      <main className="max-w-[1600px] mx-auto px-4 pt-6 pb-28 grid lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
           {error && <div className="mb-4 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
           <QuestionView

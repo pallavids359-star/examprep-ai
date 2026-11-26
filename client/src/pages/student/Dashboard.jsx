@@ -35,7 +35,7 @@ export default function Dashboard() {
   const today = data?.last7Days?.[data.last7Days.length - 1];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+    <div className="max-w-[1600px] mx-auto px-4 py-6 md:py-8">
       <WelcomeBanner name={user.name} examCode={examCode} today={today} />
       <LiveNowBanner examId={examId} />
       <QuickActions wrongCount={data?.wrongQuestionsCount || 0} />

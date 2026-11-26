@@ -106,7 +106,7 @@ export default function AssignmentReview() {
   if (error) {
     return (
       <LecturerLayout>
-        <main className="mx-auto max-w-5xl px-4 py-8 md:px-8">
+        <main className="mx-auto max-w-[1600px] px-4 py-8 md:px-8">
           <BackLink to="/lecturer/assignments">Assignments</BackLink>
           <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         </main>
@@ -116,7 +116,7 @@ export default function AssignmentReview() {
   if (!a) {
     return (
       <LecturerLayout>
-        <main className="mx-auto max-w-5xl space-y-4 px-4 py-8 md:px-8">
+        <main className="mx-auto max-w-[1600px] space-y-4 px-4 py-8 md:px-8">
           <div className="gp-card h-40 animate-pulse bg-white/60" />
           <div className="gp-card h-64 animate-pulse bg-white/60" />
         </main>
@@ -132,7 +132,7 @@ export default function AssignmentReview() {
 
   return (
     <LecturerLayout>
-      <main className="mx-auto max-w-5xl px-4 pb-16 pt-6 md:px-8 md:pt-8">
+      <main className="mx-auto max-w-[1600px] px-4 pb-16 pt-6 md:px-8 md:pt-8">
         <BackLink to="/lecturer/assignments">Assignments</BackLink>
 
         {/* Header */}

@@ -39,7 +39,7 @@ export default function Assignments() {
   const avg = done.length ? Math.round(done.reduce((n, a) => n + (a.result.maxScore ? (a.result.score / a.result.maxScore) * 100 : 0), 0) / done.length) : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">
       <Hero
         eyebrow={user?.college ? `${user.college}${user.section ? ` · Section ${user.section}` : ""}` : "From your lecturers"}
         title="Assignments"
@@ -62,7 +62,7 @@ export default function Assignments() {
 
       {error && <div className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {!list && !error && (
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {[0, 1].map((i) => (
             <div key={i} className="gp-card h-36 animate-pulse bg-white/60" />
           ))}
@@ -135,7 +135,7 @@ function Group({ title, children }) {
   return (
     <section className="mt-8">
       <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      <div className="mt-3 grid gap-4 md:grid-cols-2">{children}</div>
+      <div className="mt-3 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{children}</div>
     </section>
   );
 }

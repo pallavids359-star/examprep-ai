@@ -62,7 +62,7 @@ export default function LiveTests() {
   const minutesLeft = (t) => Math.max(0, Math.min(t.durationMinutes, Math.floor((new Date(t.endsAt).getTime() - now) / 60000)));
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 md:py-8">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 md:py-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">{exam?.code} · set by your lecturers</p>
@@ -152,7 +152,7 @@ export default function LiveTests() {
       {upcoming.length > 0 && (
         <section className="mt-10">
           <h2 className="text-lg font-bold text-slate-900">Coming up</h2>
-          <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <div className="mt-3 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {upcoming.map((t) => (
               <div key={t._id} className="gp-card gp-card-hover p-5">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Opens {fmtDateTime(t.startsAt)}</p>

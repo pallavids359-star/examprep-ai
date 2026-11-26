@@ -123,7 +123,7 @@ export default function Revise() {
   const practiseChapter = (id) => go(id, "/attempts/practice", { chapterIds: [id], count: 10 });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:py-8">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 md:py-8">
       <PageHeader eyebrow={`${exam?.code || ""} revision`} title="Revise" subtitle="Fix your mistakes, go over saved questions and strengthen weak chapters." />
 
       {error && <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
