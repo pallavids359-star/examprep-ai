@@ -2,12 +2,14 @@
 //   options: the types offered     chosen / onChosen: ticked types
 //   counts / onCounts: { type: "3" }  total: questions in all (to show what is left)
 const LABELS = {
-  single_correct: "Single correct answer",
+  single_correct: "MCQ (single correct)",
   assertion_reason: "Assertion and reason",
   statement_based: "Statement based questions",
   match_following: "Match the following",
+  diagram_based: "Diagram based questions",
+  true_false: "True / False",
   multi_correct: "Multiple correct answer",
-  numerical: "Numerical",
+  numerical: "Numerical / integer type",
 };
 const JEE_ONLY = ["multi_correct", "numerical"];
 

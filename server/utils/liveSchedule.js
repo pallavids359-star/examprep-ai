@@ -3,6 +3,7 @@
 // it opens at its start time); if a section loses questions before the test opens,
 // it goes back to draft. Also picks questions automatically.
 const mongoose = require("mongoose");
+const { labelMissing } = require("./questionFormat");
 const Question = require("../models/Question");
 const Chapter = require("../models/Chapter");
 const Test = require("../models/Test");
@@ -103,6 +104,8 @@ const autoPick = async (test, section, { chapterIds = [], classLevel, replace = 
     const usedElsewhere = others.flatMap((t) => t.sections.flatMap((s) => s.questionIds.map(String)));
 
     const base = { examId: test.examId, subjectId: section.subjectId, status: "published", chapterId: { $in: chapters.map((c) => c._id) } };
+    // Older questions may have no type yet: give them one so every type can be found
+    if (formats.length || Object.keys(auto.formatCounts || {}).length) await labelMissing(base);
     const picked = [];
     const take = async (extra, size, avoidUsed, alsoExclude = []) => {
         if (size <= 0) return 0;
@@ -161,9 +164,19 @@ const autoPick = async (test, section, { chapterIds = [], classLevel, replace = 
         if (needMcq <= 0 && needNum <= 0) break;
     }
 
+    // Still short (too few of the chosen types / difficulty): fill from any question type in the
+    // same chapters, so the paper always has the count that was asked for
+    let otherTypes = 0;
+    for (const avoidUsed of [true, false]) {
+        if (needMcq <= 0) break;
+        const got = await take({ type: { $ne: "numerical" } }, needMcq, avoidUsed);
+        otherTypes += got;
+        needMcq -= got;
+    }
+
     const all = [...kept.map((q) => ({ _id: q._id, type: q.type })), ...picked];
     section.questionIds = [...all.filter((q) => q.type !== "numerical"), ...all.filter((q) => q.type === "numerical")].map((q) => q._id);
-    return { added: picked.length, shortMcq: Math.max(0, needMcq), shortNumerical: Math.max(0, needNum) };
+    return { added: picked.length, otherTypes, shortMcq: Math.max(0, needMcq), shortNumerical: Math.max(0, needNum) };
 };
 
 // Finds one replacement for a picked question: same kind (MCQ / numerical), as close as

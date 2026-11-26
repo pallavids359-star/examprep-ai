@@ -10,7 +10,7 @@ const { formatOf } = require("../utils/questionFormat");
     const col = mongoose.connection.db.collection("questions");
     const counts = {};
     let ops = [];
-    const cursor = col.find({}, { projection: { type: 1, tags: 1, text: 1, format: 1 } });
+    const cursor = col.find({}, { projection: { type: 1, tags: 1, text: 1, format: 1, options: 1, images: 1 } });
     for await (const q of cursor) {
         const f = formatOf(q);
         counts[f] = (counts[f] || 0) + 1;

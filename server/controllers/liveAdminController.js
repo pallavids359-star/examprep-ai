@@ -198,7 +198,7 @@ const getPattern = handle("getPattern", async (req, res) => {
     const chapterDocs = await Chapter.find({ examId: exam._id }).select("name classLevel order subjectId").sort({ classLevel: 1, order: 1, name: 1 }).lean();
     const chapters = {};
     for (const sub of subjects) chapters[subjectKey(sub.name)] = chapterDocs.filter((c) => String(c.subjectId) === String(sub._id)).map((c) => ({ _id: c._id, name: c.name, classLevel: c.classLevel }));
-    const formats = ["single_correct", "assertion_reason", "statement_based", "match_following", ...(exam.code === "JEE" ? ["multi_correct", "numerical"] : [])];
+    const formats = ["single_correct", "assertion_reason", "statement_based", "match_following", "diagram_based", "true_false", ...(exam.code === "JEE" ? ["multi_correct", "numerical"] : [])];
     res.json({
         exam,
         colleges,
@@ -235,7 +235,7 @@ const buildDetails = async (body, exam, existing, me) => {
     const auto = {
         classLevel: ["11", "12"].includes(String(a.classLevel)) ? String(a.classLevel) : "both",
         mix: mixSum ? { easy: mixIn[0], medium: mixIn[1], hard: mixIn[2] } : undefined,
-        formats: (a.formats || []).filter((f) => ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"].includes(f)),
+        formats: (a.formats || []).filter((f) => require("../utils/questionFormat").FORMATS.includes(f)),
         formatCounts: Object.fromEntries(
             Object.entries(a.formatCounts || {})
                 .filter(([f, n]) => (a.formats || []).includes(f) && f !== "numerical" && Number(n) > 0)

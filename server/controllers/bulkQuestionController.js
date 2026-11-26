@@ -138,7 +138,8 @@ const bulkImport = async (req, res) => {
         b.data.topicId = created.get(t.newKey);
         delete b.data.newTopic;
       }
-      const inserted = await Question.insertMany(good.map((b) => b.data), { ordered: false });
+      const { formatOf } = require("../utils/questionFormat");
+      const inserted = await Question.insertMany(good.map((b) => ({ ...b.data, format: formatOf(b.data) })), { ordered: false });
       added = inserted.length;
     }
 

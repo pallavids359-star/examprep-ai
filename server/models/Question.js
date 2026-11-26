@@ -118,4 +118,10 @@ questionSchema.index({ "external.source": 1, "external.rowId": 1 }, { partialFil
 // Admin search box
 questionSchema.index({ text: "text", tags: "text" });
 
+// Keep the question type (single correct, assertion & reason, ...) up to date on every save
+questionSchema.pre("save", function () {
+    if (this.isNew || this.isModified("type") || this.isModified("text") || this.isModified("tags") || !this.format) {
+        this.format = require("../utils/questionFormat").formatOf(this);
+    }
+});
 module.exports = mongoose.model("Question", questionSchema);

@@ -122,7 +122,8 @@ const convertQbpRow = (r, { defaultStatus = "published", pendingStatus = "draft"
     const data = {
         explanation: { text: solution.replace(QBP_TAG, "").trim(), images: [], videoUrl: "" },
         difficulty: DIFFICULTIES.includes(diff) ? diff : "medium",
-        tags: type ? [type] : [],
+        // the portal keeps statement / match / true-false in a hidden marker: keep it as a tag too
+        tags: [...new Set([type, ((solution.match(/\[QBP_TYPE:\s*([a-z_]+)/i) || [])[1] || "").toLowerCase()].filter(Boolean))],
         images: [],
         source: { kind: SOURCE_KINDS.includes(sourceKind) ? sourceKind : "original" },
         status: toStatus(r, { defaultStatus, pendingStatus }),

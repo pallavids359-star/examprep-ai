@@ -14,8 +14,9 @@ const TestAttempt = require("../models/TestAttempt");
 const { FORMATS } = require("../utils/questionFormat");
 // Multiple correct and numerical questions are only for JEE
 const JEE_ONLY = ["multi_correct", "numerical"];
-const FORMAT_NAMES = { single_correct: "Single correct", assertion_reason: "Assertion & reason", statement_based: "Statement based", match_following: "Match the following", multi_correct: "Multiple correct", numerical: "Numerical" };
-const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_following", "multi_correct", "numerical"];
+const { labelMissing } = require("../utils/questionFormat");
+const FORMAT_NAMES = { single_correct: "MCQ (single correct)", assertion_reason: "Assertion & reason", statement_based: "Statement based", match_following: "Match the following", diagram_based: "Diagram based", true_false: "True / False", multi_correct: "Multiple correct", numerical: "Numerical / integer" };
+const ORDER = ["single_correct", "assertion_reason", "statement_based", "match_following", "diagram_based", "true_false", "multi_correct", "numerical"];
 const formatsFor = (examCode) => ORDER.filter((f) => FORMATS.includes(f) && (examCode === "JEE" || !JEE_ONLY.includes(f)));
 const { STUDENT_FIELDS } = require("../utils/attemptHelpers");
 const { shape, namesFor, FULL_FIELDS } = require("./liveLecturerController");
@@ -77,6 +78,10 @@ const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficul
     const ids = [];
     const shortages = [];
     const used = {};
+    const wantedTotal = perChapter.reduce((n, p) => n + (p.count || 0), 0);
+    const inChosen = { examId: toId(examId), subjectId: toId(subjectId), status: "published", chapterId: { $in: perChapter.map((p) => toId(p.chapterId)) } };
+    // Older questions may have no type yet: give them one so every type can be found
+    await labelMissing(inChosen);
 
     // 1. Question types with a set count come first, from all the chosen chapters
     const fromChapter = new Map(); // chapterId -> how many already picked there
@@ -131,7 +136,18 @@ const pickQuestions = async ({ examId, subjectId, perChapter, topicIds, difficul
         }
         if (got < count && count > 0) shortages.push({ chapter: chapters.find((c) => String(c._id) === String(chapterId))?.name || "Chapter", wanted: count, got });
     }
-    return { ids, shortages };
+    // Still short: take the rest from any of the chosen chapters (any difficulty), first with the
+    // chosen question types, then any type allowed for this exam, so the count is always met
+    let fromOtherChapters = 0;
+    for (const typeRule of [formats.length ? { format: { $in: formats } } : null, examCode && examCode !== "JEE" ? { format: { $nin: JEE_ONLY } } : {}]) {
+        const need = wantedTotal - ids.length;
+        if (need <= 0 || !typeRule) continue;
+        const more = await sample({ ...inChosen, ...typeRule, _id: { $nin: [...exclude, ...ids].map(toId) } }, need);
+        ids.push(...more.map((q) => q._id));
+        fromOtherChapters += more.length;
+    }
+    // Only report a shortage if the paper is really short
+    return { ids, shortages: ids.length >= wantedTotal ? [] : shortages, filled: fromOtherChapters, short: Math.max(0, wantedTotal - ids.length) };
 };
 
 // Read and check the lecturer's choices

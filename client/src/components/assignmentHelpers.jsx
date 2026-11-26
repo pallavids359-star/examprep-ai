@@ -1,11 +1,13 @@
 // Shared words and styles for the assignment pages
 export const FORMAT_LABELS = {
-  single_correct: "Single correct answer",
+  single_correct: "MCQ (single correct)",
   assertion_reason: "Assertion and reason",
   statement_based: "Statement based questions",
   match_following: "Match the following",
+  diagram_based: "Diagram based questions",
+  true_false: "True / False",
   multi_correct: "Multiple correct answer",
-  numerical: "Numerical",
+  numerical: "Numerical / integer type",
 };
 export const JEE_ONLY = ["multi_correct", "numerical"];
 export const FORMAT_SHORT = {
@@ -14,6 +16,8 @@ export const FORMAT_SHORT = {
   assertion_reason: "Assertion–Reason",
   match_following: "Match",
   statement_based: "Statements",
+  diagram_based: "Diagram",
+  true_false: "True / False",
   numerical: "Numerical",
 };
 export const CLASS_LABELS = { 11: "1st PUC", 12: "2nd PUC", both: "1st + 2nd PUC" };
