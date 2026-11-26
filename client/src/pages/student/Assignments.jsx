@@ -6,6 +6,7 @@ import { Hero, ICONS, Stat } from "../../components/premium";
 import { toast } from "../../components/Toaster";
 import { fmtDateTime, fmtUntil } from "../../components/liveHelpers";
 import { Pill, STATE } from "../../components/assignmentHelpers";
+import { rowLink } from "../../components/uiHelpers";
 
 // Student: assignments from my lecturers
 export default function Assignments() {
@@ -101,7 +102,7 @@ export default function Assignments() {
           {done.map((a) => {
             const p = a.result.maxScore ? Math.round((a.result.score / a.result.maxScore) * 100) : 0;
             return (
-              <Row key={a._id} a={a}>
+              <Row key={a._id} a={a} to={`/result/${a.attemptId}`}>
                 <p className="font-display text-2xl font-extrabold tabular-nums text-slate-900">
                   {a.result.score}
                   <span className="text-sm font-semibold text-slate-400">/{a.result.maxScore}</span>
@@ -140,10 +141,11 @@ function Group({ title, children }) {
   );
 }
 
-function Row({ a, children }) {
+function Row({ a, to, children }) {
   const st = STATE[a.state] || STATE.open;
+  const navigate = useNavigate();
   return (
-    <div className="gp-card flex items-start gap-4 p-5">
+    <div {...rowLink(navigate, to)} className={`gp-card flex items-start gap-4 p-5 ${to ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg" : ""}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="gp-chip">{a.subject}</span>

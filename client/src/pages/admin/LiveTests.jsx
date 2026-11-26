@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { rowLink } from "../../components/uiHelpers";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import { PHASE, fmtDateTime } from "../../components/liveHelpers";
@@ -17,6 +18,7 @@ const TABS = [
 
 // Head lecturer: every live test with where it stands
 export default function LiveTests() {
+  const navigate = useNavigate();
   const [tests, setTests] = useState(null);
   const [deleting, setDeleting] = useState("");
   const [publishing, setPublishing] = useState("");
@@ -160,7 +162,7 @@ export default function LiveTests() {
           const picked = t.sections.reduce((a, s) => a + Math.min(s.picked || 0, s.mcqCount + s.numericalCount), 0);
           const ready = total ? (picked / total) * 100 : 0;
           return (
-            <article key={t._id} className="gp-card gp-card-hover relative flex flex-col p-5">
+            <article key={t._id} {...rowLink(navigate, `/admin/live-tests/${t._id}`)} className="gp-card gp-card-hover relative flex cursor-pointer flex-col p-5">
               <button
                 type="button"
                 onClick={() => removeTest(t)}

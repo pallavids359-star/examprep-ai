@@ -4,6 +4,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import { useExam } from "../../context/ExamContext";
 import { Countdown, Ring } from "../../components/premium";
 import { fmtDateTime } from "../../components/liveHelpers";
+import { rowLink } from "../../components/uiHelpers";
 
 // Full screen must be asked for inside the click, before the test page opens
 const goFullScreen = () => {
@@ -175,7 +176,11 @@ export default function LiveTests() {
           <h2 className="text-lg font-bold text-slate-900">Finished</h2>
           <div className="mt-3 space-y-3">
             {done.map((t) => (
-              <div key={t._id} className="gp-card flex flex-wrap items-center gap-5 p-5">
+              <div
+                key={t._id}
+                {...rowLink(navigate, t.state === "missed" || t.resultsReady ? `/live-tests/${t._id}/report` : null)}
+                className={`gp-card flex flex-wrap items-center gap-5 p-5 ${t.state === "missed" || t.resultsReady ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg" : ""}`}
+              >
                 {t.state === "missed" ? (
                   <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">Missed</span>
                 ) : t.resultsReady && t.result ? (

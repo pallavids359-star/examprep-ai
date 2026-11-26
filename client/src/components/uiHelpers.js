@@ -24,3 +24,22 @@ export const minutes = (s) => {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
 };
 export const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+
+// Makes a whole table row (or card) open a page: click anywhere on it, or Enter when focused.
+// Clicks on a button, link or field inside the row still do their own job.
+export const rowLink = (navigate, to) =>
+  to
+    ? {
+        role: "link",
+        tabIndex: 0,
+        onClick: (e) => {
+          if (e.target.closest("a,button,input,select,textarea,label") || window.getSelection()?.toString()) return;
+          if (e.ctrlKey || e.metaKey) window.open(to, "_blank");
+          else navigate(to);
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && e.target === e.currentTarget) navigate(to);
+        },
+      }
+    : {};
+export const ROW_CLICK = "cursor-pointer transition hover:bg-[#fbf5e6] focus:outline-none focus-visible:bg-[#fbf5e6]";

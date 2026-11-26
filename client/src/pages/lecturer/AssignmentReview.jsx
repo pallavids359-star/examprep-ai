@@ -4,6 +4,8 @@ import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import BackLink from "../../components/BackLink";
 import AssignmentPicker from "../../components/AssignmentPicker";
+import { useAuth } from "../../context/AuthContext";
+import { ROW_CLICK, rowLink } from "../../components/uiHelpers";
 import SwapDialog from "../../components/SwapDialog";
 import PaperQuestionCard, { PaperToolbar } from "../../components/PaperQuestionCard";
 import { askConfirm } from "../../components/ConfirmDialog";
@@ -370,6 +372,9 @@ function Submissions({ id, published }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const canOpen = user?.role === "admin"; // the head lecturer can open each student's answers
   useEffect(() => {
     api
       .get(`/lecturer/assignments/${id}/submissions`)
@@ -430,7 +435,11 @@ function Submissions({ id, published }) {
                 {shown.map((r, i) => {
                   const st = STATE[r.status] || STATE.not_started;
                   return (
-                    <tr key={r.student._id} className={i % 2 ? "bg-[#fffdf8]" : "bg-white"}>
+                    <tr
+                      key={r.student._id}
+                      {...(canOpen && r.attemptId && r.score != null ? { ...rowLink(navigate, `/admin/attempts/${r.attemptId}`), title: "Open this student's answers" } : {})}
+                      className={`${i % 2 ? "bg-[#fffdf8]" : "bg-white"} ${canOpen && r.attemptId && r.score != null ? ROW_CLICK : ""}`}
+                    >
                       <td className="px-4 py-2.5">
                         <p className="font-semibold text-slate-900">{r.student.name}</p>
                         <p className="text-xs text-slate-500">{r.student.email}</p>

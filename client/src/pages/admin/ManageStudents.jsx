@@ -1,12 +1,14 @@
 import { askConfirm } from "../../components/ConfirmDialog";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ROW_CLICK, rowLink } from "../../components/uiHelpers";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Never");
 
 export default function ManageStudents() {
+    const navigate = useNavigate();
     const [students, setStudents] = useState([]);
     const [search, setSearch] = useState("");
     const [query, setQuery] = useState(""); // the search actually sent to the server
@@ -124,7 +126,7 @@ export default function ManageStudents() {
                         )}
                         {!loading &&
                             students.map((s) => (
-                                <tr key={s._id} className="border-b border-slate-100 last:border-0">
+                                <tr key={s._id} {...rowLink(navigate, `/admin/students/${s._id}`)} title="Open this student's results" className={`border-b border-slate-100 last:border-0 ${ROW_CLICK}`}>
                                     <td className="px-4 py-3">
                                         <Link to={`/admin/students/${s._id}`} className="font-medium text-slate-900 hover:text-indigo-700 hover:underline">
                                             {s.name}
