@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import BackLink from "../../components/BackLink";
 import { Step } from "../../components/premium";
 import { toast } from "../../components/Toaster";
+import { useAuth } from "../../context/AuthContext";
 import { toLocalInput } from "../../components/liveHelpers";
 import { CLASS_LABELS, FORMAT_LABELS, JEE_ONLY } from "../../components/assignmentHelpers";
 import QuestionTypeCounts, { cleanCounts, typedTotal } from "../../components/QuestionTypeCounts";
@@ -59,33 +60,48 @@ function Card({ n, title, hint, right, children }) {
 }
 
 // Lecturer: make a new assignment
+// Unfinished choices are kept in this browser, so going back by mistake loses nothing
+const draftKey = (user) => `gp-assignment-draft:${user?._id || user?.email || "me"}`;
+const readDraft = (user) => {
+  try {
+    const d = JSON.parse(localStorage.getItem(draftKey(user)) || "null");
+    return d && Date.now() - (d.savedAt || 0) < 14 * 864e5 ? d : null; // keep for 2 weeks
+  } catch {
+    return null;
+  }
+};
+
 export default function AssignmentForm() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [draft] = useState(() => readDraft(user)); // what was filled in last time (or null)
+  const d = (k, fallback) => (draft && draft[k] !== undefined ? draft[k] : fallback);
+  const restore = useRef(draft); // chapters and concepts are put back once their list has loaded
   const [opts, setOpts] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [examId, setExamId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-  const [title, setTitle] = useState("");
-  const [pickMode, setPickMode] = useState("auto");
-  const [classLevel, setClassLevel] = useState("both");
+  const [examId, setExamId] = useState(() => d("examId", ""));
+  const [subjectId, setSubjectId] = useState(() => d("subjectId", ""));
+  const [title, setTitle] = useState(() => d("title", ""));
+  const [pickMode, setPickMode] = useState(() => d("pickMode", "auto"));
+  const [classLevel, setClassLevel] = useState(() => d("classLevel", "both"));
   const [chapters, setChapters] = useState(null);
   const [chapterIds, setChapterIds] = useState([]);
   const [chapterSearch, setChapterSearch] = useState("");
   const [topicIds, setTopicIds] = useState([]);
   const [topicTab, setTopicTab] = useState("");
-  const [countMode, setCountMode] = useState("total");
-  const [totalCount, setTotalCount] = useState(20);
-  const [perChapter, setPerChapter] = useState({});
-  const [diffMode, setDiffMode] = useState("equal");
-  const [pct, setPct] = useState({ easy: 40, medium: 40, hard: 20 });
-  const [formats, setFormats] = useState([]);
-  const [formatCounts, setFormatCounts] = useState({});
-  const [college, setCollege] = useState("MBPU");
-  const [sections, setSections] = useState([]);
-  const [dueAt, setDueAt] = useState(nextWeek());
-  const [instructions, setInstructions] = useState("");
+  const [countMode, setCountMode] = useState(() => d("countMode", "total"));
+  const [totalCount, setTotalCount] = useState(() => d("totalCount", 20));
+  const [perChapter, setPerChapter] = useState(() => d("perChapter", {}));
+  const [diffMode, setDiffMode] = useState(() => d("diffMode", "equal"));
+  const [pct, setPct] = useState(() => d("pct", { easy: 40, medium: 40, hard: 20 }));
+  const [formats, setFormats] = useState(() => d("formats", []));
+  const [formatCounts, setFormatCounts] = useState(() => d("formatCounts", {}));
+  const [college, setCollege] = useState(() => d("college", "MBPU"));
+  const [sections, setSections] = useState(() => d("sections", []));
+  const [dueAt, setDueAt] = useState(() => d("dueAt", nextWeek()));
+  const [instructions, setInstructions] = useState(() => d("instructions", ""));
 
   // Exams, my subjects and colleges
   useEffect(() => {
@@ -109,9 +125,38 @@ export default function AssignmentForm() {
     setTopicIds([]);
     api
       .get("/lecturer/assignments/chapters", { params: { subjectId } })
-      .then((res) => setChapters(res.data.chapters))
+      .then((res) => {
+        setChapters(res.data.chapters);
+        const r = restore.current;
+        if (r && r.subjectId === subjectId) {
+          setChapterIds(r.chapterIds || []);
+          setTopicIds(r.topicIds || []);
+          setPerChapter(r.perChapter || {});
+        }
+        restore.current = null;
+      })
       .catch((err) => setError(getErrorMessage(err)));
   }, [subjectId]);
+
+  // Save every change (after the chapters are back in place)
+  const [restored, setRestored] = useState(Boolean(draft));
+  useEffect(() => {
+    if (restore.current || !chapters) return;
+    const data = { examId, subjectId, title, pickMode, classLevel, chapterIds, topicIds, countMode, totalCount, perChapter, diffMode, pct, formats, formatCounts, college, sections, dueAt, instructions };
+    try {
+      localStorage.setItem(draftKey(user), JSON.stringify({ ...data, savedAt: Date.now() }));
+    } catch {
+      /* storage full or blocked: nothing to do */
+    }
+  }, [examId, subjectId, title, pickMode, classLevel, chapterIds, topicIds, countMode, totalCount, perChapter, diffMode, pct, formats, formatCounts, college, sections, dueAt, instructions, chapters, user]);
+  const startOver = () => {
+    try {
+      localStorage.removeItem(draftKey(user));
+    } catch {
+      /* ignore */
+    }
+    window.location.reload();
+  };
 
   const inClass = useMemo(() => (chapters || []).filter((c) => classLevel === "both" || String(c.classLevel) === classLevel), [chapters, classLevel]);
   const visible = inClass.filter((c) => c.name.toLowerCase().includes(chapterSearch.trim().toLowerCase()));
@@ -192,6 +237,11 @@ export default function AssignmentForm() {
         dueAt: new Date(dueAt).toISOString(),
       });
       const { got, wanted, shortages } = res.data;
+      try {
+        localStorage.removeItem(draftKey(user)); // made: the unfinished copy is no longer needed
+      } catch {
+        /* ignore */
+      }
       if (manual) {
         toast("Saved. Now add your questions.");
         navigate(`/lecturer/assignments/${res.data.assignment._id}`, { state: { pick: true } });
@@ -212,6 +262,17 @@ export default function AssignmentForm() {
     <LecturerLayout>
       <main className="mx-auto max-w-5xl px-4 pb-40 pt-6 md:px-8 md:pt-8">
         <BackLink to="/lecturer/assignments">Assignments</BackLink>
+        {restored && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+            <span className="flex-1">↺ Your unfinished choices are back, just as you left them.</span>
+            <button type="button" onClick={startOver} className="font-semibold underline">
+              Start fresh
+            </button>
+            <button type="button" onClick={() => setRestored(false)} aria-label="Hide" className="text-amber-700">
+              ✕
+            </button>
+          </div>
+        )}
         <div className="mt-4">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b8862b]">New assignment</p>
           <h1 className="mt-1 font-display text-3xl font-extrabold text-slate-900 md:text-4xl">Build the question set</h1>

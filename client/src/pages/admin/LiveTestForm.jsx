@@ -6,6 +6,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import LecturerOptions from "../../components/LecturerOptions";
 import { toast } from "../../components/Toaster";
+import { useAuth } from "../../context/AuthContext";
 import { fmtDateTime, fmtDuration, lecturersFor, toLocalInput } from "../../components/liveHelpers";
 import { Hero, ICONS, Step } from "../../components/premium";
 
@@ -64,39 +65,55 @@ const timeLabel = (t) => {
 };
 const dayLabel = (d) => new Date(`${d}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
+// A new test's unfinished choices are kept in this browser, so going back by mistake loses nothing
+const liveDraftKey = (user) => `gp-livetest-draft:${user?._id || user?.email || "me"}`;
+const readLiveDraft = (user) => {
+  try {
+    const d = JSON.parse(localStorage.getItem(liveDraftKey(user)) || "null");
+    return d && Date.now() - (d.savedAt || 0) < 14 * 864e5 ? d : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function LiveTestForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [draft] = useState(() => (id ? null : readLiveDraft(user)));
+  const d = (k, fallback) => (draft && draft[k] !== undefined ? draft[k] : fallback);
+  const keepDuration = useRef(Boolean(draft?.duration));
+  const [restored, setRestored] = useState(Boolean(draft));
   const [exams, setExams] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [pattern, setPattern] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const [examId, setExamId] = useState("");
-  const [title, setTitle] = useState("");
-  const [titleTouched, setTitleTouched] = useState(false);
-  const [date, setDate] = useState(today());
-  const [time, setTime] = useState("20:30");
-  const [openFor, setOpenFor] = useState("custom");
-  const [endTouched, setEndTouched] = useState(false);
-  const [customEnd, setCustomEnd] = useState("");
-  const [duration, setDuration] = useState(180);
-  const [otherDate, setOtherDate] = useState(false);
-  const [otherTime, setOtherTime] = useState(false);
-  const [otherLength, setOtherLength] = useState(false);
-  const [split, setSplit] = useState(false);
-  const [rows, setRows] = useState([]); // { key, name, include, picker, lecturerId, mcqCount, numericalCount }
+  const [examId, setExamId] = useState(() => d("examId", ""));
+  const [title, setTitle] = useState(() => d("title", ""));
+  const [titleTouched, setTitleTouched] = useState(() => d("titleTouched", false));
+  const [date, setDate] = useState(() => d("date", today()));
+  const [time, setTime] = useState(() => d("time", "20:30"));
+  const [openFor, setOpenFor] = useState(() => d("openFor", "custom"));
+  const [endTouched, setEndTouched] = useState(() => d("endTouched", false));
+  const [customEnd, setCustomEnd] = useState(() => d("customEnd", ""));
+  const [duration, setDuration] = useState(() => d("duration", 180));
+  const [otherDate, setOtherDate] = useState(() => d("otherDate", false));
+  const [otherTime, setOtherTime] = useState(() => d("otherTime", false));
+  const [otherLength, setOtherLength] = useState(() => d("otherLength", false));
+  const [split, setSplit] = useState(() => d("split", false));
+  const [rows, setRows] = useState(() => d("rows", [])); // { key, name, include, picker, lecturerId, mcqCount, numericalCount }
   // Auto-pick choices
-  const [autoClass, setAutoClass] = useState("both");
-  const [autoMix, setAutoMix] = useState({ easy: "", medium: "", hard: "" }); // typed %; empty = any difficulty
-  const [autoFormats, setAutoFormats] = useState([]);
-  const [autoFormatCounts, setAutoFormatCounts] = useState({});
-  const [perChapter, setPerChapter] = useState({}); // sectionKey -> { chapterId: count }
-  const [chapterOpen, setChapterOpen] = useState({}); // sectionKey -> open
+  const [autoClass, setAutoClass] = useState(() => d("autoClass", "both"));
+  const [autoMix, setAutoMix] = useState(() => d("autoMix", { easy: "", medium: "", hard: "" })); // typed %; empty = any difficulty
+  const [autoFormats, setAutoFormats] = useState(() => d("autoFormats", []));
+  const [autoFormatCounts, setAutoFormatCounts] = useState(() => d("autoFormatCounts", {}));
+  const [perChapter, setPerChapter] = useState(() => d("perChapter", {})); // sectionKey -> { chapterId: count }
+  const [chapterOpen, setChapterOpen] = useState(() => d("chapterOpen", {})); // sectionKey -> open
   const [showResults, setShowResults] = useState("after_submit"); // students see their result as soon as they finish
-  const [college, setCollege] = useState(""); // "" = every student
-  const [audSections, setAudSections] = useState([]); // none = all sections
+  const [college, setCollege] = useState(() => d("college", "")); // "" = every student
+  const [audSections, setAudSections] = useState(() => d("audSections", [])); // none = all sections
   const [loadedSections, setLoadedSections] = useState(null);
   const [openTest, setOpenTest] = useState(null); // test already open: only its name and closing time can change
 
@@ -158,7 +175,8 @@ export default function LiveTestForm() {
       .get("/admin/live-tests/pattern", { params: { examId } })
       .then((res) => {
         setPattern(res.data);
-        if (!id) setDuration(res.data.minutes);
+        if (!id && !keepDuration.current) setDuration(res.data.minutes);
+        keepDuration.current = false;
       })
       .catch((err) => {
         setPattern(null);
@@ -191,6 +209,25 @@ export default function LiveTestForm() {
     const d = new Date(`${date}T00:00`);
     setTitle(`${exam.code} Live Test – ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`);
   }, [exam, date, titleTouched]);
+
+  // Save every change to a new test (not when editing one that already exists)
+  useEffect(() => {
+    if (id || !rows.length) return;
+    const data = { examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections };
+    try {
+      localStorage.setItem(liveDraftKey(user), JSON.stringify({ ...data, savedAt: Date.now() }));
+    } catch {
+      /* storage full or blocked */
+    }
+  }, [id, user, examId, title, titleTouched, date, time, openFor, endTouched, customEnd, duration, otherDate, otherTime, otherLength, split, rows, autoClass, autoMix, autoFormats, autoFormatCounts, perChapter, chapterOpen, college, audSections]);
+  const startOver = () => {
+    try {
+      localStorage.removeItem(liveDraftKey(user));
+    } catch {
+      /* ignore */
+    }
+    window.location.reload();
+  };
 
   const startsAt = useMemo(() => (date && time ? new Date(`${date}T${time}`) : null), [date, time]);
   const endsAt = useMemo(() => {
@@ -267,6 +304,13 @@ export default function LiveTestForm() {
     try {
       const res = id ? await api.put(`/admin/live-tests/${id}`, body) : await api.post("/admin/live-tests", body);
       (res.data.notes || []).forEach((n) => toast(n, "error"));
+      if (!id) {
+        try {
+          localStorage.removeItem(liveDraftKey(user)); // made: the unfinished copy is no longer needed
+        } catch {
+          /* ignore */
+        }
+      }
       toast(res.data.status === "published" ? "Saved. The test is published." : "Saved. When every subject is ready, open the test and press Publish.");
       navigate(`/admin/live-tests/${id || res.data.testId}`);
     } catch (err) {
@@ -281,6 +325,17 @@ export default function LiveTestForm() {
   return (
     <AdminLayout>
       <BackLink to={id ? `/admin/live-tests/${id}` : "/admin/live-tests"}>{id ? "Back to the test" : "All live tests"}</BackLink>
+      {restored && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          <span className="flex-1">↺ Your unfinished choices are back, just as you left them.</span>
+          <button type="button" onClick={startOver} className="font-semibold underline">
+            Start fresh
+          </button>
+          <button type="button" onClick={() => setRestored(false)} aria-label="Hide" className="text-amber-700">
+            ✕
+          </button>
+        </div>
+      )}
       <div className="mt-3">
         <Hero
           eyebrow={id ? "Edit live test" : "New live test"}
