@@ -83,7 +83,7 @@ export default function LiveTestForm() {
   const [draft] = useState(() => (id ? null : readLiveDraft(user)));
   const d = (k, fallback) => (draft && draft[k] !== undefined ? draft[k] : fallback);
   const keepDuration = useRef(Boolean(draft?.duration));
-  const [restored, setRestored] = useState(Boolean(draft));
+  const [restored, setRestored] = useState(Boolean(draft && (draft.titleTouched || Object.keys(draft.perChapter || {}).length || (draft.autoFormats || []).length || draft.college))); // only if something was really filled in
   const [exams, setExams] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [pattern, setPattern] = useState(null);
