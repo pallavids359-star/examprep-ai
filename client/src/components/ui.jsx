@@ -51,7 +51,7 @@ export function StatTile({ label, value, sub, accent }) {
 // Two or three big options side by side (like tabs)
 export function Segmented({ options, value, onChange, label }) {
   return (
-    <div className={cx("grid gap-2 rounded-2xl border border-slate-200 bg-slate-100/70 p-1.5", options.length === 3 ? "grid-cols-3" : "grid-cols-2")} role="tablist" aria-label={label}>
+    <div className={cx("grid gap-1.5 rounded-2xl border border-slate-200 bg-slate-100/70 p-1.5 sm:gap-2", options.length === 3 ? "grid-cols-3" : "grid-cols-2")} role="tablist" aria-label={label}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -62,12 +62,12 @@ export function Segmented({ options, value, onChange, label }) {
             aria-selected={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              "rounded-xl px-4 py-2.5 text-left transition",
+              "min-w-0 rounded-xl px-2.5 py-2.5 text-left transition sm:px-4",
               on ? "bg-white shadow-[0_4px_14px_-8px_rgba(70,48,10,0.45)] ring-1 ring-indigo-300" : "hover:bg-white/60"
             )}
           >
-            <span className={cx("block text-sm font-semibold", on ? "text-slate-900" : "text-slate-600")}>{o.label}</span>
-            {o.hint && <span className="block text-xs text-slate-500">{o.hint}</span>}
+            <span className={cx("block truncate text-[13px] font-semibold sm:text-sm", on ? "text-slate-900" : "text-slate-600")}>{o.label}</span>
+            {o.hint && <span className="block truncate text-xs text-slate-500">{o.hint}</span>}
           </button>
         );
       })}

@@ -174,10 +174,13 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
             </p>
             <div className="mt-6 flex flex-wrap items-end gap-8">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Score</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Marks</p>
                 <p className="font-display text-5xl font-extrabold">
                   <span className="gp-gold-text">{s.score}</span>
                   <span className="text-2xl text-amber-100/60"> / {s.maxScore}</span>
+                </p>
+                <p className="gp-muted mt-1 text-xs">
+                  {(data.questions || []).length} questions × {(data.questions || []).length ? Math.round(s.maxScore / data.questions.length) : 0} marks each
                 </p>
               </div>
               {r && (
@@ -260,7 +263,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
             <div className="min-w-0">
               <p className="font-bold text-slate-900">{x.name}</p>
               <p className="text-sm text-slate-600">
-                {x.score} / {x.maxScore} · <span className="text-green-700">{x.correct}✓</span> <span className="text-orange-700">{x.wrong}✗</span> · {fmtDuration(x.timeSec)}
+                {x.score} / {x.maxScore} marks · <span className="text-green-700">{x.correct}✓</span> <span className="text-orange-700">{x.wrong}✗</span> · {fmtDuration(x.timeSec)}
               </p>
               {x.weakestChapter && <p className="mt-0.5 truncate text-xs text-slate-500">Work on: {x.weakestChapter.name}</p>}
             </div>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import { useExam } from "../../context/ExamContext";
 import { Bone } from "../../components/Skeleton";
-import { Bar, Card, CardTitle, Chip, EmptyBlock, Icon, PageHeader, Pct, Segmented, StatTile } from "../../components/ui";
+import { Bar, Card, CardTitle, Chip, EmptyBlock, Icon, PageHeader, Pct, StatTile } from "../../components/ui";
 import { ICONS, cx, minutes, round1, shortDate, toneText, when } from "../../components/uiHelpers";
 
 const SUBJECT_ORDER = ["physics", "chemistry", "biology", "mathematics", "maths"];
@@ -52,10 +52,20 @@ function Trend({ tests }) {
   );
 }
 
+// The three kinds of test, shown as big buttons first
+const KINDS = [
+  ["practice", "Practice", "Chapter practice sessions", "M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z"],
+  ["mock", "Mock tests", "Full tests with a timer", "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z"],
+  ["assignment", "Assignments", "Homework from your lecturers", "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4"],
+];
+
 // The analytics view. Used by the student's own Analytics page and, for any student,
 // by the admin's student page (historyUrl = /admin/students/:id/history).
 export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", reviewLink = true, showHeader = true }) {
-  const [tab, setTab] = useState("practice");
+  // ?kind=practice|mock|assignment in the address, so Back from a result returns to the same list
+  const [params, setParams] = useSearchParams();
+  const tab = ["practice", "mock", "assignment"].includes(params.get("kind")) ? params.get("kind") : null; // null = the three big buttons
+  const setTab = (v) => setParams(v ? { kind: v } : {});
   const [data, setData] = useState({}); // tab -> tests
   const [open, setOpen] = useState(null);
   const navigate = useNavigate();
@@ -67,7 +77,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
     setData({});
     setOpen(null);
     setSubject("all");
-    ["practice", "mock"].forEach((mode) =>
+    ["practice", "mock", "assignment"].forEach((mode) =>
       api
         .get(historyUrl, { params: { examId, mode } })
         .then((res) => setData((d) => ({ ...d, [mode]: res.data.tests })))
@@ -145,7 +155,7 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
     return { attempted, correct, avg, best, time, accuracy: attempted ? (correct / attempted) * 100 : 0, subjects, weakest };
   }, [tests]);
 
-  const kind = tab === "mock" ? "mock tests" : "practice tests";
+  const kind = tab === "mock" ? "mock tests" : tab === "assignment" ? "assignments" : "practice tests";
   const openTest = (tests || []).find((t) => t.attemptId === open) || null;
   const changeTab = (v) => {
     setTab(v);
@@ -159,17 +169,38 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
         <PageHeader eyebrow={`${exam?.code || ""} performance`} title="Analytics" subtitle="Every test you finished, with marks by subject and chapter." />
       )}
 
-      <div className={showHeader ? "mt-6 max-w-xl" : "max-w-xl"}>
-        <Segmented
-          label="Kind of test"
-          value={tab}
-          onChange={changeTab}
-          options={[
-            { value: "practice", label: "Practice", hint: data.practice ? `${data.practice.length} tests` : "Loading..." },
-            { value: "mock", label: "Mock tests", hint: data.mock ? `${data.mock.length} tests` : "Loading..." },
-          ]}
-        />
-      </div>
+      {!tab ? (
+        <div className={`${showHeader ? "mt-6" : ""} grid gap-4 md:grid-cols-3`}>
+          {KINDS.map(([k, title, sub, icon]) => (
+            <button key={k} type="button" onClick={() => changeTab(k)} className="gp-card gp-card-hover group flex items-center gap-4 p-5 text-left md:flex-col md:items-start md:p-7">
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-b from-[#e5c372] to-[#b8862b] text-[#17140f] shadow-md">
+                <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d={icon} />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-xl font-extrabold text-slate-900 md:text-2xl">{title}</span>
+                <span className="mt-0.5 block text-sm text-slate-500">{sub}</span>
+                <span className="mt-2 inline-block rounded-full bg-[#f3ecdc] px-3 py-0.5 text-xs font-bold text-[#8a6420]">
+                  {data[k] ? `${data[k].length} done` : "Loading..."}
+                </span>
+              </span>
+              <svg viewBox="0 0 24 24" className="h-6 w-6 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-slate-900 md:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          ))}
+        </div>
+      ) : (
+      <>
+      <button type="button" onClick={() => changeTab(null)} className={`${showHeader ? "mt-6" : ""} group inline-flex items-center gap-2.5 text-sm font-medium text-slate-600 hover:text-slate-900`}>
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[#e7dcc3] transition group-hover:bg-[#17140f] group-hover:text-[#e5c372]">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </span>
+        {KINDS.find(([k]) => k === tab)?.[1]}
+      </button>
 
       {subjectNames.length > 1 && (
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Subject">
@@ -195,8 +226,8 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
           <EmptyBlock
             title={`No ${kind} ${subject === "all" ? "yet" : `with ${subject} yet`}`}
             text="Finish one and your marks, accuracy and weak chapters will appear here."
-            actionLabel={tab === "mock" ? "Take a mock test" : "Start practice"}
-            actionTo={tab === "mock" ? "/mock-tests" : "/practice"}
+            actionLabel={tab === "mock" ? "Take a mock test" : tab === "assignment" ? "Open assignments" : "Start practice"}
+            actionTo={tab === "mock" ? "/mock-tests" : tab === "assignment" ? "/assignments" : "/practice"}
           />
         </div>
       )}
@@ -204,6 +235,8 @@ export function AnalyticsView({ examId, exam, historyUrl = "/progress/history", 
       {openTest && <SessionResult t={openTest} kind={tab} onBack={() => setOpen(null)} reviewLink={reviewLink} />}
 
       {tests && tests.length > 0 && !openTest && <SessionList tests={tests} kind={tab} onOpen={(attemptId) => (reviewLink ? navigate(`/result/${attemptId}`) : setOpen(attemptId))} />}
+      </>
+      )}
 
     </div>
   );
@@ -219,7 +252,7 @@ const fullDay = (d) => new Date(d).toLocaleDateString("en-IN", { weekday: "short
 const timeOf = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 
 function SessionList({ tests, kind, onOpen }) {
-  const label = kind === "mock" ? "mock test" : "practice session";
+  const label = kind === "mock" ? "mock test" : kind === "assignment" ? "assignment" : "practice session";
   return (
     <section className="mt-6">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
@@ -275,14 +308,14 @@ function SessionResult({ t, kind, onBack, reviewLink }) {
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </span>
-        All {kind === "mock" ? "mock tests" : "practice sessions"}
+        All {kind === "mock" ? "mock tests" : kind === "assignment" ? "assignments" : "practice sessions"}
       </button>
 
       <div className="mt-4 overflow-hidden rounded-3xl bg-[#17140f] text-white">
         <div className="flex flex-wrap items-center justify-between gap-6 p-6 md:p-8">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e5c372]/80">
-              {kind === "mock" ? "Mock test" : "Practice"} · {fullDay(t.date)}
+              {kind === "mock" ? "Mock test" : kind === "assignment" ? "Assignment" : "Practice"} · {fullDay(t.date)}
             </p>
             <h2 className="mt-1 text-2xl font-extrabold md:text-3xl">{t.title}</h2>
             <p className="mt-2 text-sm text-white/60">{minutes(t.timeTakenSec)} taken · {total} questions</p>
