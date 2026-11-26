@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import BackLink from "../../components/BackLink";
-import { Step } from "../../components/premium";
+import { ChapterStep, Choice, ClassChoices, ConceptStep, WizCard as Card } from "../../components/SyllabusSteps";
 import { toast } from "../../components/Toaster";
 import { useAuth } from "../../context/AuthContext";
 import { toLocalInput } from "../../components/liveHelpers";
@@ -24,41 +24,6 @@ const nextWeek = () => {
   d.setHours(21, 0, 0, 0);
   return toLocalInput(d);
 };
-
-function Choice({ on, onClick, children, sub, className = "" }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={`rounded-2xl border px-4 py-3 text-left transition ${on ? "border-[#17140f] bg-[#17140f] text-white shadow-lg shadow-black/10" : "border-[#e7dcc3] bg-white text-slate-800 hover:border-[#c9a24a]"} ${className}`}
-    >
-      <span className="block text-sm font-bold">{children}</span>
-      {sub && <span className={`mt-0.5 block text-xs ${on ? "text-[#e5c372]" : "text-slate-500"}`}>{sub}</span>}
-    </button>
-  );
-}
-
-function Tick({ on }) {
-  return (
-    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${on ? "border-[#b8862b] bg-[#b8862b] text-white" : "border-slate-300 bg-white"}`}>
-      {on && (
-        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 13l4 4L19 7" />
-        </svg>
-      )}
-    </span>
-  );
-}
-
-function Card({ n, title, hint, right, children }) {
-  return (
-    <section className="gp-card p-5 md:p-6">
-      <Step n={n} title={title} hint={hint} right={right} />
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
 
 // Lecturer: make a new assignment
 // The five steps (name shown on the left and on the Proceed button)
@@ -98,9 +63,7 @@ export default function AssignmentForm() {
   const [classLevel, setClassLevel] = useState(() => d("classLevel", "both"));
   const [chapters, setChapters] = useState(null);
   const [chapterIds, setChapterIds] = useState([]);
-  const [chapterSearch, setChapterSearch] = useState("");
   const [topicIds, setTopicIds] = useState([]);
-  const [topicTab, setTopicTab] = useState("");
   const [countMode, setCountMode] = useState(() => d("countMode", "total"));
   const [totalCount, setTotalCount] = useState(() => d("totalCount", 20));
   const [perChapter, setPerChapter] = useState(() => d("perChapter", {}));
@@ -172,7 +135,6 @@ export default function AssignmentForm() {
   };
 
   const inClass = useMemo(() => (chapters || []).filter((c) => classLevel === "both" || String(c.classLevel) === classLevel), [chapters, classLevel]);
-  const visible = inClass.filter((c) => c.name.toLowerCase().includes(chapterSearch.trim().toLowerCase()));
   const picked = (chapters || []).filter((c) => chapterIds.includes(String(c._id)));
 
   // Changing the class drops chapters that are not in it
@@ -185,21 +147,13 @@ export default function AssignmentForm() {
   useEffect(() => {
     const ok = new Set(picked.flatMap((c) => c.topics.map((t) => String(t._id))));
     setTopicIds((ids) => ids.filter((id) => ok.has(id)));
-    if (!picked.some((c) => String(c._id) === topicTab)) setTopicTab(String(picked[0]?._id || ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterIds.join(",")]);
 
   const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-  const allVisibleOn = visible.length > 0 && visible.every((c) => chapterIds.includes(String(c._id)));
-  const toggleAllVisible = () => {
-    const ids = visible.map((c) => String(c._id));
-    setChapterIds(allVisibleOn ? chapterIds.filter((id) => !ids.includes(id)) : [...new Set([...chapterIds, ...ids])]);
-  };
 
   const total = countMode === "total" ? Number(totalCount) || 0 : picked.reduce((n, c) => n + (Number(perChapter[c._id]) || 0), 0);
   const pctSum = pct.easy + pct.medium + pct.hard;
-  const tabChapter = picked.find((c) => String(c._id) === topicTab);
-  const conceptsIn = (c) => c.topics.filter((t) => topicIds.includes(String(t._id))).length;
 
   const manual = pickMode === "manual";
   const problem = !subjectId
@@ -377,160 +331,31 @@ export default function AssignmentForm() {
 
           {/* 2. Class */}
           <Card n="1b" title="Class" hint="Which year's chapters to use">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                ["11", "1st PUC", "Class 11"],
-                ["12", "2nd PUC", "Class 12"],
-                ["both", "Both", "1st + 2nd PUC"],
-              ].map(([v, l, sub]) => (
-                <Choice key={v} on={classLevel === v} onClick={() => setClassLevel(v)} sub={sub}>
-                  {l}
-                </Choice>
-              ))}
-            </div>
+            <ClassChoices value={classLevel} onChange={setClassLevel} />
           </Card>
 
           </>)}
 
           {step === 2 && (<>
-          {/* 3. Chapters */}
-          <Card
+          <ChapterStep
             n="2"
-            title="Chapters"
-            hint={`${chapterIds.length} of ${inClass.length} ticked`}
-            right={
-              inClass.length > 0 && (
-                <button type="button" onClick={toggleAllVisible} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">
-                  {allVisibleOn ? "Untick all" : "Tick all"}
-                </button>
-              )
-            }
-          >
-            {!chapters ? (
-              <div className="h-32 animate-pulse rounded-xl bg-[#f3ecdc]" />
-            ) : !inClass.length ? (
-              <p className="rounded-xl bg-[#faf6ec] px-4 py-6 text-center text-sm text-slate-500">No {CLASS_LABELS[classLevel]} chapters for this subject.</p>
-            ) : (
-              <>
-                <input className={input} value={chapterSearch} onChange={(e) => setChapterSearch(e.target.value)} placeholder="Search chapters…" />
-                <div className="mt-3 grid max-h-80 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                  {visible.map((c) => {
-                    const on = chapterIds.includes(String(c._id));
-                    return (
-                      <button
-                        key={c._id}
-                        type="button"
-                        onClick={() => toggle(chapterIds, setChapterIds, String(c._id))}
-                        className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition ${on ? "border-[#c9a24a] bg-[#fbf5e6]" : "border-[#efe6d2] bg-white hover:border-[#e0cfa6]"}`}
-                      >
-                        <Tick on={on} />
-                        <span className="min-w-0 flex-1 font-medium text-slate-800">{c.name}</span>
-                        {classLevel === "both" && <span className="shrink-0 text-[11px] font-semibold text-slate-400">{CLASS_LABELS[c.classLevel] || ""}</span>}
-                      </button>
-                    );
-                  })}
-                  {!visible.length && <p className="col-span-full py-4 text-center text-sm text-slate-500">No chapter matches.</p>}
-                </div>
-              </>
-            )}
-          </Card>
+            chapters={chapters}
+            classLevel={classLevel}
+            chapterIds={chapterIds}
+            onToggle={(id) => toggle(chapterIds, setChapterIds, id)}
+            onSetMany={(ids, on) => setChapterIds(on ? [...new Set([...chapterIds, ...ids])] : chapterIds.filter((x) => !ids.includes(x)))}
+          />
 
           </>)}
 
           {step === 3 && (<>
-          {/* 4. Concepts */}
-          <Card n="3" title="Concepts" hint={topicIds.length ? `${topicIds.length} concepts chosen` : manual ? "Optional · limits what you browse" : "Optional · leave empty to use every concept"}
-            right={
-              picked.length > 0 && (
-                <div className="flex gap-2">
-                  {(() => {
-                    const all = picked.flatMap((c) => c.topics.map((t) => String(t._id)));
-                    const allOn = all.length > 0 && all.every((id) => topicIds.includes(id));
-                    return (
-                      all.length > 0 && (
-                        <button type="button" onClick={() => setTopicIds(allOn ? [] : all)} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">
-                          {allOn ? "Untick all" : `Select all concepts (${all.length})`}
-                        </button>
-                      )
-                    );
-                  })()}
-                  {topicIds.length > 0 && (
-                    <button type="button" onClick={() => setTopicIds([])} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )
-            }>
-            {!picked.length ? (
-              <p className="rounded-xl bg-[#faf6ec] px-4 py-6 text-center text-sm text-slate-500">Tick chapters first.</p>
-            ) : (
-              <>
-                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                  {picked.map((c) => {
-                    const on = String(c._id) === topicTab;
-                    const n = conceptsIn(c);
-                    return (
-                      <button
-                        key={c._id}
-                        type="button"
-                        onClick={() => setTopicTab(String(c._id))}
-                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${on ? "bg-[#17140f] text-[#e5c372]" : "bg-[#f3ecdc] text-slate-700 hover:bg-[#ece1c7]"}`}
-                      >
-                        {c.name}
-                        {n > 0 && <span className={`ml-1.5 rounded-full px-1.5 ${on ? "bg-[#e5c372] text-[#17140f]" : "bg-white text-[#b8862b]"}`}>{n}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-                {tabChapter && (
-                  <div className="mt-3 rounded-2xl border border-[#efe6d2] bg-[#fffdf8] p-3">
-                    {tabChapter.topics.length > 0 && (() => {
-                      const ids = tabChapter.topics.map((t) => String(t._id));
-                      const allOn = ids.every((id) => topicIds.includes(id));
-                      return (
-                        <div className="mb-2 flex items-center justify-between border-b border-[#f3ecdc] px-1.5 pb-2.5">
-                          <span className="text-xs font-semibold text-slate-500">
-                            {ids.filter((id) => topicIds.includes(id)).length} of {ids.length} concepts in this chapter
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setTopicIds(allOn ? topicIds.filter((id) => !ids.includes(id)) : [...new Set([...topicIds, ...ids])])}
-                            className="text-xs font-bold text-[#9a7a2c] hover:underline"
-                          >
-                            {allOn ? "Untick this chapter" : "Select all in this chapter"}
-                          </button>
-                        </div>
-                      );
-                    })()}
-                    {!tabChapter.topics.length ? (
-                      <p className="py-3 text-center text-sm text-slate-500">This chapter has no concepts listed. All its questions will be used.</p>
-                    ) : (
-                      <div className="grid gap-1.5 sm:grid-cols-2">
-                        {tabChapter.topics.map((t) => {
-                          const on = topicIds.includes(String(t._id));
-                          return (
-                            <button
-                              key={t._id}
-                              type="button"
-                              onClick={() => toggle(topicIds, setTopicIds, String(t._id))}
-                              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition ${on ? "bg-[#fbf1d9] text-slate-900" : "text-slate-700 hover:bg-[#faf6ec]"}`}
-                            >
-                              <Tick on={on} />
-                              {t.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {topicIds.length > 0 && (
-                  <p className="mt-2 text-xs text-slate-500">Chapters where you pick no concepts use all of their concepts.</p>
-                )}
-              </>
-            )}
-          </Card>
+          <ConceptStep
+            n="3"
+            picked={picked}
+            topicIds={topicIds}
+            setTopicIds={setTopicIds}
+            hint={topicIds.length ? `${topicIds.length} concepts chosen` : manual ? "Optional · limits what you browse" : "Optional · leave empty to use every concept"}
+          />
 
           </>)}
 

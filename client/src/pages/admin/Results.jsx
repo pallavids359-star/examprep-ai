@@ -58,7 +58,8 @@ export default function Results() {
         </div>
       ) : (
         <>
-          <button type="button" onClick={() => setParams({})} className={`${inDetail && view === "assignments" ? "hidden" : ""} group mb-5 inline-flex items-center gap-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 print:hidden`}>
+          {!(inDetail && view === "assignments") && (
+          <button type="button" onClick={() => setParams({})} className={`group mb-5 inline-flex items-center gap-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 print:hidden`}>
             <span className="grid h-8 w-8 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[#e7dcc3] transition group-hover:bg-[#17140f] group-hover:text-[#e5c372]">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M15 18l-6-6 6-6" />
@@ -66,6 +67,7 @@ export default function Results() {
             </span>
             Results
           </button>
+          )}
           {view === "assignments" ? <AdminAssignmentResults onDetail={setInDetail} /> : <LiveResultsSection />}
         </>
       )}
