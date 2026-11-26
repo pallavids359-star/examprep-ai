@@ -8,6 +8,8 @@ import { toast } from "../../components/Toaster";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { fmtUntil, preview } from "../../components/liveHelpers";
 import Loading from "../../components/Loading";
+import SwapDialog from "../../components/SwapDialog";
+import PaperQuestionCard, { PaperToolbar } from "../../components/PaperQuestionCard";
 
 // The lecturer picks questions for one section of a live test:
 // class -> chapters -> concepts -> questions grouped by concept, with answers and solutions.
@@ -96,6 +98,7 @@ export default function PickQuestions() {
   const [view, setView] = useState(search.get("view") === "paper" ? "paper" : "add");
   const [stage, setStage] = useState("class"); // add questions: class -> chapters -> topics -> questions // "add" = browse the bank, "paper" = the questions picked so far
   const [history, setHistory] = useState([]); // earlier versions of the paper, for Undo
+  const [swapDialog, setSwapDialog] = useState(null); // the question the Swap pop-up is open for
   const [swapFor, setSwapFor] = useState(null); // the picked question being replaced by hand
   const [busyId, setBusyId] = useState(null);
   const listTop = useRef(null);
@@ -269,10 +272,10 @@ export default function PickQuestions() {
   };
 
   // Swap: GenPrep finds a similar one (same kind, same concept or chapter), or the lecturer chooses
-  const swap = async (q, newQuestionId) => {
+  const swap = async (q, newQuestionId, choices) => {
     setBusyId(String(q._id));
     try {
-      const res = await api.post(`/lecturer/live-tests/${id}/sections/${key}/swap`, { questionId: q._id, newQuestionId });
+      const res = await api.post(`/lecturer/live-tests/${id}/sections/${key}/swap`, { questionId: q._id, newQuestionId, choices });
       remember(picked);
       setPicked((list) => list.map((x) => (String(x._id) === String(q._id) ? res.data.question : x)));
       setTestStatus(res.data.testStatus);
@@ -285,20 +288,7 @@ export default function PickQuestions() {
       setBusyId(null);
     }
   };
-  const startManualSwap = (q) => {
-    setSwapFor(q);
-    setView("add");
-    setStage("questions");
-    setPage(1);
-    setClassLevel("both");
-    setChapterIds(q.chapterId ? [String(q.chapterId)] : []);
-    setTopicIds([]);
-    setType(q.type === "numerical" ? "numerical" : "mcq");
-    setDifficulty("any");
-    setDiagram(false);
-    setMoreFilters(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+
   const finishManualSwap = async (newQ) => {
     const target = swapFor;
     if (await swap(target, newQ._id)) {
@@ -531,8 +521,7 @@ export default function PickQuestions() {
           setShowSolutions={setShowSolutions}
           onMove={move}
           onRemove={remove}
-          onSwap={(q) => swap(q)}
-          onChoose={startManualSwap}
+          onSwap={(q) => setSwapDialog(q)}
           onAdd={() => setView("add")}
           editLink={info.isAdmin ? (q) => `/admin/questions/${q._id}?back=${encodeURIComponent(`/lecturer/tests/${id}/${key}?view=paper`)}` : null}
           sendCard={
@@ -751,12 +740,45 @@ export default function PickQuestions() {
 
       </div>
       )}
+      {swapDialog && (
+        <SwapDialog
+          q={swapDialog}
+          number={picked.findIndex((x) => String(x._id) === String(swapDialog._id)) + 1}
+          subjectName={info.subject?.name}
+          loadChapters={() => chapters}
+          loadTopics={(c) => api.get(`/chapters/${c}/topics`).then((r) => r.data.topics || r.data || [])}
+          formats={
+            swapDialog.type === "numerical"
+              ? []
+              : ["single_correct", "assertion_reason", "statement_based", "match_following", "diagram_based", "true_false", ...(info.exam?.code === "JEE" ? ["multi_correct"] : [])]
+          }
+          inPaper={pickedIds}
+          loadCandidates={(c, pg) =>
+            api
+              .get(`/lecturer/live-tests/${id}/sections/${key}/questions`, {
+                params: {
+                  classLevel: c.classLevel || "both",
+                  chapterIds: c.chapterId || undefined,
+                  topicIds: c.topicId || undefined,
+                  type: swapDialog.type === "numerical" ? "numerical" : "mcq",
+                  difficulty: c.difficulty || "any",
+                  format: c.format || undefined,
+                  page: pg,
+                },
+              })
+              .then((r) => r.data)
+          }
+          onAuto={(c) => swap(swapDialog, undefined, c)}
+          onPick={(n) => swap(swapDialog, n._id)}
+          onClose={() => setSwapDialog(null)}
+        />
+      )}
     </LecturerLayout>
   );
 }
 
 // Every picked question in full, with answer and solution, and Move / Swap / Remove under each one
-function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setShowSolutions, onMove, onRemove, onSwap, onChoose, onAdd, sendCard, editLink }) {
+function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setShowSolutions, onMove, onRemove, onSwap, onAdd, sendCard, editLink }) {
   const mcqs = picked.filter((q) => q.type !== "numerical");
   const nums = picked.filter((q) => q.type === "numerical");
   const groups = [
@@ -779,17 +801,9 @@ function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setSh
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
+    <div className="mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6">
       <PaperSummary picked={picked} />
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e7dcc3] bg-white px-4 py-3">
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
-          <span className="font-semibold text-slate-900">Under each question:</span>
-          <span><b className="text-slate-900">⇄ Swap</b> similar question</span>
-          <span><b className="text-slate-900">Choose</b> your own</span>
-          <span><b className="text-slate-900">Remove</b> it</span>
-        </p>
-        <Toggle on={showSolutions} onClick={() => setShowSolutions((v) => !v)} label="Answers & solutions" />
-      </div>
+<PaperToolbar showSolutions={showSolutions} setShowSolutions={setShowSolutions} />
       {groups.map(([title, list, need, offset]) => (
         <section key={title} className="space-y-4">
           <div className="flex items-baseline justify-between gap-2">
@@ -804,46 +818,20 @@ function PaperView({ sec, picked, editable, saving, busyId, showSolutions, setSh
             const i = offset + j;
             const busy = busyId === String(q._id);
             return (
-              <article key={q._id} id={`paper-${q._id}`} className={`gp-card overflow-hidden transition ${busy ? "opacity-60" : ""}`}>
-                <div className="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-amber-50/50 px-5 py-2.5 text-xs">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-xs font-extrabold text-amber-200">{i + 1}</span>
-                  <span className="font-semibold text-slate-700">{q.chapter}</span>
-                  {q.topic && <span className="text-slate-500">· {q.topic}</span>}
-                  <span className="ml-auto flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-white px-2 py-0.5 font-medium capitalize text-slate-700 ring-1 ring-slate-200">{q.difficulty}</span>
-                    {q.classLevel && <span className="rounded-full bg-white px-2 py-0.5 text-slate-700 ring-1 ring-slate-200">Class {q.classLevel}</span>}
-                    {q.diagram && <span className="rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-800">Diagram</span>}
-                  </span>
-                </div>
-                <div className="p-5">
-                  <QuestionBody key={`${q._id}-${showSolutions}`} q={q} solutionOpen={showSolutions} compact />
-                </div>
-                {editable && (
-                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3">
-                    <button type="button" aria-label="Move up" disabled={saving || j === 0} onClick={() => onMove(i, -1)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:border-amber-300 disabled:opacity-30">
-                      ↑
-                    </button>
-                    <button type="button" aria-label="Move down" disabled={saving || j === list.length - 1} onClick={() => onMove(i, 1)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:border-amber-300 disabled:opacity-30">
-                      ↓
-                    </button>
-                    <span className="flex-1" />
-                    <button type="button" disabled={busy || saving} onClick={() => onSwap(q)} className="rounded-lg bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-amber-200 hover:bg-black disabled:opacity-50" title="Replace with a similar question from the same concept or chapter">
-                      {busy ? "Swapping..." : "⇄ Swap"}
-                    </button>
-                    <button type="button" disabled={busy || saving} onClick={() => onChoose(q)} className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:border-amber-400 disabled:opacity-50" title="Choose the replacement yourself">
-                      Choose replacement
-                    </button>
-                    {editLink && (
-                      <Link to={editLink(q)} className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:border-amber-400" title="Fix a typo, the answer or the solution of this question">
-                        ✎ Edit
-                      </Link>
-                    )}
-                    <button type="button" disabled={busy || saving} onClick={() => onRemove(q._id)} className="rounded-lg border border-red-200 px-3.5 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </article>
+              <PaperQuestionCard
+                key={q._id}
+                q={q}
+                number={i + 1}
+                solutionOpen={showSolutions}
+                editable={editable}
+                busy={busy}
+                disabled={saving}
+                onUp={j > 0 ? () => onMove(i, -1) : null}
+                onDown={j < list.length - 1 ? () => onMove(i, 1) : null}
+                onSwap={() => onSwap(q)}
+                onRemove={() => onRemove(q._id)}
+                editLink={editLink ? editLink(q) : null}
+              />
             );
           })}
         </section>

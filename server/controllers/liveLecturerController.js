@@ -55,7 +55,7 @@ const counts = (questions) => ({
 });
 
 // Full question for a lecturer: answer and solution included
-const FULL_FIELDS = "type text images options difficulty source tags explanation chapterId topicId subjectId +correctOptionIds +numericalAnswer";
+const FULL_FIELDS = "type text images options difficulty source tags explanation chapterId topicId subjectId +correctOptionIds +numericalAnswer format";
 const shape = (q, chaptersById, topicsById) => ({
     _id: q._id,
     type: q.type,
@@ -72,6 +72,7 @@ const shape = (q, chaptersById, topicsById) => ({
     classLevel: chaptersById.get(String(q.chapterId))?.classLevel || "",
     topicId: q.topicId,
     topic: topicsById.get(String(q.topicId))?.name || "",
+    format: q.format || "",
     diagram: IMG.test(q.text || "") || (q.images || []).length > 0 || (q.options || []).some((o) => IMG.test(o.text || "") || o.image?.url),
 });
 
@@ -191,6 +192,7 @@ const browseQuestions = handle("browseQuestions", async (req, res) => {
     if (req.query.type === "mcq") match.type = { $ne: "numerical" };
     if (req.query.type === "numerical") match.type = "numerical";
     if (["easy", "medium", "hard"].includes(req.query.difficulty)) match.difficulty = req.query.difficulty;
+    if (require("../utils/questionFormat").FORMATS.includes(req.query.format)) match.format = req.query.format;
     const and = [];
     if (req.query.diagram === "1") and.push(HAS_DIAGRAM);
     if (req.query.hideUsed === "1") {
@@ -319,8 +321,20 @@ const swapQuestion = handle("swapQuestion", async (req, res) => {
         if ((next.type === "numerical") !== (old.type === "numerical")) throw userError(old.type === "numerical" ? "Swap a numerical question with another numerical question" : "Swap an MCQ with another MCQ");
         if (test.sections.some((s) => s.questionIds.map(String).includes(String(next._id)))) throw userError("That question is already in this test");
     } else {
-        next = await findSwap(test, section, old);
-        if (!next) throw userError("No other question of this kind is left in the bank for this subject");
+        // Choices from the Swap pop-up (class, chapter, concept, difficulty, type); none = most similar
+        const chosen = await require("../utils/swapChoices").swapMatch(req.body.choices, { Chapter, subjectId: section.subjectId });
+        if (chosen) {
+            const inTest = test.sections.flatMap((s) => s.questionIds.map(String));
+            [next] = await Question.aggregate([
+                { $match: { examId: test.examId, subjectId: section.subjectId, status: "published", type: old.type === "numerical" ? "numerical" : { $ne: "numerical" }, ...chosen, _id: { $nin: inTest.map(toId) } } },
+                { $sample: { size: 1 } },
+                { $project: { _id: 1 } },
+            ]);
+            if (!next) throw userError("No other question matches these choices. Choose a wider chapter or any difficulty.");
+        } else {
+            next = await findSwap(test, section, old);
+            if (!next) throw userError("No other question of this kind is left in the bank for this subject");
+        }
     }
 
     section.questionIds.splice(pos, 1, toId(next._id));

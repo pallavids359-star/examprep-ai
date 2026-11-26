@@ -3,12 +3,13 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import BackLink from "../../components/BackLink";
-import QuestionBody from "../../components/QuestionBody";
 import AssignmentPicker from "../../components/AssignmentPicker";
+import SwapDialog from "../../components/SwapDialog";
+import PaperQuestionCard, { PaperToolbar } from "../../components/PaperQuestionCard";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
 import { fmtDateTime, fmtDuration, fmtUntil, toLocalInput } from "../../components/liveHelpers";
-import { CLASS_LABELS, FORMAT_SHORT, LEVEL_STYLE, Pill, STATE, audienceText } from "../../components/assignmentHelpers";
+import { CLASS_LABELS, FORMAT_SHORT, Pill, STATE, audienceText } from "../../components/assignmentHelpers";
 
 const input = "w-full rounded-xl border border-[#e7dcc3] bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#c9a24a] focus:ring-4 focus:ring-[#e5c372]/30";
 
@@ -21,7 +22,9 @@ export default function AssignmentReview() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("questions");
   const [busy, setBusy] = useState("");
-  const [open, setOpen] = useState({});
+  const [showSolutions, setShowSolutions] = useState(false);
+  const [swapDialog, setSwapDialog] = useState(null);
+  const [swapFormats, setSwapFormats] = useState([]);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [opts, setOpts] = useState(null);
@@ -52,15 +55,33 @@ export default function AssignmentReview() {
     }
   };
 
-  const swap = (q) =>
-    run(`swap-${q._id}`, async () => {
-      const res = await api.post(`/lecturer/assignments/${id}/swap`, { questionId: q._id });
+  // Swap from the pop-up: { choices } = GenPrep picks, { newQuestionId } = the lecturer picked
+  const swapWith = async (q, body) => {
+    setBusy(`swap-${q._id}`);
+    try {
+      const res = await api.post(`/lecturer/assignments/${id}/swap`, { questionId: q._id, ...body });
       setData((d) => {
         const qs = [...d.questions];
         qs[res.data.position] = res.data.question;
         return { ...d, questions: qs };
       });
-    }, "Swapped for a similar question");
+      toast(`Question ${res.data.position + 1} swapped`);
+      return true;
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+      return false;
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const move = (i, dir) =>
+    run("move", async () => {
+      const qs = [...questions];
+      [qs[i], qs[i + dir]] = [qs[i + dir], qs[i]];
+      await api.put(`/lecturer/assignments/${id}`, { questionIds: qs.map((x) => x._id) });
+      setData((d) => ({ ...d, questions: qs }));
+    });
 
   const removeQ = (q) =>
     run(`rm-${q._id}`, async () => {
@@ -285,42 +306,46 @@ export default function AssignmentReview() {
               </div>
             )}
             
-            {!(picking && editable) && questions.map((q, i) => {
-              const isOpen = open[q._id];
-              return (
-                <article key={q._id} className="gp-card overflow-hidden">
-                  <div className="flex flex-wrap items-center gap-2 border-b border-[#f1e9d7] bg-[#fffdf8] px-4 py-2.5">
-                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#17140f] font-display text-xs font-bold text-[#e5c372]">{i + 1}</span>
-                    <span className="min-w-0 truncate text-xs font-semibold text-slate-600">
-                      {q.chapter}
-                      {q.topic ? ` · ${q.topic}` : ""}
-                    </span>
-                    <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                      {q.format && <Pill cls="bg-[#f3ecdc] text-slate-700 ring-[#e7dcc3]">{FORMAT_SHORT[q.format] || q.format}</Pill>}
-                      {q.difficulty && <Pill cls={LEVEL_STYLE[q.difficulty] || ""}>{q.difficulty}</Pill>}
-                    </span>
-                  </div>
-                  <div className={`px-4 py-4 ${isOpen ? "" : "max-h-56 overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]"}`}>
-                    <QuestionBody q={q} compact solutionOpen={false} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 border-t border-[#f1e9d7] px-4 py-2.5">
-                    <button onClick={() => setOpen({ ...open, [q._id]: !isOpen })} className="text-sm font-semibold text-[#b8862b] hover:text-[#8a6420]">
-                      {isOpen ? "Show less" : "Show full question & answer"}
-                    </button>
-                    {editable && (
-                      <span className="ml-auto flex gap-2">
-                        <button onClick={() => swap(q)} disabled={busy === `swap-${q._id}`} className="gp-ghost-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold disabled:opacity-60">
-                          ⇄ {busy === `swap-${q._id}` ? "Swapping…" : "Swap"}
-                        </button>
-                        <button onClick={() => removeQ(q)} disabled={busy === `rm-${q._id}`} className="rounded-xl px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">
-                          Remove
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+            {!(picking && editable) && questions.length > 0 && <PaperToolbar showSolutions={showSolutions} setShowSolutions={setShowSolutions} />}
+            {!(picking && editable) &&
+              questions.map((q, i) => (
+                <PaperQuestionCard
+                  key={q._id}
+                  q={q}
+                  number={i + 1}
+                  solutionOpen={showSolutions}
+                  editable={editable}
+                  busy={busy === `swap-${q._id}` || busy === `rm-${q._id}`}
+                  disabled={busy === "move"}
+                  onUp={i > 0 ? () => move(i, -1) : null}
+                  onDown={i < questions.length - 1 ? () => move(i, 1) : null}
+                  onSwap={() => setSwapDialog(q)}
+                  onRemove={() => removeQ(q)}
+                />
+              ))}
+            {swapDialog && (
+              <SwapDialog
+                q={swapDialog}
+                number={questions.findIndex((x) => x._id === swapDialog._id) + 1}
+                subjectName={a.subject}
+                loadChapters={() => api.get(`/lecturer/assignments/${id}/browse`, { params: { allChapters: 1 } }).then((r) => {
+                  setSwapFormats(r.data.formats || []);
+                  return r.data.chapters;
+                })}
+                formats={swapFormats}
+                inPaper={new Set(questions.map((x) => String(x._id)))}
+                loadCandidates={(c, pg) =>
+                  api
+                    .get(`/lecturer/assignments/${id}/browse`, {
+                      params: { allChapters: 1, classLevel: c.classLevel || undefined, chapterId: c.chapterId || undefined, topicId: c.topicId || undefined, difficulty: c.difficulty || undefined, format: c.format || undefined, page: pg },
+                    })
+                    .then((r) => r.data)
+                }
+                onAuto={(c) => swapWith(swapDialog, { choices: c })}
+                onPick={(n) => swapWith(swapDialog, { newQuestionId: n._id })}
+                onClose={() => setSwapDialog(null)}
+              />
+            )}
             {a.status === "draft" && questions.length > 0 && (
               <div className="gp-card flex flex-wrap items-center justify-between gap-3 p-5">
                 <p className="text-sm text-slate-600">

@@ -353,6 +353,30 @@ const swap = handle("swapAssignmentQuestion", async (req, res) => {
     if (pos === -1) throw userError("That question is not in this assignment");
     const old = await Question.findById(req.body.questionId).select("chapterId topicId difficulty format type").lean();
     const base = { subjectId: a.subjectId, status: "published", _id: { $nin: a.questionIds } };
+
+    // Chosen by hand in the Swap pop-up
+    if (req.body.newQuestionId) {
+        if (!isValidId(req.body.newQuestionId)) throw userError("Invalid question");
+        if (a.questionIds.map(String).includes(String(req.body.newQuestionId))) throw userError("That question is already in this assignment");
+        const pick = await Question.findOne({ _id: req.body.newQuestionId, subjectId: a.subjectId, status: "published" }).select("_id").lean();
+        if (!pick) throw userError("That question is not from this subject");
+        a.questionIds.splice(pos, 1, pick._id);
+        await a.save();
+        const q = await Question.findById(pick._id).select(`${FULL_FIELDS} format`).lean();
+        const [chaptersById, topicsById] = await namesFor([q]);
+        return res.json({ position: pos, question: { ...shape(q, chaptersById, topicsById), format: q.format || "" } });
+    }
+    // Choices from the Swap pop-up (class, chapter, concept, difficulty, type)
+    const chosen = await require("../utils/swapChoices").swapMatch(req.body.choices, { Chapter, subjectId: a.subjectId });
+    if (chosen) {
+        const [hit] = await sample({ ...base, ...chosen, _id: { $nin: a.questionIds.map(toId) } }, 1);
+        if (!hit) throw userError("No other question matches these choices. Choose a wider chapter or any difficulty.");
+        a.questionIds.splice(pos, 1, hit._id);
+        await a.save();
+        const q = await Question.findById(hit._id).select(`${FULL_FIELDS} format`).lean();
+        const [chaptersById, topicsById] = await namesFor([q]);
+        return res.json({ position: pos, question: { ...shape(q, chaptersById, topicsById), format: q.format || "" } });
+    }
     const tries = [
         { chapterId: old?.chapterId, topicId: old?.topicId, difficulty: old?.difficulty, format: old?.format },
         { chapterId: old?.chapterId, difficulty: old?.difficulty, format: old?.format },
@@ -379,8 +403,10 @@ const BROWSE_PAGE = 15;
 const browse = handle("browseAssignmentQuestions", async (req, res) => {
     const a = await loadOwn(req);
     const exam = await Exam.findById(a.examId).select("code").lean();
-    const chapterIds = (a.settings?.chapterIds || []).map(String);
-    const chapterList = await Chapter.find(chapterIds.length ? { _id: { $in: chapterIds } } : { subjectId: a.subjectId })
+    const chapterIds = req.query.allChapters === "1" ? [] : (a.settings?.chapterIds || []).map(String);
+    const chapterQuery = chapterIds.length ? { _id: { $in: chapterIds } } : { subjectId: a.subjectId };
+    if (["11", "12"].includes(req.query.classLevel)) chapterQuery.classLevel = req.query.classLevel;
+    const chapterList = await Chapter.find(chapterQuery)
         .select("name classLevel order")
         .sort({ classLevel: 1, order: 1, name: 1 })
         .lean();
@@ -389,7 +415,7 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
     const match = { examId: a.examId, subjectId: a.subjectId, status: "published", chapterId: { $in: chapterList.map((c) => c._id) } };
     if (isValidId(req.query.chapterId) && chapterList.some((c) => String(c._id) === req.query.chapterId)) match.chapterId = toId(req.query.chapterId);
     if (isValidId(req.query.topicId)) match.topicId = toId(req.query.topicId);
-    else if ((a.settings?.topicIds || []).length) {
+    else if (req.query.allChapters !== "1" && (a.settings?.topicIds || []).length) {
         // the concepts chosen on the form, for the chapters that had any
         const chosen = new Set(a.settings.topicIds.map(String));
         const limited = new Set(topicList.filter((t) => chosen.has(String(t._id))).map((t) => String(t.chapterId)));
