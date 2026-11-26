@@ -581,7 +581,28 @@ export default function AssignmentForm() {
           {step === 3 && (<>
           {/* 4. Concepts */}
           <Card n="3" title="Concepts" hint={topicIds.length ? `${topicIds.length} concepts chosen` : manual ? "Optional · limits what you browse" : "Optional · leave empty to use every concept"}
-            right={topicIds.length > 0 && <button type="button" onClick={() => setTopicIds([])} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">Clear</button>}>
+            right={
+              picked.length > 0 && (
+                <div className="flex gap-2">
+                  {(() => {
+                    const all = picked.flatMap((c) => c.topics.map((t) => String(t._id)));
+                    const allOn = all.length > 0 && all.every((id) => topicIds.includes(id));
+                    return (
+                      all.length > 0 && (
+                        <button type="button" onClick={() => setTopicIds(allOn ? [] : all)} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">
+                          {allOn ? "Untick all" : `Select all concepts (${all.length})`}
+                        </button>
+                      )
+                    );
+                  })()}
+                  {topicIds.length > 0 && (
+                    <button type="button" onClick={() => setTopicIds([])} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold">
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )
+            }>
             {!picked.length ? (
               <p className="rounded-xl bg-[#faf6ec] px-4 py-6 text-center text-sm text-slate-500">Tick chapters first.</p>
             ) : (
@@ -605,6 +626,24 @@ export default function AssignmentForm() {
                 </div>
                 {tabChapter && (
                   <div className="mt-3 rounded-2xl border border-[#efe6d2] bg-[#fffdf8] p-3">
+                    {tabChapter.topics.length > 0 && (() => {
+                      const ids = tabChapter.topics.map((t) => String(t._id));
+                      const allOn = ids.every((id) => topicIds.includes(id));
+                      return (
+                        <div className="mb-2 flex items-center justify-between border-b border-[#f3ecdc] px-1.5 pb-2.5">
+                          <span className="text-xs font-semibold text-slate-500">
+                            {ids.filter((id) => topicIds.includes(id)).length} of {ids.length} concepts in this chapter
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTopicIds(allOn ? topicIds.filter((id) => !ids.includes(id)) : [...new Set([...topicIds, ...ids])])}
+                            className="text-xs font-bold text-[#9a7a2c] hover:underline"
+                          >
+                            {allOn ? "Untick this chapter" : "Select all in this chapter"}
+                          </button>
+                        </div>
+                      );
+                    })()}
                     {!tabChapter.topics.length ? (
                       <p className="py-3 text-center text-sm text-slate-500">This chapter has no concepts listed. All its questions will be used.</p>
                     ) : (
