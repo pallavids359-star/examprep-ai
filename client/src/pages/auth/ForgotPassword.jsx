@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthShell from "../../components/AuthShell";
 import api, { getErrorMessage } from "../../api/axios";
+import PasswordInput from "../../components/PasswordInput";
 
 const inputClass =
     "w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -96,11 +97,11 @@ export default function ForgotPassword() {
                         </div>
                         <div>
                             <label className={labelClass} htmlFor="password">New password</label>
-                            <input id="password" name="password" type="password" required value={form.password} onChange={handleChange} className={inputClass} />
+                            <PasswordInput id="password" name="password" required value={form.password} onChange={handleChange} className={inputClass} />
                         </div>
                         <div>
                             <label className={labelClass} htmlFor="confirm">Confirm new password</label>
-                            <input id="confirm" name="confirm" type="password" required value={form.confirm} onChange={handleChange} className={inputClass} />
+                            <PasswordInput id="confirm" name="confirm" required value={form.confirm} onChange={handleChange} className={inputClass} />
                         </div>
                         <button
                             type="submit"

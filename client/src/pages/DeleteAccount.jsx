@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { SITE } from "../content/site";
+import PasswordInput from "../components/PasswordInput";
 
 // The delete form, used on the public page and in Profile
 export function DeleteAccountForm({ onDeleted }) {
@@ -32,7 +33,7 @@ export function DeleteAccountForm({ onDeleted }) {
       </p>
       <label className="block text-sm font-medium text-slate-700">
         Your password
-        <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-rose-400" />
+        <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-rose-400" />
       </label>
       <label className="block text-sm font-medium text-slate-700">
         Type <b>DELETE</b> to confirm

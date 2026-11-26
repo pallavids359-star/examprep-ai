@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AuthShell from "../../components/AuthShell";
 import { getErrorMessage } from "../../api/axios";
+import PasswordInput from "../../components/PasswordInput";
 
 const inputClass =
     "w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -63,7 +64,7 @@ export default function Login() {
                                 Forgot password?
                             </Link>
                         </div>
-                        <input id="password" name="password" type="password" required value={form.password} onChange={handleChange} className={inputClass} />
+                        <PasswordInput id="password" name="password" required value={form.password} onChange={handleChange} className={inputClass} />
                     </div>
 
                     <button

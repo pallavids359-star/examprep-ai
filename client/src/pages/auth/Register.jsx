@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AuthShell from "../../components/AuthShell";
 import { getErrorMessage } from "../../api/axios";
+import PasswordInput from "../../components/PasswordInput";
 
 // The college list: MBPU first (the default), then others. Section A-D is asked only for MBPU.
 const DEFAULT_COLLEGE = "MBPU";
@@ -132,7 +133,7 @@ export default function Register() {
                         <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="password">
                             Password
                         </label>
-                        <input id="password" name="password" type="password" required value={form.password} onChange={handleChange} className={inputClass} />
+                        <PasswordInput id="password" name="password" required value={form.password} onChange={handleChange} className={inputClass} />
                         <p className="text-xs text-slate-500 mt-1">At least 6 characters</p>
                     </div>
 
@@ -140,7 +141,7 @@ export default function Register() {
                         <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="confirm">
                             Confirm password
                         </label>
-                        <input id="confirm" name="confirm" type="password" required value={form.confirm} onChange={handleChange} className={inputClass} />
+                        <PasswordInput id="confirm" name="confirm" required value={form.confirm} onChange={handleChange} className={inputClass} />
                     </div>
 
                     <button
