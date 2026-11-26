@@ -8,6 +8,7 @@ import { askConfirm } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toaster";
 import { PHASE, fmtDateTime, fmtUntil, preview, toLocalInput } from "../../components/liveHelpers";
 import { Countdown, Ring } from "../../components/premium";
+import Loading from "../../components/Loading";
 
 const PICKER_LABEL = { auto: "Auto-picked", me: "Set by you (admin)", lecturer: "Lecturer picks" };
 
@@ -96,7 +97,7 @@ export default function LiveTestReview() {
   if (error || !test) {
     return (
       <AdminLayout title="Live test">
-        {error ? <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : <p className="text-sm text-slate-500">Loading...</p>}
+        {error ? <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : <Loading />}
       </AdminLayout>
     );
   }

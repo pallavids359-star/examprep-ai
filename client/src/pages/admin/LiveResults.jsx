@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import AdminTestResult from "../../components/AdminTestResult";
+import Loading from "../../components/Loading";
 
 // Head lecturer: leaderboard of a live test
 export default function LiveResults() {
@@ -43,7 +44,7 @@ export default function LiveResults() {
   if (!data) {
     return (
       <AdminLayout title="Results">
-        <p className="text-sm text-slate-500">Loading...</p>
+        <Loading />
       </AdminLayout>
     );
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { getErrorMessage } from "../../api/axios";
 import LiveResultsBrowser from "../../components/LiveResultsBrowser";
+import Loading from "../../components/Loading";
 
 // Student: my live test results, by exam
 export default function MyResults() {
@@ -17,7 +18,7 @@ export default function MyResults() {
       <h1 className="text-3xl font-extrabold text-slate-900">My results</h1>
       <p className="mt-1 mb-6 text-sm text-slate-500">Your live tests: rank, marks, and every question with the right answer.</p>
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!data && !error && <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
+      {!data && !error && <Loading />}
       {data && <LiveResultsBrowser data={data} reportLink={(t) => `/live-tests/${t.testId}/report`} empty="You haven't taken a live test for this exam yet." />}
     </main>
   );

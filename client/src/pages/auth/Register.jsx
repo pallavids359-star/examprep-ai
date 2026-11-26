@@ -146,9 +146,9 @@ export default function Register() {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="w-full rounded-lg bg-indigo-600 text-white font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
+                        className="gp-btn gp-btn-dark w-full py-3.5"
                     >
-                        {submitting ? "Creating account..." : "Create account"}
+                        {submitting ? <><span className="gp-spinner" />Creating account…</> : "Create account"}
                     </button>
                     <p className="text-center text-xs text-slate-500">
                         By creating an account you agree to the{" "}

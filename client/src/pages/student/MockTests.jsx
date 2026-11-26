@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/ui";
 import api, { getErrorMessage } from "../../api/axios";
 import MockSetup from "../../components/MockSetup";
 import { toast } from "../../components/Toaster";
+import Loading from "../../components/Loading";
 
 // The real paper pattern (the server uses the same numbers)
 const PATTERNS = {
@@ -103,7 +104,7 @@ export default function MockTests() {
                     </div>
                 )}
 
-                {loading && <p className="mt-6 text-slate-500">Loading...</p>}
+                {loading && <Loading />}
 
                 {setupFor && patternOf(setupFor.code, stream) && (
                     <div className="mt-6 max-w-3xl">

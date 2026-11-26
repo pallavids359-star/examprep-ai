@@ -9,6 +9,7 @@ import SyllabusPicker from "../../components/SyllabusPicker";
 import OptionsEditor from "../../components/OptionsEditor";
 import QuestionImages from "../../components/QuestionImages";
 import { usePasteImage } from "../../components/ImageTools";
+import Loading from "../../components/Loading";
 
 const inputClass =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -141,7 +142,7 @@ export default function QuestionForm() {
     if (loading) {
         return (
             <AdminLayout title="Edit question">
-                <p className="mt-6 text-slate-500">Loading...</p>
+                <Loading />
             </AdminLayout>
         );
     }

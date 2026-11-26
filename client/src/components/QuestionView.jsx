@@ -12,7 +12,8 @@ export default function QuestionView({ question, index, total, selected, isMarke
   const isNumerical = question.type === "numerical" || !(question.options || []).length;
   return (
     <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-7">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-start gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <span className="text-lg font-bold text-slate-900">Question {index + 1}</span>
         <span className="text-sm text-slate-400">of {total}</span>
         {question.difficulty && (
@@ -28,6 +29,7 @@ export default function QuestionView({ question, index, total, selected, isMarke
         {isMarked && (
           <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-50 text-violet-700">Marked for review</span>
         )}
+      </div>
         {onFlag && <FlagButton flag={flag} onClick={onFlag} />}
       </div>
 

@@ -262,12 +262,15 @@ function SessionList({ tests, kind, onOpen }) {
       <ul className="mt-3 divide-y divide-[#efe6d2] overflow-hidden rounded-2xl bg-white ring-1 ring-[#e7dcc3]">
         {tests.map((t, i) => (
           <li key={t.attemptId}>
-            <button type="button" onClick={() => onOpen(t.attemptId)} className="group flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-[#fbf8f1]">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#f7f3ea] font-display text-lg font-extrabold text-[#b8862b]">{tests.length - i}</span>
+            <button type="button" onClick={() => onOpen(t.attemptId)} className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[#fbf8f1] sm:gap-4 sm:px-5 sm:py-4">
+              <span className="grid h-10 w-10 shrink-0 sm:h-11 sm:w-11 place-items-center rounded-xl bg-[#f7f3ea] font-display text-lg font-extrabold text-[#b8862b]">{tests.length - i}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold text-slate-900">{t.title}</span>
-                <span className="block text-sm text-slate-500">
+                <span className="block truncate text-xs text-slate-500 sm:text-sm">
                   {fullDay(t.date)} · {timeOf(t.date)}
+                </span>
+                <span className="mt-0.5 block text-xs sm:hidden">
+                  <span className="text-green-700">{t.correct}✓</span> <span className="text-orange-700">{t.incorrect}✗</span> <span className="text-slate-400">{t.unanswered} skipped</span>
                 </span>
               </span>
               <span className="hidden gap-4 text-center text-xs text-slate-500 sm:flex">
@@ -281,7 +284,7 @@ function SessionList({ tests, kind, onOpen }) {
                   <b className="block text-base text-slate-500">{t.unanswered}</b>skipped
                 </span>
               </span>
-              <span className="w-24 text-right font-display text-lg font-extrabold tabular-nums text-slate-900">
+              <span className="shrink-0 whitespace-nowrap text-right font-display text-lg font-extrabold tabular-nums text-slate-900 sm:w-24">
                 {t.score}
                 <span className="text-xs font-medium text-slate-400"> / {t.maxScore}</span>
               </span>

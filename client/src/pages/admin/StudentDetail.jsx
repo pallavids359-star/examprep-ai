@@ -6,6 +6,7 @@ import AdminLayout from "../../components/AdminLayout";
 import LiveResultsBrowser from "../../components/LiveResultsBrowser";
 import { fmtDateTime, fmtDuration } from "../../components/liveHelpers";
 import { useReportPrinter } from "../../components/ReportPrinter";
+import Loading from "../../components/Loading";
 
 
 // Admin view of one student: details plus the same Analytics the student sees
@@ -32,7 +33,7 @@ export default function StudentDetail() {
             <BackLink to="/admin/students">All students</BackLink>
 
             {error && <div className="mt-4 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
-            {!info && !error && <p className="mt-6 text-sm text-slate-500">Loading...</p>}
+            {!info && !error && <Loading />}
 
             {student && (
                 <>
@@ -80,7 +81,7 @@ function StudentLive({ id }) {
     useEffect(() => {
         api.get(`/admin/students/${id}/live-results`).then((res) => setData(res.data)).catch(() => setData({ exams: [], tests: [] }));
     }, [id]);
-    if (!data) return <p className="py-6 text-sm text-slate-400">Loading...</p>;
+    if (!data) return <Loading />;
     return <LiveResultsBrowser data={data} reportLink={(t) => `/admin/attempts/${t.attemptId}`} empty="No live tests taken for this exam." />;
 }
 

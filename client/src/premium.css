@@ -354,6 +354,7 @@ table tbody tr:hover {
 .gp-sheet tbody td { color: #475569; font-weight: 700; }
 .gp-sheet tbody td.gp-total { color: #0f172a; }
 .gp-sheet, .gp-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
 /* ---------- Loaders ---------- */
 .gp-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px 0; color: #8a7d66; font-size: 14px; font-weight: 500; }
 .gp-spinner { width: 22px; height: 22px; border-radius: 999px; border: 2.5px solid rgba(201, 162, 74, 0.25); border-top-color: #c9a24a; animation: gp-spin 0.75s linear infinite; }
@@ -364,3 +365,44 @@ table tbody tr:hover {
 .gp-splash-ring img { width: 78px; height: 78px; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(70, 48, 10, 0.6); }
 @keyframes gp-spin { to { transform: rotate(360deg); } }
 @keyframes gp-fade { 50% { opacity: 0.45; } }
+
+/* ---------- Buttons: one feel everywhere ---------- */
+html { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+button:not(:disabled), a.rounded-lg, a.rounded-xl, a.rounded-2xl, .gp-card-hover, .gp-tile { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+button:not(:disabled):active, a.rounded-lg:active, a.rounded-xl:active, a.rounded-2xl:active, .gp-card-hover:active, .gp-tile:active { transform: scale(0.97); }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid #c9a24a; outline-offset: 2px; }
+
+.gp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; padding: 12px 20px; font-weight: 700; font-size: 15px; line-height: 1; }
+.gp-btn-dark { background: #17140f; color: #e5c372; box-shadow: 0 10px 24px -14px rgba(23, 20, 15, 0.9); }
+.gp-btn-dark:hover:not(:disabled) { background: #000; }
+.gp-btn-gold { background: linear-gradient(180deg, #e8c877, #c9a24a); color: #17140f; box-shadow: 0 10px 24px -14px rgba(160, 120, 40, 0.9); }
+.gp-btn-gold:hover:not(:disabled) { filter: brightness(1.05); }
+.gp-btn-light { background: #fff; color: #17140f; border: 1px solid #e7dcc3; }
+.gp-btn-light:hover:not(:disabled) { border-color: #c9a24a; }
+.gp-btn:disabled { opacity: 0.55; }
+.gp-btn .gp-spinner { width: 16px; height: 16px; border-width: 2px; border-color: currentColor; border-top-color: transparent; opacity: 0.8; }
+
+/* ---------- Pages fade in ---------- */
+.gp-page-in { animation: gp-page-in 0.28s ease-out both; }
+@keyframes gp-page-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- Phone: bottom bar, "More" sheet, safe areas ---------- */
+.gp-tabbar { padding-bottom: env(safe-area-inset-bottom); }
+.gp-tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 2px 8px; font-size: 11px; font-weight: 600; color: #8a7d66; position: relative; }
+.gp-tab.active { color: #17140f; }
+.gp-tab.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 4px 4px; background: linear-gradient(90deg, #c9a24a, #e5c372); }
+.gp-tab.active svg { color: #b8862b; }
+.gp-sheet-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(23, 20, 15, 0.45); animation: gp-fade-in 0.2s ease-out; }
+.gp-more-sheet { position: fixed; inset: auto 0 0 0; z-index: 41; background: #fffdf8; border-radius: 24px 24px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -20px 50px -20px rgba(23, 20, 15, 0.5); animation: gp-sheet-up 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.gp-more-sheet .gp-grab { width: 40px; height: 4px; border-radius: 4px; background: #e2d6bd; margin: 0 auto 14px; }
+@keyframes gp-fade-in { from { opacity: 0; } }
+@keyframes gp-sheet-up { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .gp-spinner, .gp-splash-ring::before, .gp-splash p, .gp-page-in, .gp-more-sheet, .gp-sheet-backdrop { animation: none !important; }
+  button:not(:disabled):active { transform: none; }
+}
+
+/* Nothing can make the page scroll sideways on phones */
+html, body { overflow-x: clip; }

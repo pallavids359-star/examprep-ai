@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
+import Loading from "../../components/Loading";
 
 const TILES = [
     { key: "students", label: "Students", to: "/admin/students" },
@@ -33,7 +34,7 @@ export default function AdminDashboard() {
     return (
         <AdminLayout title="Overview">
             {error && <div className="mt-6 rounded-lg bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>}
-            {!data && !error && <p className="mt-6 text-slate-500">Loading...</p>}
+            {!data && !error && <Loading />}
 
             {data && (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">

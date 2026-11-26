@@ -122,19 +122,19 @@ export function Countdown({ to, onDone, dark = true, compact = false }) {
 // Number tile with an icon
 export function Stat({ label, value, sub, icon, accent = false }) {
   return (
-    <div className="gp-card p-5">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+    <div className="gp-card min-w-0 p-3.5 sm:p-5">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <p className="min-w-0 text-[11px] font-semibold uppercase leading-tight tracking-wider text-slate-500 sm:text-xs">{label}</p>
         {icon && (
-          <span className={`grid h-9 w-9 place-items-center rounded-xl ${accent ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-700"}`}>
+          <span className={`hidden h-9 w-9 shrink-0 place-items-center rounded-xl sm:grid ${accent ? "bg-slate-900 text-amber-200" : "bg-amber-50 text-amber-700"}`}>
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d={icon} />
             </svg>
           </span>
         )}
       </div>
-      <p className="mt-2 font-display text-3xl font-extrabold tabular-nums text-slate-900">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+      <p className="mt-1.5 whitespace-nowrap font-display text-2xl font-extrabold tabular-nums text-slate-900 sm:mt-2 sm:text-3xl">{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-xs">{sub}</p>}
     </div>
   );
 }

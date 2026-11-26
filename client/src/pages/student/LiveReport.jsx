@@ -163,7 +163,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
       </div>
 
       {/* Score hero */}
-      <section className="gp-hero mt-4 p-6 md:p-8">
+      <section className="gp-hero mt-4 p-5 sm:p-6 md:p-8">
         <div className="relative flex flex-wrap items-center justify-between gap-8">
           <div className="min-w-0 max-w-xl">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80">{admin && data.student ? `${data.student.name} · ${(data.kindLabel || "Live test").toLowerCase()} report` : `${data.kindLabel || "Live test"} report`}</p>
@@ -172,10 +172,10 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
               Taken {fmtDateTime(data.startedAt)} – {fmtDateTime(data.submittedAt)}
               {data.autoSubmitted ? " · submitted automatically when time ran out" : ""}
             </p>
-            <div className="mt-6 flex flex-wrap items-end gap-8">
+            <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-4 sm:mt-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Marks</p>
-                <p className="font-display text-5xl font-extrabold">
+                <p className="font-display text-4xl font-extrabold sm:text-5xl">
                   <span className="gp-gold-text">{s.score}</span>
                   <span className="text-2xl text-amber-100/60"> / {s.maxScore}</span>
                 </p>
@@ -186,12 +186,16 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
               {r && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Rank</p>
-                  <p className="font-display text-5xl font-extrabold text-white">
+                  <p className="font-display text-4xl font-extrabold text-white sm:text-5xl">
                     #{r.rank}
                     <span className="text-2xl text-amber-100/60"> of {r.totalCandidates}</span>
                   </p>
                 </div>
               )}
+              <div className="sm:hidden">
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-200/70">Percent</p>
+                <p className="font-display text-4xl font-extrabold text-white">{s.percentage ?? 0}%</p>
+              </div>
             </div>
             {r && <p className="mt-3 text-sm text-amber-100/80">{admin ? "Did" : "You did"} better than {r.percentile}% of everyone who took it.</p>}
             <div className="mt-5 flex flex-wrap gap-2">
@@ -202,7 +206,9 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
               )}
             </div>
           </div>
-          <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />
+          <div className="hidden sm:block">
+            <Ring value={s.percentage || 0} size={170} stroke={14} dark label={`${s.percentage ?? 0}%`} sub="of total marks" />
+          </div>
         </div>
       </section>
 
@@ -214,7 +220,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
       </div>
 
       {/* Every question at a glance */}
-      <section className="gp-card mt-5 flex flex-wrap items-center gap-8 p-6">
+      <section className="gp-card mt-5 flex flex-col items-center gap-6 p-5 sm:flex-row sm:flex-wrap sm:gap-8 sm:p-6">
         <Donut
           size={170}
           center={questions.length}
@@ -226,7 +232,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
             { label: "Never opened", value: s.notVisited, color: "#e7dcc3" },
           ]}
         />
-        <div className="min-w-0 flex-1">
+        <div className="w-full min-w-0 flex-1">
           <h2 className="text-lg font-bold text-slate-900">Every question at a glance</h2>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
@@ -272,9 +278,30 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
       </div>
 
       {/* By section */}
-      <section className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-5">
+      <section className="relative mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="font-semibold text-slate-900">By subject</h2>
-        <table className="mt-3 w-full min-w-[680px] text-sm">
+        {/* Phones: one card per subject */}
+        <div className="mt-3 space-y-3 sm:hidden">
+          {data.sections.map((x) => (
+            <div key={x.name} className="rounded-xl bg-[#fbf7ee] p-3.5 ring-1 ring-[#efe6d2]">
+              <div className="flex items-baseline justify-between gap-2">
+                <b className="text-slate-900">{x.name}</b>
+                <span className="font-display font-extrabold tabular-nums text-slate-900">
+                  {x.score}<span className="text-sm font-semibold text-slate-400"> / {x.maxScore} marks</span>
+                </span>
+              </div>
+              <p className="mt-1 text-sm">
+                <span className="text-green-700">{x.correct} right</span> · <span className="text-orange-700">{x.wrong} wrong</span> · <span className="text-slate-600">{x.skipped + x.notVisited} skipped</span> · <span className="text-slate-600">{fmtDuration(x.timeSec)}</span>
+              </p>
+              {x.weakestChapter && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Work on: {x.weakestChapter.name} ({x.weakestChapter.correct} of {x.weakestChapter.total})
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        <table className="mt-3 hidden w-full min-w-[680px] text-sm sm:table">
           <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th className="py-2 pr-3">Subject</th>
@@ -329,7 +356,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
             </span>
           ))}
         </div>
-        <div className="mt-4 overflow-x-auto">
+        <div className="relative mt-4 overflow-x-auto">
           <div className="flex h-44 min-w-[480px] items-end gap-1 border-b border-slate-200" role="img" aria-label={`Seconds spent on each ${chartSection} question`}>
             {chartQs.map((q) => (
               <button
@@ -411,7 +438,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-[#fbf8f1] text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">

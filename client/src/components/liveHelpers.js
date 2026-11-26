@@ -7,9 +7,10 @@ export const fmtDuration = (sec) => {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const r = s % 60;
-  if (h) return `${h} h ${m} m`;
-  if (m) return `${m} m ${String(r).padStart(2, "0")} s`;
-  return `${r} s`;
+  // \u00a0 keeps "50m 00s" on one line
+  if (h) return `${h}h\u00a0${m}m`;
+  if (m) return `${m}m\u00a0${String(r).padStart(2, "0")}s`;
+  return `${r}s`;
 };
 
 // "in 2 days 3 h", "in 45 min"

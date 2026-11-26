@@ -7,6 +7,7 @@ import QuestionBody from "../../components/QuestionBody";
 import { toast } from "../../components/Toaster";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { fmtUntil, preview } from "../../components/liveHelpers";
+import Loading from "../../components/Loading";
 
 // The lecturer picks questions for one section of a live test:
 // class -> chapters -> concepts -> questions grouped by concept, with answers and solutions.
@@ -360,7 +361,7 @@ export default function PickQuestions() {
   if (!info) {
     return (
       <LecturerLayout>
-        <p className="px-4 py-10 text-center text-sm text-slate-500">Loading...</p>
+        <Loading />
       </LecturerLayout>
     );
   }

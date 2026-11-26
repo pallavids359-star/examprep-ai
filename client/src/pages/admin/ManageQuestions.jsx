@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
+import Loading from "../../components/Loading";
 
 const selectClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
 const STATUS_STYLES = {
@@ -161,7 +162,7 @@ export default function ManageQuestions() {
             <p className="mt-4 text-sm text-slate-500">{data.total.toLocaleString("en-IN")} question(s)</p>
 
             {loading ? (
-                <p className="mt-2 text-slate-500">Loading...</p>
+                <Loading />
             ) : (
                 <div className="mt-2 space-y-2">
                     {data.questions.map((q) => (

@@ -1,4 +1,5 @@
-import { Link, NavLink, Navigate, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { choiceKey } from "../pages/student/Welcome";
 import { useAuth } from "../context/AuthContext";
 import { ExamProvider, useExam } from "../context/ExamContext";
@@ -14,6 +15,12 @@ const LINKS = [
   { to: "/guide", label: "User guide", icon: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4.5M12 17.5h.01" },
   { to: "/revise", label: "Revise", icon: "M4 4v6h6M20 20v-6h-6M5.5 15a7.5 7.5 0 0013.5 2M18.5 9A7.5 7.5 0 005 7" },
 ];
+// Phone: the 4 main tabs in the bottom bar; everything else is under "More"
+const TABS = ["/dashboard", "/practice", "/live-tests", "/assignments"];
+const SHORT = { "/dashboard": "Home", "/live-tests": "Live" };
+const MORE_ICON = "M4 6h16M4 12h16M4 18h16";
+const PROFILE_ICON = "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1";
+
 const ADMIN_ICON = "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z";
 
 const initials = (name = "") => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
@@ -72,11 +79,14 @@ function ExamPicker({ full }) {
 function Shell() {
   const { user, logout } = useAuth();
   const { examId } = useExam();
+  const { pathname } = useLocation();
+  const [more, setMore] = useState(false);
+  useEffect(() => setMore(false), [pathname]);
   if (!localStorage.getItem(choiceKey(user))) return <Navigate to="/welcome" replace />;
 
   const sideLink = ({ isActive }) => `gp-nav-link ${isActive ? "active" : ""}`;
-  const tabClass = ({ isActive }) =>
-    `flex-1 min-w-[4.5rem] shrink-0 flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium whitespace-nowrap ${isActive ? "text-indigo-700" : "text-slate-500"}`;
+  const moreActive = !TABS.some((t) => pathname.startsWith(t)) && LINKS.some((l) => pathname.startsWith(l.to)) || pathname.startsWith("/profile");
+  const tabClass = ({ isActive }) => `gp-tab ${isActive ? "active" : ""}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -134,20 +144,58 @@ function Shell() {
         </div>
       </header>
 
-      <main className="pb-20 lg:ml-64 lg:pb-0">
+      <main className="pb-24 lg:ml-64 lg:pb-0">
         {/* key: when the exam changes, the page reloads its data for the new exam */}
-        <Outlet key={examId} />
+        <div key={`${examId}${pathname}`} className="gp-page-in">
+          <Outlet key={examId} />
+        </div>
       </main>
 
-      {/* Phone: bottom tabs */}
-      <nav className="gp-tabbar lg:hidden fixed bottom-0 inset-x-0 z-20 flex overflow-x-auto" aria-label="Main">
-        {LINKS.map((l) => (
-          <NavLink key={l.to} to={l.to} className={tabClass}>
-            <Icon path={l.icon} />
-            {l.label}
-          </NavLink>
-        ))}
+      {/* Phone: 4 main tabs + More */}
+      <nav className="gp-tabbar lg:hidden fixed bottom-0 inset-x-0 z-20 flex" aria-label="Main">
+        {TABS.map((to) => {
+          const l = LINKS.find((x) => x.to === to);
+          return (
+            <NavLink key={to} to={to} className={tabClass}>
+              <Icon path={l.icon} />
+              {SHORT[to] || l.label}
+            </NavLink>
+          );
+        })}
+        <button type="button" onClick={() => setMore(true)} className={`gp-tab ${moreActive ? "active" : ""}`} aria-haspopup="dialog">
+          <Icon path={MORE_ICON} />
+          More
+        </button>
       </nav>
+
+      {more && (
+        <>
+          <div className="gp-sheet-backdrop lg:hidden" onClick={() => setMore(false)} />
+          <div className="gp-more-sheet lg:hidden" role="dialog" aria-label="More">
+            <div className="gp-grab" />
+            <div className="grid grid-cols-3 gap-2.5">
+              {[...LINKS.filter((l) => !TABS.includes(l.to)), { to: "/profile", label: "Profile", icon: PROFILE_ICON }].map((l) => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  onClick={() => setMore(false)}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center text-[13px] font-semibold ring-1 ${isActive ? "bg-[#17140f] text-[#e5c372] ring-[#17140f]" : "bg-white text-slate-800 ring-[#efe6d2]"}`
+                  }
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-b from-[#f3e3b8] to-[#e2c47e] text-[#17140f]">
+                    <Icon path={l.icon} />
+                  </span>
+                  {l.label}
+                </NavLink>
+              ))}
+            </div>
+            <button type="button" onClick={() => { setMore(false); logout(); }} className="mt-4 w-full rounded-2xl bg-white py-3.5 text-sm font-semibold text-rose-700 ring-1 ring-rose-100">
+              Log out
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

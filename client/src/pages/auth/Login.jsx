@@ -69,9 +69,9 @@ export default function Login() {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="w-full rounded-lg bg-indigo-600 text-white font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
+                        className="gp-btn gp-btn-dark w-full py-3.5"
                     >
-                        {submitting ? "Logging in..." : "Log in"}
+                        {submitting ? <><span className="gp-spinner" />Logging in…</> : "Log in"}
                     </button>
                 </form>
 

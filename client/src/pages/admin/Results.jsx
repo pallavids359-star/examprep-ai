@@ -5,6 +5,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
 import AdminTestResult from "../../components/AdminTestResult";
 import { PHASE } from "../../components/liveHelpers";
+import Loading from "../../components/Loading";
 
 const day = (d) => new Date(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
@@ -106,7 +107,7 @@ function LiveResultsSection() {
   return (
     <>
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!tests && !error && <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
+      {!tests && !error && <Loading />}
 
       {tests && (
         <>
@@ -180,7 +181,7 @@ function LiveResultsSection() {
                 </span>
                 All {exam} live tests
               </button>
-              {board ? <AdminTestResult board={board} /> : <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
+              {board ? <AdminTestResult board={board} /> : <Loading />}
             </div>
           )}
         </>

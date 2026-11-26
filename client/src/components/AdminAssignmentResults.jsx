@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../api/axios";
 import { fmtDateTime } from "./liveHelpers";
 import { RankList } from "./AdminTestResult";
+import Loading from "./Loading";
 
 const EXAMS = ["NEET", "JEE", "KCET"];
 const pctOf = (r) => (r.maxScore ? Math.round((r.score / r.maxScore) * 100) : 0);
@@ -59,7 +60,7 @@ export default function AdminAssignmentResults({ onDetail }) {
   return (
     <div>
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {!list && !error && <p className="py-10 text-center text-sm text-slate-400">Loading...</p>}
+      {!list && !error && <Loading />}
       {list && (
         <>
           <div className="grid grid-cols-3 gap-3">
@@ -260,7 +261,7 @@ function AssignmentResult({ id, onBack, backLabel }) {
   }, [id]);
 
   if (error) return <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!a || !sub) return <p className="py-10 text-center text-sm text-slate-400">Loading...</p>;
+  if (!a || !sub) return <Loading />;
 
   // Sections it was given to (none listed = every section of the college)
   const sections = (a.sections?.length ? a.sections : [...new Set(sub.rows.map((r) => r.student.section).filter(Boolean))]).slice().sort();

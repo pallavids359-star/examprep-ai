@@ -74,9 +74,9 @@ export default function ForgotPassword() {
                         <button
                             type="submit"
                             disabled={busy}
-                            className="w-full rounded-lg bg-indigo-600 text-white font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
+                            className="gp-btn gp-btn-dark w-full py-3.5"
                         >
-                            {busy ? "Sending..." : "Send code"}
+                            {busy ? <><span className="gp-spinner" />Sending…</> : "Send code"}
                         </button>
                     </form>
                 ) : (
@@ -105,9 +105,9 @@ export default function ForgotPassword() {
                         <button
                             type="submit"
                             disabled={busy}
-                            className="w-full rounded-lg bg-indigo-600 text-white font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
+                            className="gp-btn gp-btn-dark w-full py-3.5"
                         >
-                            {busy ? "Saving..." : "Change password"}
+                            {busy ? <><span className="gp-spinner" />Saving…</> : "Change password"}
                         </button>
                         <div className="flex justify-between text-sm">
                             <button type="button" onClick={sendCode} disabled={busy} className="text-indigo-600 hover:underline">

@@ -18,7 +18,7 @@ export function FlagButton({ flag, onClick }) {
       onClick={onClick}
       title={on ? "You reported this question. Click to change." : "Report a mistake in this question"}
       aria-label={on ? "Reported. Change report" : "Report a mistake in this question"}
-      className={`ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition ${
+      className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition ${
         on ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : "text-slate-400 hover:bg-rose-50 hover:text-rose-600"
       }`}
     >
