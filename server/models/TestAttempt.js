@@ -17,6 +17,8 @@ const answerSchema = new mongoose.Schema(
         correctOptionIds: { type: [String], default: undefined },
         isCorrect: { type: Boolean, default: null }, // null = unanswered
         marksAwarded: { type: Number, default: 0 },
+        // The question was found to be wrong: full marks, whatever was answered
+        bonus: { type: Boolean, default: undefined },
     },
     { _id: false }
 );
@@ -96,6 +98,7 @@ const testAttemptSchema = new mongoose.Schema(
 );
 
 testAttemptSchema.index({ userId: 1, createdAt: -1 }); // "recent tests"
+testAttemptSchema.index({ "answers.questionId": 1 }); // reported questions: everyone who got a question
 testAttemptSchema.index({ testId: 1, status: 1, "result.score": -1 }); // ranking
 // One live-test attempt per student (also stops a double click making two)
 testAttemptSchema.index({ testId: 1, userId: 1 }, { unique: true, partialFilterExpression: { mode: "live" } });

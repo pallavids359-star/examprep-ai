@@ -6,6 +6,10 @@ import Analytics from "./pages/student/Analytics";
 import Welcome from "./pages/student/Welcome";
 import { ExamProvider } from "./context/ExamContext";
 import Landing from "./pages/Landing";
+const Privacy = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Privacy })));
+const Terms = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Terms })));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
+const AppErrors = lazy(() => import("./pages/admin/AppErrors"));
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -28,6 +32,7 @@ const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const ManageSyllabus = lazy(() => import("./pages/admin/ManageSyllabus"));
 const ManageQuestions = lazy(() => import("./pages/admin/ManageQuestions"));
 const DraftQuestions = lazy(() => import("./pages/admin/DraftQuestions"));
+const ReportedQuestions = lazy(() => import("./pages/admin/ReportedQuestions"));
 const QuestionForm = lazy(() => import("./pages/admin/QuestionForm"));
 const ManageTests = lazy(() => import("./pages/admin/ManageTests"));
 const ManageStudents = lazy(() => import("./pages/admin/ManageStudents"));
@@ -73,6 +78,9 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/delete-account" element={<DeleteAccount />} />
 
       {/* Student pages share one navigation bar */}
       <Route element={protect(<StudentLayout />)}>
@@ -100,6 +108,8 @@ export default function App() {
       <Route path="/admin/syllabus" element={adminOnly(<ManageSyllabus />)} />
       <Route path="/admin/questions" element={adminOnly(<ManageQuestions />)} />
       <Route path="/admin/drafts" element={adminOnly(<DraftQuestions />)} />
+      <Route path="/admin/reported" element={adminOnly(<ReportedQuestions />)} />
+      <Route path="/admin/errors" element={adminOnly(<AppErrors />)} />
       <Route path="/admin/questions/bulk" element={adminOnly(<BulkUpload />)} />
       <Route path="/admin/questions/:id" element={adminOnly(<QuestionForm />)} />
       <Route path="/admin/tests" element={adminOnly(<ManageTests />)} />

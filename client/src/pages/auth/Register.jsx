@@ -150,6 +150,11 @@ export default function Register() {
                     >
                         {submitting ? "Creating account..." : "Create account"}
                     </button>
+                    <p className="text-center text-xs text-slate-500">
+                        By creating an account you agree to the{" "}
+                        <Link to="/terms" className="underline">Terms</Link> and{" "}
+                        <Link to="/privacy" className="underline">Privacy policy</Link>.
+                    </p>
                 </form>
 
                 <p className="text-sm text-slate-600 mt-6 text-center">

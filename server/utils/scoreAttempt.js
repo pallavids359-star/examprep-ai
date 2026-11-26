@@ -63,6 +63,9 @@ const scoreAttempt = (attempt, submitted, questionsById) => {
             if (selected.length > 0) isCorrect = sameSet(selected, answer.correctOptionIds);
         }
 
+        // A question found to be wrong gives full marks to everyone who got it
+        if (answer.bonus && question) isCorrect = true;
+
         answer.isCorrect = isCorrect;
         answer.marksAwarded = isCorrect === null ? scheme.unanswered : isCorrect ? plus : minus;
         score += answer.marksAwarded;

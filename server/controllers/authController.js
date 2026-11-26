@@ -64,6 +64,22 @@ const register = async (req, res) => {
     }
 };
 
+// Wrong passwords per email: 10 tries per 15 minutes, whatever network they come from
+const FAIL_WINDOW = 15 * 60 * 1000;
+const MAX_FAILS = 10;
+const fails = new Map(); // email -> { count, resetAt }
+const tooManyFails = (email) => {
+    const f = fails.get(email);
+    return Boolean(f && f.resetAt > Date.now() && f.count >= MAX_FAILS);
+};
+const noteFail = (email) => {
+    const now = Date.now();
+    const f = fails.get(email);
+    if (!f || f.resetAt <= now) fails.set(email, { count: 1, resetAt: now + FAIL_WINDOW });
+    else f.count += 1;
+    if (fails.size > 50000) fails.clear(); // never grow without limit
+};
+
 // POST /api/auth/login
 const login = async (req, res) => {
     try {
@@ -76,8 +92,16 @@ const login = async (req, res) => {
                 .json({ message: "Email and password are required" });
         }
 
+        if (typeof email !== "string" || typeof password !== "string") {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+        const key = email.trim().toLowerCase();
+        if (tooManyFails(key)) {
+            return res.status(429).json({ message: "Too many wrong passwords for this email. Wait 15 minutes, or use Forgot password." });
+        }
+
         // 2. Find the user. "+passwordHash" asks for the hidden password field.
-        const user = await User.findOne({ email: email.toLowerCase() }).select(
+        const user = await User.findOne({ email: key }).select(
             "+passwordHash"
         );
 
@@ -87,8 +111,10 @@ const login = async (req, res) => {
 
         // Same message for both cases, so attackers can't tell which emails exist
         if (!passwordMatches) {
+            noteFail(key);
             return res.status(401).json({ message: "Invalid email or password" });
         }
+        fails.delete(key);
 
         // 4. Block suspended accounts
         if (user.status !== "active") {
@@ -118,4 +144,39 @@ const getMe = async (req, res) => {
     res.json({ user: publicUser(req.user) });
 };
 
-module.exports = { register, login, getMe };
+// DELETE /api/auth/account   body: { password }
+// A student deletes their own account and everything saved for it (Google Play rule).
+const deleteAccount = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select("+passwordHash");
+        if (!user) return res.status(404).json({ message: "Account not found" });
+        if (user.role !== "student") {
+            return res.status(403).json({ message: "Lecturer and admin accounts are removed by the head lecturer." });
+        }
+        const { password } = req.body || {};
+        if (typeof password !== "string" || !(await bcrypt.compare(password, user.passwordHash))) {
+            return res.status(400).json({ message: "Your password is not correct" });
+        }
+
+        const TestAttempt = require("../models/TestAttempt");
+        const Progress = require("../models/Progress");
+        const Bookmark = require("../models/Bookmark");
+        const QuestionReport = require("../models/QuestionReport");
+        const Otp = require("../models/Otp");
+        await Promise.all([
+            TestAttempt.deleteMany({ userId: user._id }),
+            Progress.deleteMany({ userId: user._id }),
+            Bookmark.deleteMany({ userId: user._id }),
+            QuestionReport.deleteMany({ userId: user._id }),
+            Otp.deleteMany({ email: user.email }),
+        ]);
+        await User.deleteOne({ _id: user._id });
+        console.log(`Account deleted by the student: ${user._id}`);
+        res.json({ message: "Your account and all your data have been deleted." });
+    } catch (error) {
+        console.error("deleteAccount error:", error.message);
+        res.status(500).json({ message: "Something went wrong on the server" });
+    }
+};
+
+module.exports = { register, login, getMe, deleteAccount, createToken };

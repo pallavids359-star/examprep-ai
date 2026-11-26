@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import ClassLeaderboard from "./ClassLeaderboard";
+import { useReportPrinter } from "./ReportPrinter";
 import { PHASE, fmtDateTime, fmtDuration } from "./liveHelpers";
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
@@ -13,7 +14,6 @@ const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 // One live test's result for the admin: who wrote it, then every student by rank.
 // Click a student to open their result right there.
 export default function AdminTestResult({ board }) {
-  const [openId, setOpenId] = useState(null);
   const { test, stats, rows } = board;
   const ph = PHASE[test.phase] || PHASE.closed || { label: test.phase, cls: "" };
   const completed = (stats.submitted ?? 0) + (stats.autoSubmitted ?? 0) || stats.finished;
@@ -115,7 +115,23 @@ export default function AdminTestResult({ board }) {
       {rows.length === 0 ? (
         <p className="mt-3 rounded-2xl bg-white px-6 py-10 text-center text-sm text-slate-500 ring-1 ring-[#e7dcc3]">No one has completed this test yet.</p>
       ) : (
-        <ul className="mt-3 space-y-2">
+        <RankList rows={rows} />
+      )}
+
+      {/* What "Download PDF" prints */}
+      <div className="hidden print:block">
+        <ClassLeaderboard test={test} rows={rows} />
+      </div>
+    </div>
+  );
+}
+
+// The ranked list of students (also used for assignment results, so both look the same).
+// rows: { attemptId, student, score, maxScore, correct, incorrect, unanswered, timeTakenSec, submittedAt, subjects? }
+export function RankList({ rows }) {
+  const [openId, setOpenId] = useState(null);
+  return (
+    <ul className="mt-3 space-y-2">
           {[...rows]
             .sort((a, b) => b.score - a.score || (a.timeTakenSec || 0) - (b.timeTakenSec || 0))
             .map((r, i) => {
@@ -161,17 +177,11 @@ export default function AdminTestResult({ board }) {
               );
             })}
         </ul>
-      )}
-
-      {/* What "Download PDF" prints */}
-      <div className="hidden print:block">
-        <ClassLeaderboard test={test} rows={rows} />
-      </div>
-    </div>
   );
 }
 
 function StudentResult({ r, place, total }) {
+  const printer = useReportPrinter();
   const attempted = r.correct + r.incorrect;
   return (
     <div className="border-t border-[#efe6d2] bg-[#fbf8f1] px-5 py-5">
@@ -234,9 +244,15 @@ function StudentResult({ r, place, total }) {
           Submitted {fmtDateTime(r.submittedAt)}
           {r.autoSubmitted ? " · time ran out" : ""}
         </p>
-        <Link to={`/admin/attempts/${r.attemptId}`} className="inline-flex items-center gap-2 rounded-xl bg-[#17140f] px-4 py-2 text-sm font-semibold text-[#e5c372] hover:bg-black">
-          See every question & answer →
-        </Link>
+        <span className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => printer.printReports([r.attemptId], "one", `${r.student?.name || "Student"}_report`)} disabled={Boolean(printer.busy)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-[#8a6420] ring-1 ring-[#e7dcc3] hover:bg-white disabled:opacity-50">
+            ⤓ {printer.busy ? "Preparing…" : "Download report"}
+          </button>
+          <Link to={`/admin/attempts/${r.attemptId}`} className="inline-flex items-center gap-2 rounded-xl bg-[#17140f] px-4 py-2 text-sm font-semibold text-[#e5c372] hover:bg-black">
+            See every question & answer →
+          </Link>
+        </span>
+        {printer.node}
       </div>
     </div>
   );

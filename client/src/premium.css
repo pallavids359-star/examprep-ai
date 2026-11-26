@@ -335,6 +335,7 @@ table tbody tr:hover {
 /* Many reports in one PDF: one scorecard per page */
 .gp-print-batch { display: none; }
 @media print {
+  body.gp-printing-batch { background: #fff !important; }
   body.gp-printing-batch > *:not(.gp-print-batch) { display: none !important; }
   body.gp-printing-batch .gp-print-batch { display: block !important; }
   body.gp-printing-batch .gp-print-batch, body.gp-printing-batch .gp-print-batch * { visibility: visible !important; }

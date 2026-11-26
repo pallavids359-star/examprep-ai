@@ -67,4 +67,16 @@ const { runSync, syncStatus } = require("../controllers/syncController");
 router.get("/sync/status", syncStatus);
 router.post("/sync/supabase", runSync);
 
+// Errors from the app and the server
+const appErrors = require("../controllers/appErrorController");
+router.get("/app-errors", appErrors.listAppErrors);
+router.delete("/app-errors", appErrors.clearAppErrors);
+
+// Questions students reported as wrong
+const qReports = require("../controllers/questionReportController");
+router.get("/question-reports/count", qReports.openCount);
+router.get("/question-reports", qReports.listReports);
+router.post("/question-reports/:questionId/accept", qReports.acceptReport);
+router.post("/question-reports/:questionId/reject", qReports.rejectReport);
+
 module.exports = router;

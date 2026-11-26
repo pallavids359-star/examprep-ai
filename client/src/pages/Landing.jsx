@@ -271,6 +271,10 @@ export default function Landing({ loggedIn }) {
       <footer id="contact" className="border-t border-[#efe6d2] bg-[#fffdf8]">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-[#7a6e5b] sm:flex-row">
           <span>&copy; {new Date().getFullYear()} GenPrep &middot; A Manchester Technologies product</span>
+          <span className="flex gap-4">
+            <Link to="/privacy" className="hover:underline">Privacy</Link>
+            <Link to="/terms" className="hover:underline">Terms</Link>
+          </span>
           {CONTACT_EMAIL && <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-[#8f6215] hover:underline">{CONTACT_EMAIL}</a>}
         </div>
       </footer>

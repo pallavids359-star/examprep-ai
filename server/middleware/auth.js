@@ -22,6 +22,11 @@ const protect = async (req, res, next) => {
             return res.status(401).json({ message: "Account not found or inactive" });
         }
 
+        // Password changed after this login was made: log in again
+        if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+            return res.status(401).json({ message: "Your password was changed. Please log in again." });
+        }
+
         // 4. Attach the user to the request so controllers can use it
         req.user = user;
         next(); // let the request continue

@@ -94,11 +94,13 @@ const questionSchema = new mongoose.Schema(
             syncedAt: { type: Date },
             editedAt: { type: Date }, // changed in GenPrep: the sync no longer overwrites it
             acceptedInSourceAt: { type: Date }, // published in GenPrep and accepted in the Question Bank Portal
+            pushedAt: { type: Date }, // last GenPrep edit sent to the Question Bank Portal
         },
 
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         version: { type: Number, default: 1 },
+        contentEditedAt: { type: Date }, // last time someone saved it in the question editor
     },
     { timestamps: true }
 );

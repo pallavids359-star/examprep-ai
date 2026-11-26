@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import AdminLayout from "../../components/AdminLayout";
+import { toast } from "../../components/Toaster";
 import SyllabusPicker from "../../components/SyllabusPicker";
 import OptionsEditor from "../../components/OptionsEditor";
 import QuestionImages from "../../components/QuestionImages";
@@ -112,7 +113,16 @@ export default function QuestionForm() {
         setSaving(true);
         try {
             if (isNew) await api.post("/admin/questions", payload);
-            else await api.put(`/admin/questions/${id}`, payload);
+            else {
+                const res = await api.put(`/admin/questions/${id}`, payload);
+                // Also sent to the main Supabase (Question Bank Portal)?
+                const sb = res.data?.supabaseEdit;
+                if (sb?.enabled && !sb.skipped) {
+                    if (sb.error) toast(`Saved in GenPrep, but not in Supabase: ${sb.error}`, "error");
+                    else if (sb.sent?.length) toast(`Saved in GenPrep and Supabase (${sb.sent.join(", ")})${sb.notSent?.length ? `. Not sent: ${sb.notSent.join(", ")}` : ""}`);
+                    else if (sb.notSent?.length) toast(`Saved in GenPrep. Not sent to Supabase: ${sb.notSent.join(", ")}`, "error");
+                }
+            }
 
             if (addAnother) {
                 setForm({ ...EMPTY, options: blankOptions(), difficulty: form.difficulty, status: form.status });

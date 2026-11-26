@@ -18,7 +18,9 @@ export default function Login() {
     const [submitting, setSubmitting] = useState(false);
 
     // Already logged in? Go to the right home page
-    if (user) return <Navigate to="/" replace />;
+    const next = new URLSearchParams(location.search).get("next") || "";
+    const goTo = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    if (user) return <Navigate to={goTo} replace />;
 
     const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -28,7 +30,7 @@ export default function Login() {
         setSubmitting(true);
         try {
             await login(form.email, form.password);
-            navigate("/");
+            navigate(goTo);
         } catch (err) {
             setError(getErrorMessage(err));
         } finally {

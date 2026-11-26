@@ -89,6 +89,7 @@ const resetPassword = async (req, res) => {
         if (!user) return res.status(400).json({ message: "This code has expired. Ask for a new one." });
 
         user.passwordHash = await bcrypt.hash(password, 10);
+        user.passwordChangedAt = new Date(); // old logins stop working
         await user.save();
         await Otp.deleteMany({ email, purpose: PURPOSE }); // a code works only once
 

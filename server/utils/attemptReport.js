@@ -118,6 +118,7 @@ const buildReport = async (attempt, { test = null, head = null } = {}) => {
             section: sectionOf.get(String(a.questionId)) || subjectName.get(String(a.subjectId)) || subjectName.get(String(q?.subjectId)) || "",
             status,
             markedForReview: a.markedForReview,
+            bonus: Boolean(a.bonus),
             selectedOptionIds: a.selectedOptionIds,
             numericalValue: a.numericalValue ?? null,
             marksAwarded: a.marksAwarded,

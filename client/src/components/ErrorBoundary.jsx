@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { reportError } from "../utils/reportError";
 
 // If any page crashes, show a calm message instead of a blank white screen
 export default class ErrorBoundary extends Component {
@@ -13,6 +14,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("Page crashed:", error, info?.componentStack);
+    reportError(error, info?.componentStack);
   }
 
   render() {
@@ -30,7 +32,7 @@ export default class ErrorBoundary extends Component {
             Sorry, this page hit a problem. Your test answers are saved on this device. Reloading usually fixes it.
           </p>
           <div className="mt-6 flex justify-center gap-3">
-            <button onClick={() => window.location.reload()} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">
+            <button onClick={() => window.location.reload()} className="rounded-lg bg-[#17140f] px-5 py-2.5 text-sm font-semibold text-[#e5c372] hover:bg-black">
               Reload page
             </button>
             <a href="/" className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">

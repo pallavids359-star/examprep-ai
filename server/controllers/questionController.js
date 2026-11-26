@@ -240,12 +240,15 @@ const updateQuestion = async (req, res) => {
 
         question.version += 1;
         question.updatedBy = req.user._id;
+        question.contentEditedAt = new Date(); // shows as "Fixed" on the Reported questions page
         if (question.external?.id) question.set("external.editedAt", new Date()); // keep this edit when Supabase syncs again
         await question.save();
 
         // Just published (e.g. a draft saved as Published) → accepted in the main Supabase too
         const supabase = !wasPublished && question.status === "published" ? await acceptInSupabase([question._id]) : { enabled: false };
-        res.json({ message: "Question updated", question, supabase });
+        // The same fix in the main Supabase (Question Bank Portal)
+        const supabaseEdit = question.external?.id ? await require("../utils/supabaseEditWriter").pushEditToSupabase(question) : { enabled: false, skipped: true };
+        res.json({ message: "Question updated", question, supabase, supabaseEdit });
     } catch (error) {
         console.error("updateQuestion error:", error.message);
         res.status(500).json({ message: "Something went wrong on the server" });

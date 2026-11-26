@@ -154,9 +154,10 @@ export function PasswordForm() {
     setSaving(true);
     setNote(null);
     try {
-      await api.put("/auth/password", { currentPassword: form.current, newPassword: form.next });
+      const res = await api.put("/auth/password", { currentPassword: form.current, newPassword: form.next });
+      if (res.data?.token) localStorage.setItem("token", res.data.token); // stay logged in here
       setForm({ current: "", next: "", confirm: "" });
-      toast("Password changed. Use the new one next time you log in.");
+      toast("Password changed. You were logged out on your other devices.");
     } catch (err) {
       setNote({ ok: false, text: err.response ? getErrorMessage(err) : err.message });
     }

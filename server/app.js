@@ -31,7 +31,14 @@ if (missingEnv.length) {
 const app = express();
 
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
+
+// How many proxies sit in front of the server, so each student is counted by their own address.
+// Render behind the Vercel /api rewrite: 2 (Vercel + Render). On Vercel itself: 1.
+// Override with TRUST_PROXY. Check: open /api/health and see "yourAddress".
+app.set("trust proxy", Number(process.env.TRUST_PROXY) || (process.env.VERCEL ? 1 : 2));
+
+// Server errors are also saved, so they show on the admin "App errors" page
+require("./utils/errorLog").captureServerErrors();
 
 app.use(securityHeaders);
 app.use(express.json({ limit: "4mb" })); // Vercel rejects request bodies over 4.5 MB
@@ -46,7 +53,8 @@ app.get("/api/health", (req, res) => {
         status: missingEnv.length ? "misconfigured" : "ok",
         message: missingEnv.length
             ? `Missing environment variable(s): ${missingEnv.join(", ")}`
-            : "GenPrep server is running"
+            : "GenPrep server is running",
+        yourAddress: req.ip // should be YOUR internet address, not Vercel's (see trust proxy above)
     });
 });
 
@@ -75,6 +83,9 @@ app.get("/api/images/:id", require("./controllers/uploadController").serveImage)
 // a bulk insert in Supabase fires one webhook per row, all from the same address.
 app.use("/api/sync", syncRoutes);
 
+// Crash reports from the website / app (no login needed)
+app.post("/api/app-errors", rateLimit({ windowMs: 60 * 1000, max: 20, message: "Too many reports" }), require("./controllers/appErrorController").reportAppError);
+
 // Authentication rate limits
 const authLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -86,6 +97,7 @@ app.use("/api/auth/login", authLimit);
 app.use("/api/auth/register", authLimit);
 app.use("/api/auth/forgot-password", authLimit);
 app.use("/api/auth/reset-password", authLimit);
+app.use("/api/auth/account", authLimit);
 
 // General API rate limit
 app.use("/api", rateLimit({

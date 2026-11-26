@@ -38,6 +38,12 @@ api.interceptors.response.use(
   },
   (error) => {
     finished(error.config);
+    // Login no longer valid (password changed, account removed): back to the login page
+    const url = error.config?.url || "";
+    if (error.response?.status === 401 && localStorage.getItem("token") && !url.startsWith("/auth/login") && !url.startsWith("/auth/me")) {
+      localStorage.removeItem("token");
+      if (!location.pathname.startsWith("/login")) location.assign(`/login?next=${encodeURIComponent(location.pathname)}`);
+    }
     return Promise.reject(error);
   }
 );

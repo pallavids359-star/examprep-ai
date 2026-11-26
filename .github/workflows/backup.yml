@@ -1,0 +1,27 @@
+# Daily database backup, kept for 30 days in GitHub (Actions → Database backup → a run → Artifacts).
+# Needs the repository secret MONGO_URI (Settings → Secrets and variables → Actions).
+# Keep this repository PRIVATE: the backup contains student data.
+name: Database backup
+on:
+  schedule:
+    - cron: "17 21 * * *" # 2:47 am India time
+  workflow_dispatch: {}
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+        working-directory: server
+      - run: node scripts/backup.js
+        working-directory: server
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genprep-db-${{ github.run_id }}
+          path: server/backups
+          retention-days: 30

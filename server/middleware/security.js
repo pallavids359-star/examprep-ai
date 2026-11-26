@@ -47,7 +47,7 @@ const apiNotFound = (req, res) => res.status(404).json({ message: "Not found" })
 const errorHandler = (err, req, res, next) => {
     if (err.type === "entity.parse.failed") return res.status(400).json({ message: "The request could not be read" });
     if (err.type === "entity.too.large") return res.status(413).json({ message: "The upload is too large" });
-    console.error("Unhandled error:", err.message);
+    console.error("Unhandled error:", err.message, req.method, req.originalUrl);
     res.status(err.status || 500).json({ message: "Something went wrong on the server" });
 };
 

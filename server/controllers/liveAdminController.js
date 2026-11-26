@@ -150,6 +150,7 @@ const updateLecturer = handle("updateLecturer", async (req, res) => {
     if (req.body.password !== undefined) {
         if (String(req.body.password).length < 8) throw userError("The password needs at least 8 characters");
         update.passwordHash = await bcrypt.hash(String(req.body.password), 10);
+        update.passwordChangedAt = new Date();
     }
     if (!Object.keys(update).length) throw userError("Nothing to change");
     const user = await User.findOneAndUpdate({ _id: req.params.id, role: "lecturer" }, update, { returnDocument: "after" }).select("name email role status subject");

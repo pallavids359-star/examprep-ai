@@ -138,3 +138,17 @@ Nothing else is written: edits, deletes and question text stay in GenPrep only.
 
 The connection must be allowed to run that function: `SUPABASE_N_DB_URL` (database owner) works, or
 `SUPABASE_N_URL` + `SUPABASE_N_KEY` with the **service_role** key (the anon key is refused).
+
+## Write-back: edits made in GenPrep go to Supabase too
+
+With the same two settings (`SUPABASE_WRITE_BACK=true`, `SUPABASE_WRITE_AS=<admin email>`), saving a
+question in GenPrep's question editor also updates its row in the Question Bank Portal.
+
+- Only what changed is written: question text, options A–D, correct option / numerical answer,
+  solution and difficulty. The portal's hidden `[QBP_...]` markers are kept.
+- Difficulty goes through `apply_question_workflow(..., 'difficulty', ...)`, so it shows in the
+  portal's history. Other fields are written like an edit in the portal: `updated_by`,
+  `updated_by_name` = "<admin> (GenPrep)", plus an `UPDATE_QUESTION` row in `audit_log`.
+- Not sent: images, and the question text of match-the-following / statement-based questions.
+  The editor tells you when something was not sent; change those in the portal.
+- The copies of the same row for other exams (e.g. NEET and JEE) pick up the change at the next sync.

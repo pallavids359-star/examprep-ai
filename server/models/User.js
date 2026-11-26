@@ -55,6 +55,8 @@ const userSchema = new mongoose.Schema(
         classLevel: { type: String, enum: ["11", "12", "dropper"] },
         targetYear: { type: Number },
         lastLoginAt: { type: Date },
+        // Logins made before this time stop working (set when the password changes)
+        passwordChangedAt: { type: Date },
     },
     { timestamps: true } // adds createdAt and updatedAt automatically
 );

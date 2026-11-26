@@ -114,4 +114,4 @@ const acceptInSupabase = async (questionIds) => {
     return out;
 };
 
-module.exports = { acceptInSupabase, writeBackEnabled };
+module.exports = { acceptInSupabase, writeBackEnabled, actorFor, pgRun, rest };

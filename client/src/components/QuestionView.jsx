@@ -1,4 +1,5 @@
 import MathText from "./MathText";
+import { FlagButton } from "./ReportQuestion";
 
 const DIFFICULTY_STYLES = {
   easy: "bg-emerald-50 text-emerald-700",
@@ -7,7 +8,7 @@ const DIFFICULTY_STYLES = {
 };
 
 // One question card with big, easy-to-tap options
-export default function QuestionView({ question, index, total, selected, isMarked, markingScheme, onChoose, onNumber }) {
+export default function QuestionView({ question, index, total, selected, isMarked, markingScheme, onChoose, onNumber, flag, onFlag }) {
   const isNumerical = question.type === "numerical" || !(question.options || []).length;
   return (
     <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-7">
@@ -25,8 +26,9 @@ export default function QuestionView({ question, index, total, selected, isMarke
           </span>
         )}
         {isMarked && (
-          <span className="ml-auto px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-50 text-violet-700">Marked for review</span>
+          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-50 text-violet-700">Marked for review</span>
         )}
+        {onFlag && <FlagButton flag={flag} onClick={onFlag} />}
       </div>
 
       {question.type === "mcq_multi" && (

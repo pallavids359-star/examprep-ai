@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../api/axios";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -6,12 +7,14 @@ const LINKS = [
   { to: "/admin", label: "Overview", end: true, icon: "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" },
   { to: "/admin/questions", label: "Questions", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
   { to: "/admin/drafts", label: "Draft questions", icon: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" },
+  { to: "/admin/reported", label: "Reported questions", badge: "reports", icon: "M4 22V4M4 4h13l-2 4 2 4H4" },
   { to: "/admin/syllabus", label: "Syllabus", icon: "M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7" },
   { to: "/admin/tests", label: "Mock tests", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" },
   { to: "/admin/live-tests", label: "Live tests", icon: "M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 100 8 4 4 0 000-8z" },
   { to: "/lecturer/assignments", label: "Assignments", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4" },
   { to: "/admin/results", label: "Results", icon: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3" },
   { to: "/admin/lecturers", label: "Lecturers", icon: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" },
+  { to: "/admin/errors", label: "App errors", icon: "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" },
   { to: "/admin/guide", label: "User guide", icon: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4.5M12 17.5h.01" },
   { to: "/admin/students", label: "Students", icon: "M16 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1M9 10a3 3 0 100-6 3 3 0 000 6zM22 19v-1a4 4 0 00-3-3.9M16 4.1a3 3 0 010 5.8" },
 ];
@@ -26,15 +29,23 @@ function Icon({ d }) {
 
 const GROUPS = [
   ["Overview", ["/admin"]],
-  ["Content", ["/admin/questions", "/admin/drafts", "/admin/syllabus"]],
+  ["Content", ["/admin/questions", "/admin/drafts", "/admin/reported", "/admin/syllabus"]],
   ["Tests", ["/admin/tests", "/admin/live-tests", "/lecturer/assignments", "/admin/results"]],
   ["People", ["/admin/students", "/admin/lecturers"]],
-  ["Help", ["/admin/guide"]],
+  ["Help", ["/admin/errors", "/admin/guide"]],
 ];
 
 function Sidebar({ onNavigate }) {
   const { user, logout } = useAuth();
   const link = ({ isActive }) => `gp-nav-link ${isActive ? "active" : ""}`;
+  // Number of reported questions waiting to be checked
+  const [reports, setReports] = useState(0);
+  useEffect(() => {
+    const load = () => api.get("/admin/question-reports/count").then((r) => setReports(r.data.count)).catch(() => {});
+    load();
+    window.addEventListener("gp-reports-changed", load);
+    return () => window.removeEventListener("gp-reports-changed", load);
+  }, []);
   return (
     <div className="flex h-full flex-col">
       <Link to="/admin" onClick={onNavigate} className="flex items-center gap-3 px-3 py-5">
@@ -51,6 +62,9 @@ function Sidebar({ onNavigate }) {
                 <NavLink key={l.to} to={l.to} end={l.end} className={link} onClick={onNavigate}>
                   <Icon d={l.icon} />
                   {l.label}
+                  {l.badge === "reports" && reports > 0 && (
+                    <span className="ml-auto rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">{reports}</span>
+                  )}
                 </NavLink>
               ))}
             </div>

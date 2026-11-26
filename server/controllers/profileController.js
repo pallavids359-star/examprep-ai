@@ -98,8 +98,11 @@ const changePassword = async (req, res) => {
     }
 
     user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordChangedAt = new Date();
     await user.save();
-    res.json({ message: "Password changed" });
+    // Other phones and browsers are logged out; this one gets a fresh login
+    const { createToken } = require("./authController");
+    res.json({ message: "Password changed. You were logged out on your other devices.", token: createToken(user._id, user.role) });
   } catch (error) {
     console.error("changePassword error:", error.message);
     res.status(500).json({ message: "Something went wrong on the server" });

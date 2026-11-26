@@ -4,6 +4,7 @@ import api, { getErrorMessage } from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 import { useExam } from "../../context/ExamContext";
 import { DetailsForm, PasswordForm } from "../../components/ProfileForms";
+import { DeleteAccountCard } from "../../components/DeleteAccountCard";
 
 const CLASS_TEXT = { 11: "Class 11", 12: "Class 12", dropper: "Dropper" };
 const initials = (name = "") =>
@@ -97,6 +98,7 @@ export default function Profile() {
         </div>
         <div className="lg:col-span-2 space-y-4">
           <PasswordForm />
+          <DeleteAccountCard />
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <h2 className="font-semibold text-slate-900">Shortcuts</h2>
             <div className="mt-3 grid gap-2 text-sm font-medium">

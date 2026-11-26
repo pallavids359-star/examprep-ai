@@ -199,15 +199,22 @@ const readAudience = (body) => {
     return { college, sections, dueAt };
 };
 
-const summary = async (list) => {
+// withStats: also the number of students it was sent to and the average % (admin Results page)
+const summary = async (list, { withStats = false } = {}) => {
     const [subjects, exams, people, counts] = await Promise.all([
         Subject.find({ _id: { $in: list.map((a) => a.subjectId) } }).select("name").lean(),
         Exam.find({ _id: { $in: list.map((a) => a.examId) } }).select("code").lean(),
         User.find({ _id: { $in: list.map((a) => a.createdBy) } }).select("name").lean(),
-        TestAttempt.aggregate([{ $match: { mode: "assignment", assignmentId: { $in: list.map((a) => a._id) }, status: { $in: FINISHED } } }, { $group: { _id: "$assignmentId", n: { $sum: 1 } } }]),
+        TestAttempt.aggregate([
+            { $match: { mode: "assignment", assignmentId: { $in: list.map((a) => a._id) }, status: { $in: FINISHED } } },
+            { $group: { _id: "$assignmentId", n: { $sum: 1 }, avg: { $avg: "$result.percentage" } } },
+        ]),
     ]);
+    const students = withStats
+        ? await Promise.all(list.map((a) => User.countDocuments({ role: "student", college: collegeFilter(a.college), ...(a.sections?.length ? { section: { $in: a.sections } } : {}) })))
+        : [];
     const nameOf = (arr, id, k = "name") => arr.find((x) => String(x._id) === String(id))?.[k] || "";
-    return list.map((a) => ({
+    return list.map((a, i) => ({
         _id: a._id,
         title: a.title,
         exam: nameOf(exams, a.examId, "code"),
@@ -220,6 +227,9 @@ const summary = async (list) => {
         questions: a.questionIds.length,
         submitted: counts.find((c) => String(c._id) === String(a._id))?.n || 0,
         createdAt: a.createdAt,
+        ...(withStats
+            ? { students: students[i], avgPct: (() => { const c = counts.find((x) => String(x._id) === String(a._id)); return c && c.avg != null ? Math.round(c.avg) : null; })() }
+            : {}),
     }));
 };
 
@@ -260,8 +270,9 @@ const chapters = handle("assignmentChapters", async (req, res) => {
 // GET /api/lecturer/assignments
 const listMine = handle("listAssignments", async (req, res) => {
     const filter = isAdmin(req) ? {} : { createdBy: req.user._id };
+    if (req.query.published === "1") filter.status = "published";
     const list = await Assignment.find(filter).sort({ createdAt: -1 }).limit(200).lean();
-    res.json({ assignments: await summary(list) });
+    res.json({ assignments: await summary(list, { withStats: req.query.stats === "1" }) });
 });
 
 // POST /api/lecturer/assignments   create a draft with picked questions
@@ -455,6 +466,7 @@ const submissions = handle("assignmentSubmissions", async (req, res) => {
         const r = t?.result || {};
         return {
             student: s,
+            attemptId: t?._id || null,
             status: !t ? "not_started" : FINISHED.includes(t.status) ? "submitted" : "in_progress",
             submittedAt: t?.submittedAt || null,
             score: t && FINISHED.includes(t.status) ? r.score ?? 0 : null,

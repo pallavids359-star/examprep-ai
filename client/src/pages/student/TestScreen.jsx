@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import QuestionView from "../../components/QuestionView";
 import QuestionPalette from "../../components/QuestionPalette";
@@ -8,6 +8,9 @@ import SubmitSummary from "../../components/SubmitSummary";
 import { countStatuses } from "../../components/testStatus";
 import useTestSession, { formatClock } from "../../hooks/useTestSession";
 import useAntiCheat, { ExamGuard } from "../../hooks/useAntiCheat";
+import { FlagDialog } from "../../components/ReportQuestion";
+import api, { getErrorMessage } from "../../api/axios";
+import { toast } from "../../components/Toaster";
 
 export default function TestScreen() {
   const { id } = useParams();
@@ -17,6 +20,47 @@ export default function TestScreen() {
   } = useTestSession(id);
 
   const question = questions[current];
+
+  // Questions this student reported as wrong (flag at the top right of each question)
+  const [flags, setFlags] = useState({});
+  const [flagOpen, setFlagOpen] = useState(false);
+  const [flagBusy, setFlagBusy] = useState(false);
+  useEffect(() => {
+    if (loading || !questions.length) return;
+    api
+      .get(`/attempts/${id}/flags`)
+      .then((res) => setFlags(Object.fromEntries(res.data.flags.map((f) => [String(f.questionId), f]))))
+      .catch(() => {});
+  }, [id, loading, questions.length]);
+  const sendFlag = async (body) => {
+    setFlagBusy(true);
+    try {
+      const res = await api.post(`/attempts/${id}/flags`, { questionId: question._id, ...body });
+      setFlags((f) => ({ ...f, [String(question._id)]: res.data.flag }));
+      setFlagOpen(false);
+      toast("Thanks. The head lecturer will check this question.");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setFlagBusy(false);
+    }
+  };
+  const removeFlag = async () => {
+    setFlagBusy(true);
+    try {
+      await api.delete(`/attempts/${id}/flags/${question._id}`);
+      setFlags((f) => {
+        const next = { ...f };
+        delete next[String(question._id)];
+        return next;
+      });
+      setFlagOpen(false);
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setFlagBusy(false);
+    }
+  };
 
   // Mock tests: exam rules (no tab switching, no copying, full screen)
   const guard = useAntiCheat({
@@ -28,7 +72,7 @@ export default function TestScreen() {
   // 6. Keyboard: 1-4 or A-D choose an option, arrow keys move between questions
   useEffect(() => {
     const onKey = (e) => {
-      if (!question || summaryOpen || guard.showWarning || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!question || summaryOpen || flagOpen || guard.showWarning || e.ctrlKey || e.metaKey || e.altKey) return;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
       const k = e.key.toLowerCase();
       const pos = "1234".includes(k) && k.length === 1 ? Number(k) - 1 : "abcd".indexOf(k);
@@ -88,6 +132,8 @@ export default function TestScreen() {
             markingScheme={info.markingScheme}
             onChoose={(optionId) => chooseOption(question, optionId)}
             onNumber={(text) => setAnswers((prev) => ({ ...prev, [question._id]: text.trim() ? [text] : [] }))}
+            flag={flags[String(question._id)]}
+            onFlag={() => setFlagOpen(true)}
           />
         </div>
         <QuestionPalette questions={questions} current={current} answers={answers} marked={marked} visited={visited} onJump={goTo} />
@@ -109,6 +155,18 @@ export default function TestScreen() {
         }}
         onSaveNext={saveNext}
       />
+
+      {flagOpen && (
+        <FlagDialog
+          key={question._id}
+          number={current + 1}
+          flag={flags[String(question._id)]}
+          busy={flagBusy}
+          onSend={sendFlag}
+          onRemove={removeFlag}
+          onClose={() => setFlagOpen(false)}
+        />
+      )}
 
       {summaryOpen && (
         <SubmitSummary

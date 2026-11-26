@@ -451,6 +451,7 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
                       <td className="py-3 pr-3">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.chip}`}>{st.label}</span>
                         {q.markedForReview && <span className="ml-1.5 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800">Marked</span>}
+                        {q.bonus && <span title="This question had a mistake, so everyone got full marks for it" className="ml-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">Bonus · full marks</span>}
                       </td>
                       <td className="py-3 pr-3">
                         <span className="inline-flex items-center gap-1.5 tabular-nums">
@@ -494,6 +495,11 @@ export default function LiveReport({ testId, studentId, attemptId, asAdmin = fal
                               <b className="text-slate-900">Q{q.number}</b> · {preview(q.chapter, 60)} · {q.topic} · you {fmtDuration(q.timeSpentSec)}
                               {q.batch ? `, batch average ${fmtDuration(q.batch.avgTimeSec)}, ${q.batch.correctPct}% got it right` : ""}
                             </p>
+                            {q.bonus && (
+                              <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
+                                This question had a mistake. Everyone who got it was given full marks (+{q.marksAwarded}).
+                              </p>
+                            )}
                             <QuestionBody q={q} chosen={q.selectedOptionIds || []} numericalValue={q.numericalValue} solutionOpen />
                             <div className="mt-4 flex gap-2">
                               {[-1, 1].map((d) => {
