@@ -269,7 +269,7 @@ export default function AssignmentReview() {
             + Add questions
           </button>
         )}
-        {tab === "questions" && editable && picking && <AssignmentPicker id={id} count={questions.length} onChange={load} onClose={() => setPicking(false)} />}
+        {tab === "questions" && editable && picking && <AssignmentPicker id={id} count={questions.length} selected={questions} onChange={load} onClose={() => setPicking(false)} />}
 
         {tab === "questions" ? (
           <div className="mt-4 space-y-3">
@@ -284,8 +284,8 @@ export default function AssignmentReview() {
                 )}
               </div>
             )}
-            {questions.length > 0 && picking && <h3 className="pt-2 text-base font-bold text-slate-900">In this assignment ({questions.length})</h3>}
-            {questions.map((q, i) => {
+            
+            {!(picking && editable) && questions.map((q, i) => {
               const isOpen = open[q._id];
               return (
                 <article key={q._id} className="gp-card overflow-hidden">

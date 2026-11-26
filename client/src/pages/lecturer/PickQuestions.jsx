@@ -592,8 +592,9 @@ export default function PickQuestions() {
           />
         )}
 
-        {/* Questions grouped by concept */}
+        {/* Questions grouped by concept (left) and the selected questions (right) */}
         {stage === "questions" && (
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <main className="min-w-0 space-y-4" ref={listTop}>
           {swapFor && (
             <div className="gp-hero flex flex-wrap items-center justify-between gap-3 p-4">
@@ -718,6 +719,34 @@ export default function PickQuestions() {
             </>
           )}
         </main>
+        <aside className="hidden xl:sticky xl:top-20 xl:block">
+          <div className="gp-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#f1e9d7] bg-[#fbf6ea] px-4 py-2.5">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b8862b]">Selected questions</p>
+              <span className="rounded-full bg-[#17140f] px-2.5 py-0.5 text-xs font-bold text-[#e5c372]">
+                {pickedCount}/{total}
+              </span>
+            </div>
+            {!picked.length ? (
+              <p className="px-4 py-10 text-center text-sm text-slate-500">Nothing selected yet. Add questions from the list.</p>
+            ) : (
+              <ol className="max-h-[70vh] space-y-2 overflow-y-auto p-3">
+                {picked.map((q, i) => (
+                  <li key={q._id} className="flex gap-2.5 rounded-xl bg-white p-3 ring-1 ring-[#efe6d2]">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#17140f] text-[11px] font-bold text-[#e5c372]">{i + 1}</span>
+                    <p className="line-clamp-2 min-w-0 flex-1 text-sm text-slate-800">{preview(q.text, 140)}</p>
+                    {editable && (
+                      <button type="button" onClick={() => remove(q._id)} disabled={saving} aria-label={`Remove question ${i + 1}`} title="Remove" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">
+                        ✕
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </aside>
+        </div>
         )}
 
       </div>
