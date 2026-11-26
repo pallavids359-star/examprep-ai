@@ -68,6 +68,9 @@ app.use("/api", async (req, res, next) => {
     }
 });
 
+// Question images saved in MongoDB (public; before the rate limit, a test can show many at once)
+app.get("/api/images/:id", require("./controllers/uploadController").serveImage);
+
 // Supabase webhooks and the Vercel cron. Mounted before the general rate limit:
 // a bulk insert in Supabase fires one webhook per row, all from the same address.
 app.use("/api/sync", syncRoutes);

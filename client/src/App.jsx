@@ -27,6 +27,7 @@ const BulkUpload = lazy(() => import("./pages/admin/BulkUpload"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const ManageSyllabus = lazy(() => import("./pages/admin/ManageSyllabus"));
 const ManageQuestions = lazy(() => import("./pages/admin/ManageQuestions"));
+const DraftQuestions = lazy(() => import("./pages/admin/DraftQuestions"));
 const QuestionForm = lazy(() => import("./pages/admin/QuestionForm"));
 const ManageTests = lazy(() => import("./pages/admin/ManageTests"));
 const ManageStudents = lazy(() => import("./pages/admin/ManageStudents"));
@@ -98,6 +99,7 @@ export default function App() {
       <Route path="/admin" element={adminOnly(<AdminDashboard />)} />
       <Route path="/admin/syllabus" element={adminOnly(<ManageSyllabus />)} />
       <Route path="/admin/questions" element={adminOnly(<ManageQuestions />)} />
+      <Route path="/admin/drafts" element={adminOnly(<DraftQuestions />)} />
       <Route path="/admin/questions/bulk" element={adminOnly(<BulkUpload />)} />
       <Route path="/admin/questions/:id" element={adminOnly(<QuestionForm />)} />
       <Route path="/admin/tests" element={adminOnly(<ManageTests />)} />

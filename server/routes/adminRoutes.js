@@ -12,7 +12,7 @@ const { createTest, listTestsAdmin, deleteTest } = require("../controllers/testC
 const admin = require("../controllers/adminController");
 const attempts = require("../controllers/adminAttemptController");
 const uploadImage = require("../middleware/upload");
-const { uploadQuestionImage } = require("../controllers/uploadController");
+const { uploadQuestionImage, uploadFromDrive } = require("../controllers/uploadController");
 const { bulkImport, bulkSyllabus } = require("../controllers/bulkQuestionController");
 
 const router = express.Router();
@@ -22,12 +22,14 @@ router.use(protect, isAdmin);
 
 router.get("/overview", admin.getOverview);
 router.post("/upload", uploadImage, uploadQuestionImage);
+router.post("/upload/drive", uploadFromDrive);
 
 // Questions
 router.post("/questions", createQuestion);
 router.post("/questions/bulk", bulkImport);
 router.get("/questions/bulk/syllabus", bulkSyllabus);
 router.get("/questions", listQuestions);
+router.post("/questions/status", require("../controllers/questionController").setQuestionsStatus);
 router.get("/questions/:id", getQuestion);
 router.put("/questions/:id", updateQuestion);
 router.delete("/questions/:id", deleteQuestion);

@@ -119,3 +119,22 @@ Test it: edit a question in Supabase, then refresh the admin dashboard. "Last we
 - **Daily job time:** 02:00 IST (`30 20 * * *` UTC in `vercel.json`). Vercel's
   Hobby plan allows only daily cron jobs. On Pro you can change it to e.g. `*/10 * * * *`.
 - Questions you created in GenPrep itself (admin form or bulk upload) are never touched by the sync.
+
+## Write-back: publishing in GenPrep accepts the question in Supabase
+
+Off by default (Supabase stays read-only). To switch it on, set in `server/.env` and on Render:
+
+```
+SUPABASE_WRITE_BACK=true
+SUPABASE_WRITE_AS=<email of an ACTIVE admin user of the Question Bank Portal>
+```
+
+When a question is published in GenPrep (Draft questions page, or saved as Published in the editor),
+GenPrep calls the portal's own `public.apply_question_workflow(id, 'accept', admin, ...)`. The portal
+sets `review_status = 'accepted'` and records it in its question history, audit log and the author's
+notifications, exactly as if that admin accepted it in the portal.
+
+Nothing else is written: edits, deletes and question text stay in GenPrep only.
+
+The connection must be allowed to run that function: `SUPABASE_N_DB_URL` (database owner) works, or
+`SUPABASE_N_URL` + `SUPABASE_N_KEY` with the **service_role** key (the anon key is refused).

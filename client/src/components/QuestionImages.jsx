@@ -1,63 +1,55 @@
 import { useState } from "react";
-import api, { getErrorMessage } from "../api/axios";
+import { ImageButtons, imageInPaste, uploadImageFile } from "./ImageTools";
 
-// Upload, preview and remove the diagrams attached to a question
-export default function QuestionImages({ images = [], onChange }) {
-    const [uploading, setUploading] = useState(false);
-    const [error, setError] = useState("");
+// The pictures of a question: upload, paste (Ctrl+V) or Google Drive; preview and remove
+export default function QuestionImages({ images = [], onChange, title = "Question images (optional)" }) {
+  const [pasting, setPasting] = useState(false);
+  const [error, setError] = useState("");
+  const add = (img) => onChange([...images, img]);
+  const remove = (index) => onChange(images.filter((_, i) => i !== index));
 
-    const upload = async (e) => {
-        const file = e.target.files[0];
-        e.target.value = ""; // lets the same file be chosen again later
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) return setError("Image must be 2 MB or smaller");
+  const onPaste = async (e) => {
+    const file = imageInPaste(e);
+    if (!file) return;
+    e.preventDefault();
+    setPasting(true);
+    setError("");
+    try {
+      add(await uploadImageFile(file));
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message);
+    } finally {
+      setPasting(false);
+    }
+  };
 
-        setError("");
-        setUploading(true);
-        try {
-            const data = new FormData();
-            data.append("image", file);
-            const res = await api.post("/admin/upload", data);
-            onChange([...images, { ...res.data.image, alt: "" }]);
-        } catch (err) {
-            setError(getErrorMessage(err));
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const remove = (index) => onChange(images.filter((_, i) => i !== index));
-
-    return (
-        <div>
-            <p className="text-xs font-medium text-slate-600 mb-1">Diagrams (optional)</p>
-
-            <div className="flex flex-wrap gap-3">
-                {images.map((img, index) => (
-                    <div key={img.url} className="relative">
-                        <img src={img.url} alt={img.alt || "Question diagram"} className="h-28 rounded-lg border border-slate-200 object-contain bg-white" />
-                        <button
-                            type="button"
-                            onClick={() => remove(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 text-white text-sm leading-6"
-                            title="Remove image"
-                        >
-                            ×
-                        </button>
-                    </div>
-                ))}
-
-                <label
-                    className={`h-28 w-36 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-sm text-slate-500 ${uploading ? "opacity-60" : "cursor-pointer hover:border-indigo-400 hover:text-indigo-600"
-                        }`}
-                >
-                    {uploading ? "Uploading..." : "+ Add image"}
-                    <span className="text-xs text-slate-400 mt-1">JPG or PNG, max 2 MB</span>
-                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={upload} disabled={uploading} className="hidden" />
-                </label>
-            </div>
-
-            {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-slate-600">{title}</p>
+      <div
+        tabIndex={0}
+        onPaste={onPaste}
+        className="rounded-xl border-2 border-dashed border-[#e7dcc3] bg-[#fffdf8] p-3 outline-none transition focus:border-[#c9a24a] focus:bg-white"
+        aria-label="Click here and press Ctrl+V to paste an image"
+      >
+        {images.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-3">
+            {images.map((img, index) => (
+              <div key={img.url + index} className="relative">
+                <img src={img.url} alt={img.alt || "Question image"} className="h-28 rounded-lg border border-slate-200 bg-white object-contain" />
+                <button type="button" onClick={() => remove(index)} className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-red-600 text-sm leading-6 text-white" title="Remove image">
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <ImageButtons onAdd={add} />
+          <span className="text-xs text-slate-500">{pasting ? "Pasting…" : "or click this box and press Ctrl+V"}</span>
         </div>
-    );
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      </div>
+    </div>
+  );
 }

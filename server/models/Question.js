@@ -93,6 +93,7 @@ const questionSchema = new mongoose.Schema(
             rowId: { type: String }, // the Supabase row id (one row can make one question per exam)
             syncedAt: { type: Date },
             editedAt: { type: Date }, // changed in GenPrep: the sync no longer overwrites it
+            acceptedInSourceAt: { type: Date }, // published in GenPrep and accepted in the Question Bank Portal
         },
 
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

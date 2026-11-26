@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Question = require("../models/Question");
 const Topic = require("../models/Topic");
 const Chapter = require("../models/Chapter");
+const { acceptInSupabase } = require("../utils/supabaseWriter");
 
 const isValidId = (id) => mongoose.isValidObjectId(id);
 
@@ -170,6 +171,29 @@ const listQuestions = async (req, res) => {
         res.status(500).json({ message: "Something went wrong on the server" });
     }
 };
+// POST /api/admin/questions/status   { ids: [...], status: "published" | "archived" }
+// Publish (or delete) many questions at once — used on the Draft questions page.
+// Marked as edited, so the next Supabase sync keeps the admin's choice.
+const setQuestionsStatus = async (req, res) => {
+    try {
+        const status = req.body.status;
+        if (!["published", "archived", "draft"].includes(status)) return res.status(400).json({ message: "Status must be published, draft or archived" });
+        const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).filter(isValidId).slice(0, 500);
+        if (!ids.length) return res.status(400).json({ message: "Choose at least one question" });
+        const now = new Date();
+        const [plain, synced] = await Promise.all([
+            Question.updateMany({ _id: { $in: ids }, "external.id": { $exists: false } }, { $set: { status } }),
+            Question.updateMany({ _id: { $in: ids }, "external.id": { $exists: true } }, { $set: { status, "external.editedAt": now } }),
+        ]);
+        // Published in GenPrep → accepted in the main Supabase (only if write-back is switched on)
+        const supabase = status === "published" ? await acceptInSupabase(ids) : { enabled: false };
+        res.json({ updated: plain.modifiedCount + synced.modifiedCount, supabase });
+    } catch (error) {
+        console.error("setQuestionsStatus error:", error.message);
+        res.status(500).json({ message: "Something went wrong on the server" });
+    }
+};
+
 // GET /api/admin/questions/:id
 const getQuestion = async (req, res) => {
     try {
@@ -195,6 +219,7 @@ const updateQuestion = async (req, res) => {
         const question = await Question.findById(id).select("+correctOptionIds +numericalAnswer");
         if (!question) return res.status(404).json({ message: "Question not found" });
 
+        const wasPublished = question.status === "published";
         // Apply only the allowed changes
         Object.assign(question, pickAllowed(req.body));
 
@@ -218,7 +243,9 @@ const updateQuestion = async (req, res) => {
         if (question.external?.id) question.set("external.editedAt", new Date()); // keep this edit when Supabase syncs again
         await question.save();
 
-        res.json({ message: "Question updated", question });
+        // Just published (e.g. a draft saved as Published) → accepted in the main Supabase too
+        const supabase = !wasPublished && question.status === "published" ? await acceptInSupabase([question._id]) : { enabled: false };
+        res.json({ message: "Question updated", question, supabase });
     } catch (error) {
         console.error("updateQuestion error:", error.message);
         res.status(500).json({ message: "Something went wrong on the server" });
@@ -248,6 +275,7 @@ const deleteQuestion = async (req, res) => {
 };
 
 module.exports = {
+    setQuestionsStatus,
     createQuestion,
     listQuestions,
     getQuestion,

@@ -7,6 +7,7 @@ import AdminLayout from "../../components/AdminLayout";
 import SyllabusPicker from "../../components/SyllabusPicker";
 import OptionsEditor from "../../components/OptionsEditor";
 import QuestionImages from "../../components/QuestionImages";
+import { usePasteImage } from "../../components/ImageTools";
 
 const inputClass =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -77,6 +78,9 @@ export default function QuestionForm() {
 
     const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
     const setOptionText = (optId, text) => update("options", form.options.map((o) => (o.id === optId ? { ...o, text } : o)));
+    const setOptionImage = (optId, image) => update("options", form.options.map((o) => (o.id === optId ? { ...o, image } : o)));
+    // Ctrl+V of a picture into the question box adds it to the question images
+    const pasteIntoQuestion = usePasteImage((img) => setForm((f) => ({ ...f, images: [...(f.images || []), img] })), setError);
     const toggleCorrect = (optId) => {
         if (form.type === "mcq_single") return update("correctOptionIds", [optId]);
         const list = form.correctOptionIds;
@@ -170,9 +174,11 @@ export default function QuestionForm() {
                     </div>
 
                     <Field label="Question">
-                        <textarea rows={4} value={form.text} onChange={(e) => update("text", e.target.value)} required className={inputClass} />
+                        <textarea rows={4} value={form.text} onChange={(e) => update("text", e.target.value)} onPaste={pasteIntoQuestion} required className={inputClass} placeholder="Type the question. You can also paste an image here (Ctrl+V)." />
 {/\$|\{\{IMG::/.test(form.text) && <div className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm"><span className="text-xs font-semibold text-indigo-700">Preview: </span><MathText text={form.text} /></div>}
                     </Field>
+
+                    <QuestionImages images={form.images} onChange={(imgs) => update("images", imgs)} />
 
                     <div>
                         <p className="text-xs font-medium text-slate-600 mb-1">
@@ -184,10 +190,10 @@ export default function QuestionForm() {
                             multi={form.type === "mcq_multi"}
                             onChangeText={setOptionText}
                             onToggleCorrect={toggleCorrect}
+                            onChangeImage={setOptionImage}
                         />
                     </div>
 
-                              <QuestionImages images={form.images} onChange={(imgs) => update("images", imgs)} />
 <Field label="Explanation (shown after the test)">
                         <textarea rows={3} value={form.explanation} onChange={(e) => update("explanation", e.target.value)} className={inputClass} />
 {/\$|\{\{IMG::/.test(form.explanation) && <div className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm"><span className="text-xs font-semibold text-indigo-700">Preview: </span><MathText text={form.explanation} /></div>}

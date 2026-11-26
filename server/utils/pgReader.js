@@ -115,4 +115,4 @@ const makePgReader = (source) => ({
     },
 });
 
-module.exports = { makePgReader, pageSql, idsSql, cleanConnectionString };
+module.exports = { makePgReader, pageSql, idsSql, cleanConnectionString, getPool };

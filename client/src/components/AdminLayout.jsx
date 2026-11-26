@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 const LINKS = [
   { to: "/admin", label: "Overview", end: true, icon: "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" },
   { to: "/admin/questions", label: "Questions", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6" },
+  { to: "/admin/drafts", label: "Draft questions", icon: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" },
   { to: "/admin/syllabus", label: "Syllabus", icon: "M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7" },
   { to: "/admin/tests", label: "Mock tests", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z" },
   { to: "/admin/live-tests", label: "Live tests", icon: "M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 100 8 4 4 0 000-8z" },
@@ -25,7 +26,7 @@ function Icon({ d }) {
 
 const GROUPS = [
   ["Overview", ["/admin"]],
-  ["Content", ["/admin/questions", "/admin/syllabus"]],
+  ["Content", ["/admin/questions", "/admin/drafts", "/admin/syllabus"]],
   ["Tests", ["/admin/tests", "/admin/live-tests", "/lecturer/assignments", "/admin/results"]],
   ["People", ["/admin/students", "/admin/lecturers"]],
   ["Help", ["/admin/guide"]],

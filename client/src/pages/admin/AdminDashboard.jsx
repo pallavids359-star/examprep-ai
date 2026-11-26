@@ -8,7 +8,7 @@ import AdminLayout from "../../components/AdminLayout";
 const TILES = [
     { key: "students", label: "Students", to: "/admin/students" },
     { key: "questions", label: "Published questions", to: "/admin/questions" },
-    { key: "drafts", label: "Draft questions", to: "/admin/questions" },
+    { key: "drafts", label: "Draft questions", to: "/admin/drafts" },
     { key: "tests", label: "Mock tests", to: "/admin/tests" },
     { key: "attemptsToday", label: "Attempts today", to: null },
 ];
