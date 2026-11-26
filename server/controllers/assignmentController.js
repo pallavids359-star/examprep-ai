@@ -413,9 +413,7 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
     const topicList = await Topic.find({ chapterId: { $in: chapterList.map((c) => c._id) } }).select("name chapterId order").sort({ order: 1, name: 1 }).lean();
 
     const match = { examId: a.examId, subjectId: a.subjectId, status: "published", chapterId: { $in: chapterList.map((c) => c._id) } };
-    if (isValidId(req.query.chapterId) && chapterList.some((c) => String(c._id) === req.query.chapterId)) match.chapterId = toId(req.query.chapterId);
-    if (isValidId(req.query.topicId)) match.topicId = toId(req.query.topicId);
-    else if (req.query.allChapters !== "1" && (a.settings?.topicIds || []).length) {
+    if (req.query.allChapters !== "1" && (a.settings?.topicIds || []).length) {
         // the concepts chosen on the form, for the chapters that had any
         const chosen = new Set(a.settings.topicIds.map(String));
         const limited = new Set(topicList.filter((t) => chosen.has(String(t._id))).map((t) => String(t.chapterId)));
@@ -430,6 +428,19 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
     if (words) match.text = new RegExp(words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     if (req.query.hideAdded === "1") match._id = { $nin: a.questionIds };
 
+    // How many questions each concept has for these filters (for the Chapter / Concept bar)
+    const perTopic = await Question.aggregate([{ $match: match }, { $group: { _id: "$topicId", count: { $sum: 1 } } }]);
+    const countOf = new Map(perTopic.map((t) => [String(t._id), t.count]));
+    const chapterName = new Map(chapterList.map((c) => [String(c._id), c.name]));
+    const topicCounts = topicList
+        .filter((t) => countOf.get(String(t._id)))
+        .sort((x, y) => chapterList.findIndex((c) => String(c._id) === String(x.chapterId)) - chapterList.findIndex((c) => String(c._id) === String(y.chapterId)))
+        .map((t) => ({ _id: t._id, name: t.name, chapterId: t.chapterId, chapter: chapterName.get(String(t.chapterId)) || "", count: countOf.get(String(t._id)) }));
+
+    // Then the chapter / concept picked on the bar or in the dropdowns
+    if (isValidId(req.query.chapterId) && chapterList.some((c) => String(c._id) === req.query.chapterId)) match.chapterId = toId(req.query.chapterId);
+    if (isValidId(req.query.topicId)) match.topicId = toId(req.query.topicId);
+
     const total = await Question.countDocuments(match);
     const pages = Math.max(1, Math.ceil(total / BROWSE_PAGE));
     const page = Math.min(Math.max(1, parseInt(req.query.page) || 1), pages);
@@ -441,6 +452,7 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
         page,
         pages,
         formats: allowed,
+        topicCounts,
         chapters: chapterList.map((c) => ({ _id: c._id, name: c.name, classLevel: c.classLevel, topics: topicList.filter((t) => String(t.chapterId) === String(c._id)).map((t) => ({ _id: t._id, name: t.name })) })),
         questions: docs.map((q) => ({ ...shape(q, chaptersById, topicsById), format: q.format || "", added: added.has(String(q._id)) })),
     });

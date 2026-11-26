@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import api, { getErrorMessage } from "../api/axios";
 import QuestionBody from "./QuestionBody";
 import MathText from "./MathText";
+import QuestionPreviewModal from "./QuestionPreviewModal";
+import ConceptNav from "./ConceptNav";
 import { toast } from "./Toaster";
 import { CLASS_LABELS, FORMAT_LABELS, FORMAT_SHORT, JEE_ONLY, LEVEL_STYLE, Pill } from "./assignmentHelpers";
 
@@ -17,6 +19,7 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
   const [busy, setBusy] = useState("");
   const [open, setOpen] = useState({});
   const [pane, setPane] = useState("list"); // phones: "list" or "selected"
+  const [viewing, setViewing] = useState(null); // index in "Selected questions" shown in full
 
   // Wait a moment after typing before searching
   useEffect(() => {
@@ -38,7 +41,6 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
   }, [id, filters, page]);
 
   const set = (k, v) => setFilters((f) => ({ ...f, [k]: v, ...(k === "chapterId" ? { topicId: "" } : {}) }));
-  const chapter = data?.chapters.find((c) => String(c._id) === filters.chapterId);
 
   const toggle = async (q) => {
     setBusy(q._id);
@@ -116,23 +118,7 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
       <p className="hidden border-b border-[#f1e9d7] bg-[#fbf6ea] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-[#b8862b] lg:block">Question list · tick the ones you want</p>
       {/* Filters */}
       <div className="space-y-3 border-b border-[#f1e9d7] bg-[#fffdf8] px-5 py-4">
-        <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
-          <select className={select} value={filters.chapterId} onChange={(e) => set("chapterId", e.target.value)} aria-label="Chapter">
-            <option value="">All chapters</option>
-            {(data?.chapters || []).map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name} {CLASS_LABELS[c.classLevel] ? `(${CLASS_LABELS[c.classLevel]})` : ""}
-              </option>
-            ))}
-          </select>
-          <select className={select} value={filters.topicId} onChange={(e) => set("topicId", e.target.value)} disabled={!chapter} aria-label="Concept">
-            <option value="">{chapter ? "All concepts" : "Concepts (pick a chapter)"}</option>
-            {(chapter?.topics || []).map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+        <div className="grid gap-2 sm:grid-cols-2">
           <select className={select} value={filters.format} onChange={(e) => set("format", e.target.value)} aria-label="Question type">
             <option value="">All question types</option>
             {(data?.formats || []).map((f) => (
@@ -166,6 +152,17 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
           </label>
         </div>
       </div>
+
+      {data?.topicCounts?.length > 0 && (
+        <ConceptNav
+          className="border-b border-[#f1e9d7] bg-white"
+          topics={data.topicCounts}
+          focusChapter={filters.chapterId}
+          focusTopic={filters.topicId}
+          onJump={(chapterId, topicId = "") => setFilters((f) => ({ ...f, chapterId, topicId }))}
+          picked={selected}
+        />
+      )}
 
       {/* Results */}
       <div className="px-5 py-4">
@@ -247,9 +244,9 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
           ) : (
             <ol className="max-h-[75vh] space-y-2 overflow-y-auto p-3">
               {selected.map((q, i) => (
-                <li key={q._id} className="flex gap-2.5 rounded-xl bg-white p-3 ring-1 ring-[#efe6d2]">
+                <li key={q._id} className={`flex gap-2.5 rounded-xl bg-white p-3 ring-1 transition hover:ring-[#c9a24a] ${viewing === i ? "ring-[#c9a24a]" : "ring-[#efe6d2]"}`}>
                   <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#17140f] text-[11px] font-bold text-[#e5c372]">{i + 1}</span>
-                  <div className="min-w-0 flex-1">
+                  <button type="button" onClick={() => setViewing(i)} title="See the full question" className="min-w-0 flex-1 text-left hover:opacity-80">
                     <div className="line-clamp-2 text-sm text-slate-800">
                       <MathText text={String(q.text || "").replace(/\{\{IMG::[^}]*\}\}/g, "[image]").slice(0, 220)} />
                     </div>
@@ -258,7 +255,7 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
                       {q.format ? ` · ${FORMAT_SHORT[q.format] || q.format}` : ""}
                       {q.difficulty ? ` · ${q.difficulty}` : ""}
                     </p>
-                  </div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => removeSelected(q)}
@@ -276,6 +273,18 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
         </div>
       </aside>
       </div>
+      {viewing !== null && selected.length > 0 && (
+        <QuestionPreviewModal
+          list={selected}
+          index={Math.min(viewing, selected.length - 1)}
+          onIndex={setViewing}
+          onRemove={async (q) => {
+            await removeSelected(q);
+            if (selected.length <= 1) setViewing(null);
+          }}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </section>
   );
 }

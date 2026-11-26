@@ -4,11 +4,14 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import api, { getErrorMessage } from "../../api/axios";
 import LecturerLayout from "../../components/LecturerLayout";
 import QuestionBody from "../../components/QuestionBody";
+import MathText from "../../components/MathText";
+import ConceptNav from "../../components/ConceptNav";
 import { toast } from "../../components/Toaster";
 import { askConfirm } from "../../components/ConfirmDialog";
 import { fmtUntil, preview } from "../../components/liveHelpers";
 import Loading from "../../components/Loading";
 import SwapDialog from "../../components/SwapDialog";
+import QuestionPreviewModal from "../../components/QuestionPreviewModal";
 import PaperQuestionCard, { PaperToolbar } from "../../components/PaperQuestionCard";
 
 // The lecturer picks questions for one section of a live test:
@@ -91,6 +94,10 @@ export default function PickQuestions() {
 
   const [results, setResults] = useState(null);
   const [loadingResults, setLoadingResults] = useState(false);
+  // Jump to one chapter / one concept of the chosen ones ("" = show all of them)
+  const [focusChapter, setFocusChapter] = useState("");
+  const [focusTopic, setFocusTopic] = useState("");
+  const [navTopics, setNavTopics] = useState([]); // every concept of the choices, with question counts
   const [showSolutions, setShowSolutions] = useState(true);
   const [showConcepts, setShowConcepts] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
@@ -98,7 +105,8 @@ export default function PickQuestions() {
   const [view, setView] = useState(search.get("view") === "paper" ? "paper" : "add");
   const [stage, setStage] = useState("class"); // add questions: class -> chapters -> topics -> questions // "add" = browse the bank, "paper" = the questions picked so far
   const [history, setHistory] = useState([]); // earlier versions of the paper, for Undo
-  const [swapDialog, setSwapDialog] = useState(null); // the question the Swap pop-up is open for
+  const [swapDialog, setSwapDialog] = useState(null);
+  const [viewing, setViewing] = useState(null); // index in "Selected questions" shown in full // the question the Swap pop-up is open for
   const [swapFor, setSwapFor] = useState(null); // the picked question being replaced by hand
   const [busyId, setBusyId] = useState(null);
   const listTop = useRef(null);
@@ -144,8 +152,8 @@ export default function PickQuestions() {
       .get(`/lecturer/live-tests/${id}/sections/${key}/questions`, {
         params: {
           classLevel,
-          chapterIds: chapterIds.join(","),
-          topicIds: topicIds.join(","),
+          chapterIds: (focusChapter ? [focusChapter] : chapterIds).join(","),
+          topicIds: (focusTopic ? [focusTopic] : topicIds).join(","),
           type,
           difficulty,
           diagram: diagram ? "1" : "0",
@@ -153,13 +161,28 @@ export default function PickQuestions() {
           page,
         },
       })
-      .then((res) => !cancelled && setResults(res.data))
+      .then((res) => {
+        if (cancelled) return;
+        setResults(res.data);
+        if (!focusChapter && !focusTopic) setNavTopics(res.data.topics || []);
+      })
       .catch((err) => !cancelled && toast(getErrorMessage(err), "error"))
       .finally(() => !cancelled && setLoadingResults(false));
     return () => {
       cancelled = true;
     };
-  }, [info, id, key, classLevel, chapterIds, topicIds, type, difficulty, diagram, hideUsed, page, stage]);
+  }, [info, id, key, classLevel, chapterIds, topicIds, type, difficulty, diagram, hideUsed, page, stage, focusChapter, focusTopic]);
+
+  // New choices: show all of them again
+  useEffect(() => {
+    setFocusChapter("");
+    setFocusTopic("");
+  }, [classLevel, chapterIds, topicIds, type, difficulty, diagram, hideUsed]);
+  const jump = (chapterId, topicId = "") => {
+    setFocusChapter(chapterId);
+    setFocusTopic(topicId);
+    setPage(1);
+  };
 
   // Any filter change goes back to page 1
   const filtered = (fn) => (...args) => {
@@ -612,8 +635,12 @@ export default function PickQuestions() {
             <div className="gp-card p-10 text-center text-slate-500">No questions match these filters.</div>
           ) : (
             <>
+              <ConceptNav topics={navTopics} focusChapter={focusChapter} focusTopic={focusTopic} onJump={jump} picked={picked} loading={loadingResults} />
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-slate-600">{loadingResults ? "Loading..." : "Questions for your choices"}</p>
+                <p className="text-sm text-slate-600">
+                  {loadingResults ? "Loading..." : `${results.total} question${results.total === 1 ? "" : "s"}`}
+                  {!loadingResults && results.pages > 1 ? ` · page ${results.page} of ${results.pages}` : ""}
+                </p>
                 <Toggle on={showSolutions} onClick={() => setShowSolutions((v) => !v)} label="Show answers & solutions" />
               </div>
               {groups.map((g) => {
@@ -627,6 +654,7 @@ export default function PickQuestions() {
                       </div>
                       <span className="flex gap-1.5 text-xs font-semibold">
                         {inTopic > 0 && <span className="rounded-full bg-green-50 px-2.5 py-1 text-green-800 ring-1 ring-green-200">{inTopic} in paper</span>}
+                        {g.total > 0 && <span className="rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-200">{g.total} questions</span>}
                       </span>
                     </div>
                     {g.questions.map((q) => {
@@ -721,9 +749,12 @@ export default function PickQuestions() {
             ) : (
               <ol className="max-h-[70vh] space-y-2 overflow-y-auto p-3">
                 {picked.map((q, i) => (
-                  <li key={q._id} className="flex gap-2.5 rounded-xl bg-white p-3 ring-1 ring-[#efe6d2]">
+                  <li key={q._id} className={`flex gap-2.5 rounded-xl bg-white p-3 ring-1 transition hover:ring-[#c9a24a] ${viewing === i ? "ring-[#c9a24a]" : "ring-[#efe6d2]"}`}>
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#17140f] text-[11px] font-bold text-[#e5c372]">{i + 1}</span>
-                    <p className="line-clamp-2 min-w-0 flex-1 text-sm text-slate-800">{preview(q.text, 140)}</p>
+                    <button type="button" onClick={() => setViewing(i)} title="See the full question" className="min-w-0 flex-1 text-left hover:opacity-80">
+                      <span className="line-clamp-2 text-sm text-slate-800"><MathText text={String(q.text || "").replace(/\{\{IMG::[^}]*\}\}/g, "[image]").slice(0, 220)} /></span>
+                      {q.chapter && <span className="mt-1 block truncate text-[11px] text-slate-500">{q.chapter}{q.difficulty ? ` · ${q.difficulty}` : ""}</span>}
+                    </button>
                     {editable && (
                       <button type="button" onClick={() => remove(q._id)} disabled={saving} aria-label={`Remove question ${i + 1}`} title="Remove" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">
                         ✕
@@ -739,6 +770,22 @@ export default function PickQuestions() {
         )}
 
       </div>
+      )}
+      {viewing !== null && picked.length > 0 && (
+        <QuestionPreviewModal
+          list={picked}
+          index={Math.min(viewing, picked.length - 1)}
+          onIndex={setViewing}
+          onRemove={
+            editable
+              ? (q) => {
+                  remove(q._id);
+                  if (picked.length <= 1) setViewing(null);
+                }
+              : null
+          }
+          onClose={() => setViewing(null)}
+        />
       )}
       {swapDialog && (
         <SwapDialog

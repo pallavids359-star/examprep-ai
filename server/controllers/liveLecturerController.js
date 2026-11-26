@@ -247,7 +247,7 @@ const browseQuestions = handle("browseQuestions", async (req, res) => {
         total,
         page,
         pages,
-        topics: topicsSorted.map((t) => ({ _id: t._id, name: t.name, chapter: t.chapter?.name || "", count: countByTopic.get(String(t._id)) || 0 })),
+        topics: topicsSorted.map((t) => ({ _id: t._id, name: t.name, chapterId: t.chapterId, chapter: t.chapter?.name || "", count: countByTopic.get(String(t._id)) || 0 })),
         questions: ids.map((id) => byId.get(String(id))).filter(Boolean).map((q) => shape(q, chaptersById, topicsById)),
     });
 });
