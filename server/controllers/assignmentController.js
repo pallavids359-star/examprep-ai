@@ -415,10 +415,10 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
     const match = { examId: a.examId, subjectId: a.subjectId, status: "published", chapterId: { $in: chapterList.map((c) => c._id) } };
     if (req.query.allChapters !== "1" && (a.settings?.topicIds || []).length) {
         // the concepts chosen on the form, for the chapters that had any
+        // (chapters with no chosen concept keep ALL their questions, even ones with no concept set)
         const chosen = new Set(a.settings.topicIds.map(String));
-        const limited = new Set(topicList.filter((t) => chosen.has(String(t._id))).map((t) => String(t.chapterId)));
-        const ok = topicList.filter((t) => !limited.has(String(t.chapterId)) || chosen.has(String(t._id))).map((t) => t._id);
-        match.topicId = { $in: ok };
+        const limited = [...new Set(topicList.filter((t) => chosen.has(String(t._id))).map((t) => String(t.chapterId)))];
+        if (limited.length) match.$or = [{ chapterId: { $nin: limited.map(toId) } }, { topicId: { $in: [...chosen].filter(isValidId).map(toId) } }];
     }
     if (LEVELS.includes(req.query.difficulty)) match.difficulty = req.query.difficulty;
     const allowed = formatsFor(exam?.code);
