@@ -447,8 +447,16 @@ const browse = handle("browseAssignmentQuestions", async (req, res) => {
     const docs = await Question.find(match).sort({ chapterId: 1, topicId: 1, difficulty: 1, _id: 1 }).skip((page - 1) * BROWSE_PAGE).limit(BROWSE_PAGE).select(`${FULL_FIELDS} format`).lean();
     const [chaptersById, topicsById] = await namesFor(docs);
     const added = new Set(a.questionIds.map(String));
+    // Nothing published here? Say how many are still drafts, so the lecturer knows why the list is empty
+    let drafts = 0;
+    if (!total) {
+        const draftMatch = { ...match, status: "draft" };
+        delete draftMatch._id;
+        drafts = await Question.countDocuments(draftMatch);
+    }
     res.json({
         total,
+        drafts,
         page,
         pages,
         formats: allowed,

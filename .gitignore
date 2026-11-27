@@ -1,3 +1,19 @@
+# dependencies
 node_modules/
+
+# secrets (keep the .env.example files)
 .env
+.env.*
+!.env.example
+
+# build output and local data
+dist/
 backups/
+coverage/
+*.log
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

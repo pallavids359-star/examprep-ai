@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { SITE } from "../content/site";
 
-// Public pages: Privacy policy and Terms of use (needed for the Google Play listing)
+// Public pages: Privacy policy and Terms of use
 function Shell({ title, children }) {
   return (
     <div className="min-h-screen bg-[#fbf8f1]">
@@ -34,7 +34,7 @@ export function Privacy() {
   return (
     <Shell title="Privacy policy">
       <p>
-        {SITE.name} is an exam-preparation app for NEET, JEE and KCET, run by {SITE.owner}. This page explains what we
+        {SITE.name} is an exam-preparation website for NEET, JEE and KCET, run by {SITE.owner}. This page explains what we
         collect, why, and how you can delete it. We do not sell your data and we do not show ads.
       </p>
 
@@ -43,7 +43,7 @@ export function Privacy() {
         <li><b>Account details:</b> name, email, mobile number (optional), college, section, class and exam.</li>
         <li><b>Your password,</b> stored only in scrambled (hashed) form. Nobody, including us, can read it.</li>
         <li><b>Your test work:</b> answers, marks, time taken, ranks, bookmarks, and questions you report as wrong.</li>
-        <li><b>Basic technical data:</b> if the app crashes, the error, the page and your device/browser type, so we can fix it.</li>
+        <li><b>Basic technical data:</b> if the site crashes, the error, the page and your device/browser type, so we can fix it.</li>
       </ul>
       <p>We do not collect your location, contacts, photos, camera or microphone.</p>
 
@@ -72,7 +72,7 @@ export function Privacy() {
 
       <H>Deleting your account</H>
       <p>
-        Open <b>Profile → Delete my account</b> in the app, or visit <Link to="/delete-account" className="font-medium text-[#8f6215] underline">{SITE.url.replace(/^https?:\/\//, "")}/delete-account</Link>.
+        Open <b>Profile → Delete my account</b> after logging in, or visit <Link to="/delete-account" className="font-medium text-[#8f6215] underline">{SITE.url.replace(/^https?:\/\//, "")}/delete-account</Link>.
         Your account, answers, marks, bookmarks and reports are deleted straight away and cannot be recovered. Copies in backups are gone within 30 days.
         If you cannot log in, email <Mail /> from your account's email address and we will delete it within 7 days.
       </p>
@@ -114,7 +114,7 @@ export function Terms() {
         are not official exam results.
       </p>
       <H>Suspension</H>
-      <p>We may suspend accounts that cheat, misuse the app or harm other users.</p>
+      <p>We may suspend accounts that cheat, misuse the site or harm other users.</p>
       <H>The service</H>
       <p>
         We try to keep {SITE.name} working at all times but cannot promise it will never be unavailable. We may change or improve features.

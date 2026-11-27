@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { DeleteAccountForm } from "../pages/DeleteAccount";
+import DeleteAccountForm from "./DeleteAccountForm";
 import { toast } from "./Toaster";
 
-// Profile: "Delete my account" (Google Play requires it inside the app)
+// Profile: "Delete my account"
 export function DeleteAccountCard() {
   const [open, setOpen] = useState(false);
   const { logout } = useAuth();

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import QuestionBody from "./QuestionBody";
 import MathText from "./MathText";
 import QuestionPreviewModal from "./QuestionPreviewModal";
@@ -11,6 +13,8 @@ const select = "rounded-xl border border-[#e7dcc3] bg-white px-3 py-2 text-sm te
 
 // Browse the question bank of an assignment's chapters and add questions by hand
 export default function AssignmentPicker({ id, count, selected = [], onChange, onClose }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [filters, setFilters] = useState({ chapterId: "", topicId: "", difficulty: "", format: "", q: "", hideAdded: false });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -171,7 +175,22 @@ export default function AssignmentPicker({ id, count, selected = [], onChange, o
         {data && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-slate-600">
-              {data.total ? `${data.total} matching · page ${data.page} of ${data.pages}` : "No questions match these filters."}
+              {data.total ? (
+                `${data.total} matching · page ${data.page} of ${data.pages}`
+              ) : data.drafts > 0 ? (
+                <span className="block rounded-xl bg-amber-50 px-4 py-3 text-amber-900 ring-1 ring-amber-200">
+                  <b>No published questions here yet.</b> {data.drafts} question{data.drafts === 1 ? " is" : "s are"} still <b>drafts</b>, and students only get published questions.{" "}
+                  {isAdmin ? (
+                    <Link to="/admin/drafts" className="font-semibold underline">
+                      Publish them in Draft questions →
+                    </Link>
+                  ) : (
+                    "Ask the head lecturer to publish them."
+                  )}
+                </span>
+              ) : (
+                "No questions match these filters."
+              )}
             </p>
             {data.questions.some((q) => !q.added) && (
               <button onClick={addPage} disabled={busy === "page"} className="gp-ghost-btn px-3 py-1.5 text-xs font-semibold disabled:opacity-60">
